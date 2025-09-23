@@ -2,7 +2,8 @@
 
 // Global variables
 let cv = null;
-let net = null;
+let faceDetector = null;
+let net = null; // Fallback DNN detector
 let isOpenCvReady = false;
 let currentImage = null;
 let detectedFaces = [];
@@ -69,13 +70,37 @@ function onOpenCvReady() {
     console.log('🎉 [CLEAN] OpenCV is ready!');
     isOpenCvReady = true;
     showStatus('OpenCV.js loaded! Loading face detection model...', 'success');
-    loadDNNModel();
+    loadFaceDetectionModel();
 }
 
 // ===== MODEL LOADING =====
-async function loadDNNModel() {
+async function loadFaceDetectionModel() {
+    console.log('🔍 [CLEAN] Checking available detection methods...');
+    console.log('   cv.FaceDetectorYN:', !!cv.FaceDetectorYN);
+    console.log('   cv.FaceDetectorYN.create:', !!(cv.FaceDetectorYN && cv.FaceDetectorYN.create));
+    console.log('   cv.dnn:', !!cv.dnn);
+    console.log('   cv.dnn.readNetFromONNX:', !!(cv.dnn && cv.dnn.readNetFromONNX));
+    console.log('   cv.CascadeClassifier:', !!cv.CascadeClassifier);
+
+    // First, check if FaceDetectorYN is available (preferred method)
+    if (cv.FaceDetectorYN && cv.FaceDetectorYN.create) {
+        console.log('✅ [CLEAN] Using FaceDetectorYN');
+        await loadFaceDetectorYN();
+    } else if (cv.dnn && cv.dnn.readNetFromONNX) {
+        console.log('✅ [CLEAN] Using DNN fallback');
+        await loadDNNModel();
+    } else if (cv.CascadeClassifier) {
+        console.log('✅ [CLEAN] Using Haar Cascade fallback');
+        await loadHaarCascade();
+    } else {
+        console.log('⚠️ [CLEAN] No detection methods available, using simple fallback');
+        showStatus('Ready! Using simple detection method.', 'success');
+    }
+}
+
+async function loadFaceDetectorYN() {
     try {
-        console.log('📦 [CLEAN] Loading YuNet model...');
+        console.log('📦 [CLEAN] Loading YuNet model for FaceDetectorYN...');
 
         const response = await fetch('./face_detection_yunet_2023mar.onnx');
         if (!response.ok) {
@@ -86,19 +111,110 @@ async function loadDNNModel() {
         const modelBytes = new Uint8Array(modelData);
         console.log(`📊 [CLEAN] Model size: ${modelBytes.length} bytes`);
 
+        // Save model to OpenCV.js filesystem
         cv.FS_createDataFile('/', 'yunet.onnx', modelBytes, true, false, false);
-        net = cv.dnn.readNetFromONNX('yunet.onnx');
 
-        if (net && !net.empty()) {
-            console.log('🎉 [CLEAN] YuNet model loaded!');
+        // Create FaceDetectorYN instance
+        faceDetector = cv.FaceDetectorYN.create(
+            'yunet.onnx',      // model path
+            '',                // config (empty for ONNX)
+            new cv.Size(320, 320), // input size
+            0.9,               // score threshold
+            0.3,               // nms threshold
+            5000               // top_k
+        );
+
+        if (faceDetector && !faceDetector.empty()) {
+            console.log('🎉 [CLEAN] FaceDetectorYN created successfully!');
             showStatus('Ready! Choose an image to detect faces.', 'success');
         } else {
-            throw new Error('Model failed to initialize');
+            throw new Error('FaceDetectorYN creation failed');
         }
     } catch (error) {
-        console.error('❌ [CLEAN] Model error:', error);
+        console.error('❌ [CLEAN] FaceDetectorYN error:', error);
+        console.log('🔄 [CLEAN] Falling back to DNN method...');
+        faceDetector = null;
+        await loadDNNModel();
+    }
+}
+
+async function loadDNNModel() {
+    try {
+        console.log('📦 [CLEAN] Loading YuNet model for DNN...');
+
+        const response = await fetch('./face_detection_yunet_2023mar.onnx');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch model: ${response.status}`);
+        }
+
+        const modelData = await response.arrayBuffer();
+        const modelBytes = new Uint8Array(modelData);
+        console.log(`📊 [CLEAN] Model size: ${modelBytes.length} bytes`);
+
+        // Simple approach: try to create file, if it fails try to remove and recreate
+        let modelFileName = 'yunet_' + Date.now() + '.onnx'; // Use unique filename
+
+        try {
+            cv.FS_createDataFile('/', modelFileName, modelBytes, true, false, false);
+            console.log('💾 [CLEAN] Model file created:', modelFileName);
+        } catch (fsError) {
+            console.log('⚠️ [CLEAN] File creation failed, trying simpler approach...');
+            modelFileName = 'yunet.onnx';
+            cv.FS_createDataFile('/', modelFileName, modelBytes, true, false, false);
+            console.log('💾 [CLEAN] Model file created with simple name');
+        }
+
+        // Load the model
+        net = cv.dnn.readNetFromONNX(modelFileName);
+
+        if (net && !net.empty()) {
+            console.log('🎉 [CLEAN] DNN YuNet model loaded successfully!');
+            showStatus('Ready! Choose an image to detect faces.', 'success');
+        } else {
+            throw new Error('Model loaded but is empty or invalid');
+        }
+    } catch (error) {
+        console.error('❌ [CLEAN] DNN Model loading failed:', error);
         net = null;
-        showStatus('Model failed. Using fallback detection.', 'error');
+        // Try Haar cascade as next fallback
+        if (cv.CascadeClassifier) {
+            console.log('🔄 [CLEAN] Trying Haar cascade fallback...');
+            await loadHaarCascade();
+        } else {
+            showStatus('Ready! Using simple detection method.', 'success');
+        }
+    }
+}
+
+async function loadHaarCascade() {
+    try {
+        console.log('📦 [CLEAN] Loading Haar cascade...');
+
+        // Try to load a pre-built cascade if available
+        const faceCascade = new cv.CascadeClassifier();
+
+        // Check if we can load from a URL or use built-in
+        try {
+            const response = await fetch('https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml');
+            if (response.ok) {
+                const cascadeData = await response.text();
+                cv.FS_createDataFile('/', 'haarcascade.xml', cascadeData, true, false, false);
+                faceCascade.load('haarcascade.xml');
+                console.log('🎉 [CLEAN] Haar cascade loaded from URL!');
+                showStatus('Ready! Using Haar cascade detection.', 'success');
+                return;
+            }
+        } catch (urlError) {
+            console.log('⚠️ [CLEAN] Could not load cascade from URL:', urlError.message);
+        }
+
+        // If URL loading fails, just use simple detection
+        console.log('📝 [CLEAN] Using simple detection method');
+        showStatus('Ready! Using simple detection method.', 'success');
+
+    } catch (error) {
+        console.error('❌ [CLEAN] Haar cascade loading failed:', error);
+        showStatus('Ready! Using simple detection method.', 'success');
     }
 }
 
@@ -180,11 +296,13 @@ function detectFaces() {
     const src = cv.imread(inputCanvas);
     const faces = new cv.RectVector();
 
-    // Simple face detection for testing
-    if (net && !net.empty()) {
-        detectWithYuNet(src, faces);
+    // Use FaceDetectorYN if available, otherwise fall back to DNN
+    if (faceDetector && !faceDetector.empty()) {
+        detectWithFaceDetectorYN(src, faces);
+    } else if (net && !net.empty()) {
+        detectWithDNN(src, faces);
     } else {
-        // Fallback detection
+        // Final fallback detection
         const faceWidth = Math.min(src.cols * 0.3, 200);
         const faceHeight = faceWidth * 1.2;
         const x = (src.cols - faceWidth) / 2;
@@ -218,8 +336,45 @@ function detectFaces() {
     showStatus(`Found ${detectedFaces.length} face(s)!`, 'success');
 }
 
-function detectWithYuNet(src, faces) {
+function detectWithFaceDetectorYN(src, faces) {
     try {
+        console.log('🔍 [CLEAN] Using FaceDetectorYN detection');
+
+        // Set input size for the detector
+        faceDetector.setInputSize(new cv.Size(src.cols, src.rows));
+
+        // Update score threshold from slider
+        const threshold = parseFloat(document.getElementById('confidenceSlider').value);
+        faceDetector.setScoreThreshold(threshold);
+
+        // Detect faces
+        let facesMat = new cv.Mat();
+        faceDetector.detect(src, facesMat);
+
+        // Convert results to RectVector
+        for (let i = 0; i < facesMat.rows; i++) {
+            const x = facesMat.data32F[i * facesMat.cols + 0];
+            const y = facesMat.data32F[i * facesMat.cols + 1];
+            const w = facesMat.data32F[i * facesMat.cols + 2];
+            const h = facesMat.data32F[i * facesMat.cols + 3];
+            const confidence = facesMat.data32F[i * facesMat.cols + 14];
+
+            const face = new cv.Rect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h));
+            faces.push_back(face);
+            console.log('👤 [CLEAN] FaceDetectorYN face:', confidence.toFixed(3));
+        }
+
+        facesMat.delete();
+    } catch (error) {
+        console.error('❌ [CLEAN] FaceDetectorYN error:', error);
+        console.log('🔄 [CLEAN] Falling back to DNN detection...');
+        detectWithDNN(src, faces);
+    }
+}
+
+function detectWithDNN(src, faces) {
+    try {
+        console.log('🔍 [CLEAN] Using DNN detection');
         const blob = cv.dnn.blobFromImage(src, 1.0, new cv.Size(320, 320), new cv.Scalar(0, 0, 0), true, false);
         net.setInput(blob);
         const detections = net.forward();
@@ -238,14 +393,14 @@ function detectWithYuNet(src, faces) {
 
                 const face = new cv.Rect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h));
                 faces.push_back(face);
-                console.log('👤 [CLEAN] YuNet face:', confidence.toFixed(3));
+                console.log('👤 [CLEAN] DNN face:', confidence.toFixed(3));
             }
         }
 
         detections.delete();
         blob.delete();
     } catch (error) {
-        console.error('❌ [CLEAN] YuNet error:', error);
+        console.error('❌ [CLEAN] DNN error:', error);
     }
 }
 
@@ -257,7 +412,6 @@ function cropFaces(sourceCanvas, faces) {
     const padding = parseInt(document.getElementById('paddingSlider').value);
     const outputWidth = parseInt(document.getElementById('outputWidth').value);
     const outputHeight = parseInt(document.getElementById('outputHeight').value);
-    const maintainAspectRatio = document.getElementById('maintainAspectRatio').checked;
 
     for (let i = 0; i < faces.size(); i++) {
         const face = faces.get(i);
@@ -275,35 +429,38 @@ function cropFaces(sourceCanvas, faces) {
         tempCanvas.height = cropH;
         tempCtx.drawImage(sourceCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-        // Create final canvas with custom dimensions
+        // Create final canvas with exact specified dimensions
         const cropCanvas = document.createElement('canvas');
         const ctx = cropCanvas.getContext('2d');
 
-        let finalWidth = outputWidth;
-        let finalHeight = outputHeight;
+        cropCanvas.width = outputWidth;
+        cropCanvas.height = outputHeight;
 
-        if (maintainAspectRatio) {
-            const aspectRatio = cropW / cropH;
-            if (aspectRatio > 1) {
-                // Width is larger, adjust height
-                finalHeight = Math.round(finalWidth / aspectRatio);
-            } else {
-                // Height is larger, adjust width
-                finalWidth = Math.round(finalHeight * aspectRatio);
-            }
-        }
+        // Fill with background color (optional - you can remove this line for transparent background)
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(0, 0, outputWidth, outputHeight);
 
-        cropCanvas.width = finalWidth;
-        cropCanvas.height = finalHeight;
+        // Calculate scale to fit the face inside the specified dimensions
+        const scaleX = outputWidth / cropW;
+        const scaleY = outputHeight / cropH;
+        const scale = Math.min(scaleX, scaleY); // Use smaller scale to fit entirely
 
-        // Draw resized image
-        ctx.drawImage(tempCanvas, 0, 0, finalWidth, finalHeight);
+        // Calculate final dimensions after scaling
+        const scaledWidth = cropW * scale;
+        const scaledHeight = cropH * scale;
+
+        // Center the scaled image within the output dimensions
+        const offsetX = (outputWidth - scaledWidth) / 2;
+        const offsetY = (outputHeight - scaledHeight) / 2;
+
+        // Draw the scaled and centered face
+        ctx.drawImage(tempCanvas, offsetX, offsetY, scaledWidth, scaledHeight);
 
         const faceDiv = document.createElement('div');
         faceDiv.className = 'face-crop';
         faceDiv.innerHTML = `
-            <canvas width="${finalWidth}" height="${finalHeight}"></canvas>
-            <div>Face ${i + 1} (${finalWidth}x${finalHeight})</div>
+            <canvas width="${outputWidth}" height="${outputHeight}"></canvas>
+            <div>Face ${i + 1} (${outputWidth}x${outputHeight})</div>
             <button class="download-btn" onclick="downloadFace(${i})">💾 Download</button>
         `;
 
