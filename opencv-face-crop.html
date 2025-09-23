@@ -58,6 +58,26 @@
                     <input type="checkbox" id="autoTiltCheckbox"> Auto-tilt correction
                 </label>
             </div>
+            <div class="dimension-controls">
+                <h3>Output Dimensions</h3>
+                <div class="dimension-row">
+                    <div class="input-container">
+                        <label for="outputWidth">Width:</label>
+                        <input type="number" id="outputWidth" min="50" max="2000" value="200" step="10">
+                        <span>px</span>
+                    </div>
+                    <div class="input-container">
+                        <label for="outputHeight">Height:</label>
+                        <input type="number" id="outputHeight" min="50" max="2000" value="200" step="10">
+                        <span>px</span>
+                    </div>
+                </div>
+                <div class="checkbox-container">
+                    <label>
+                        <input type="checkbox" id="maintainAspectRatio" checked> Maintain aspect ratio
+                    </label>
+                </div>
+            </div>
         </div>
 
         <div id="status" class="status" style="display: none;"></div>

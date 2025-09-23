@@ -255,28 +255,55 @@ function cropFaces(sourceCanvas, faces) {
     detectedFaces = [];
 
     const padding = parseInt(document.getElementById('paddingSlider').value);
+    const outputWidth = parseInt(document.getElementById('outputWidth').value);
+    const outputHeight = parseInt(document.getElementById('outputHeight').value);
+    const maintainAspectRatio = document.getElementById('maintainAspectRatio').checked;
 
     for (let i = 0; i < faces.size(); i++) {
         const face = faces.get(i);
 
-        const cropCanvas = document.createElement('canvas');
-        const ctx = cropCanvas.getContext('2d');
+        // Create temporary canvas for initial crop with padding
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
 
         const cropX = Math.max(0, face.x - padding);
         const cropY = Math.max(0, face.y - padding);
         const cropW = Math.min(sourceCanvas.width - cropX, face.width + 2 * padding);
         const cropH = Math.min(sourceCanvas.height - cropY, face.height + 2 * padding);
 
-        cropCanvas.width = cropW;
-        cropCanvas.height = cropH;
+        tempCanvas.width = cropW;
+        tempCanvas.height = cropH;
+        tempCtx.drawImage(sourceCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-        ctx.drawImage(sourceCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        // Create final canvas with custom dimensions
+        const cropCanvas = document.createElement('canvas');
+        const ctx = cropCanvas.getContext('2d');
+
+        let finalWidth = outputWidth;
+        let finalHeight = outputHeight;
+
+        if (maintainAspectRatio) {
+            const aspectRatio = cropW / cropH;
+            if (aspectRatio > 1) {
+                // Width is larger, adjust height
+                finalHeight = Math.round(finalWidth / aspectRatio);
+            } else {
+                // Height is larger, adjust width
+                finalWidth = Math.round(finalHeight * aspectRatio);
+            }
+        }
+
+        cropCanvas.width = finalWidth;
+        cropCanvas.height = finalHeight;
+
+        // Draw resized image
+        ctx.drawImage(tempCanvas, 0, 0, finalWidth, finalHeight);
 
         const faceDiv = document.createElement('div');
         faceDiv.className = 'face-crop';
         faceDiv.innerHTML = `
-            <canvas width="${cropW}" height="${cropH}"></canvas>
-            <div>Face ${i + 1}</div>
+            <canvas width="${finalWidth}" height="${finalHeight}"></canvas>
+            <div>Face ${i + 1} (${finalWidth}x${finalHeight})</div>
             <button class="download-btn" onclick="downloadFace(${i})">💾 Download</button>
         `;
 
