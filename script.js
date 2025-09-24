@@ -4,58 +4,145 @@
 let cv = null;
 let faceDetector = null;
 let net = null; // Fallback DNN detector
+let faceCascade = null; // Haar cascade detector
 let isOpenCvReady = false;
 let currentImage = null;
 let detectedFaces = [];
 
+// YuNet model constants
+const INPUT_W = 320, INPUT_H = 320;
+
+// ===== YUNET POST-PROCESSING HELPERS =====
+const sigmoid = x => 1 / (1 + Math.exp(-x));
+
+function nms(dets, iouThresh = 0.3) {
+    // dets: [{x,y,w,h,score, landmarks:[...]}] -> indices to keep
+    const area = dets.map(d => d.w * d.h);
+    const order = dets.map((d, i) => [i, d.score]).sort((a, b) => b[1] - a[1]).map(a => a[0]);
+    const keep = [];
+    while (order.length) {
+        const i = order.shift();
+        keep.push(i);
+        const ox = dets[i].x, oy = dets[i].y, ow = dets[i].w, oh = dets[i].h;
+        for (let k = order.length - 1; k >= 0; --k) {
+            const j = order[k];
+            const xx1 = Math.max(ox, dets[j].x);
+            const yy1 = Math.max(oy, dets[j].y);
+            const xx2 = Math.min(ox + ow, dets[j].x + dets[j].w);
+            const yy2 = Math.min(oy + oh, dets[j].y + dets[j].h);
+            const w = Math.max(0, xx2 - xx1), h = Math.max(0, yy2 - yy1);
+            const inter = w * h, uni = area[i] + area[j] - inter;
+            const iou = uni ? (inter / uni) : 0;
+            if (iou >= iouThresh) order.splice(k, 1);
+        }
+    }
+    return keep;
+}
+
+function postprocessYuNet(outputs, inW, inH, outW, outH, scoreThresh = 0.6, iouNms = 0.3) {
+    // outputs: array of cv.Mat from net.forward()
+    let dets = [];
+
+    if (outputs.length === 1) {
+        // Case B: already N×15 (x,y,w,h, 5*2 landmarks, score)
+        const out = outputs[0];
+        const rows = out.rows;
+        for (let r = 0; r < rows; r++) {
+            const row = out.data32F.subarray(r * out.cols, (r + 1) * out.cols);
+            const score = row[14];
+            if (score < scoreThresh) continue;
+            dets.push({
+                x: row[0], y: row[1], w: row[2], h: row[3],
+                landmarks: [row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12], row[13]],
+                score
+            });
+        }
+    } else {
+        // Case A: 3 blobs: loc (N×14), conf (N×2), iou (N×1)
+        const loc = outputs[0], conf = outputs[1], iou = outputs[2];
+        const N = loc.rows;
+        for (let r = 0; r < N; r++) {
+            const bb = loc.data32F.subarray(r * loc.cols, (r + 1) * loc.cols); // 14 numbers: x,y,w,h + 10 landmark coords
+            const cf = conf.data32F.subarray(r * conf.cols, (r + 1) * conf.cols); // 2-class: [bg, face]
+            const iq = iou.data32F[r]; // scalar
+            const faceProb = sigmoid(cf[1]); // class prob for "face"
+            const iouQual = sigmoid(iq); // quality from IoU head
+            const score = Math.sqrt(faceProb * iouQual); // common fusion heuristic
+
+            if (score < scoreThresh) continue;
+            dets.push({
+                x: bb[0], y: bb[1], w: bb[2], h: bb[3],
+                landmarks: [bb[4], bb[5], bb[6], bb[7], bb[8], bb[9], bb[10], bb[11], bb[12], bb[13]],
+                score
+            });
+        }
+    }
+
+    // NMS
+    const keepIdx = nms(dets, iouNms);
+    dets = keepIdx.map(i => dets[i]);
+
+    // Map from model space (inW×inH) back to original (outW×outH)
+    const sx = outW / inW, sy = outH / inH;
+    for (const d of dets) {
+        d.x *= sx; d.y *= sy; d.w *= sx; d.h *= sy;
+        for (let k = 0; k < 10; k += 2) { d.landmarks[k] *= sx; d.landmarks[k + 1] *= sy; }
+    }
+    return dets;
+}
+
 // ===== OPENCV LOADING =====
 function loadOpenCV() {
-    console.log('🚀 [CLEAN] Loading OpenCV.js...');
-    showStatus('Loading OpenCV.js library...', 'info');
+    console.log('🚀 [CLEAN] Loading OpenCV.js with DNN support...');
+    showStatus('Loading OpenCV.js library with DNN support...', 'info');
+
+    // Set up OpenCV module configuration before loading
+    window.Module = {
+        onRuntimeInitialized: function() {
+            console.log('🎉 [CLEAN] WebAssembly runtime initialized!');
+            cv = window.cv;
+            onOpenCvReady();
+        },
+        locateFile: function(path, scriptDirectory) {
+            // Help OpenCV find the .wasm file
+            if (path.endsWith('.wasm')) {
+                console.log('📁 [CLEAN] Locating WASM file:', path);
+                return scriptDirectory + path;
+            }
+            return scriptDirectory + path;
+        }
+    };
 
     const script = document.createElement('script');
     script.type = 'text/javascript';
+
+    // Use local DNN-enabled opencv.js
     script.src = './opencv.js';
 
     script.onload = function() {
         console.log('✅ [CLEAN] OpenCV script loaded');
+        console.log('   window.cv exists:', !!window.cv);
+        console.log('   window.Module exists:', !!window.Module);
 
-        // Check immediately
-        if (window.cv && window.cv.Mat) {
-            console.log('🎉 [CLEAN] OpenCV ready immediately!');
-            cv = window.cv;
-            onOpenCvReady();
-            return;
-        }
+        if (window.cv) {
+            console.log('   cv.Mat exists:', !!window.cv.Mat);
+            console.log('   cv.dnn exists:', !!window.cv.dnn);
 
-        // Poll for readiness
-        let attempts = 0;
-        const maxAttempts = 20;
-
-        const checkCV = () => {
-            attempts++;
-            console.log(`🔄 [CLEAN] Check ${attempts}/${maxAttempts}`);
-
-            if (window.cv && window.cv.Mat) {
-                console.log('🎉 [CLEAN] OpenCV ready after polling!');
+            // Check if already initialized
+            if (window.cv.Mat && window.cv.dnn) {
+                console.log('🎉 [CLEAN] OpenCV already ready with DNN!');
                 cv = window.cv;
                 onOpenCvReady();
-            } else if (window.cv && window.cv.onRuntimeInitialized) {
-                console.log('🔄 [CLEAN] Setting runtime callback...');
-                window.cv.onRuntimeInitialized = () => {
-                    console.log('🚀 [CLEAN] Runtime callback fired!');
-                    cv = window.cv;
-                    onOpenCvReady();
-                };
-            } else if (attempts < maxAttempts) {
-                setTimeout(checkCV, 500);
-            } else {
-                console.error('❌ [CLEAN] OpenCV failed to load');
-                showStatus('OpenCV failed to load. Please refresh.', 'error');
+                return;
             }
-        };
 
-        setTimeout(checkCV, 200);
+            console.log('🔄 [CLEAN] Waiting for WebAssembly initialization...');
+            // The Module.onRuntimeInitialized callback should handle this now
+
+        } else {
+            console.error('❌ [CLEAN] OpenCV object not found');
+            showStatus('OpenCV failed to load. Please refresh.', 'error');
+        }
     };
 
     script.onerror = function() {
@@ -76,25 +163,15 @@ function onOpenCvReady() {
 // ===== MODEL LOADING =====
 async function loadFaceDetectionModel() {
     console.log('🔍 [CLEAN] Checking available detection methods...');
-    console.log('   cv.FaceDetectorYN:', !!cv.FaceDetectorYN);
-    console.log('   cv.FaceDetectorYN.create:', !!(cv.FaceDetectorYN && cv.FaceDetectorYN.create));
     console.log('   cv.dnn:', !!cv.dnn);
     console.log('   cv.dnn.readNetFromONNX:', !!(cv.dnn && cv.dnn.readNetFromONNX));
-    console.log('   cv.CascadeClassifier:', !!cv.CascadeClassifier);
 
-    // First, check if FaceDetectorYN is available (preferred method)
-    if (cv.FaceDetectorYN && cv.FaceDetectorYN.create) {
-        console.log('✅ [CLEAN] Using FaceDetectorYN');
-        await loadFaceDetectorYN();
-    } else if (cv.dnn && cv.dnn.readNetFromONNX) {
-        console.log('✅ [CLEAN] Using DNN fallback');
+    if (cv.dnn && cv.dnn.readNetFromONNX) {
+        console.log('✅ [CLEAN] DNN module found! Loading YuNet model...');
         await loadDNNModel();
-    } else if (cv.CascadeClassifier) {
-        console.log('✅ [CLEAN] Using Haar Cascade fallback');
-        await loadHaarCascade();
     } else {
-        console.log('⚠️ [CLEAN] No detection methods available, using simple fallback');
-        showStatus('Ready! Using simple detection method.', 'success');
+        console.error('❌ [CLEAN] DNN module not available in this OpenCV.js build');
+        showStatus('DNN module not available. Please use a DNN-enabled OpenCV.js build.', 'error');
     }
 }
 
@@ -190,8 +267,8 @@ async function loadHaarCascade() {
     try {
         console.log('📦 [CLEAN] Loading Haar cascade...');
 
-        // Try to load a pre-built cascade if available
-        const faceCascade = new cv.CascadeClassifier();
+        // Create new cascade classifier
+        faceCascade = new cv.CascadeClassifier();
 
         // Check if we can load from a URL or use built-in
         try {
@@ -199,21 +276,28 @@ async function loadHaarCascade() {
             if (response.ok) {
                 const cascadeData = await response.text();
                 cv.FS_createDataFile('/', 'haarcascade.xml', cascadeData, true, false, false);
-                faceCascade.load('haarcascade.xml');
-                console.log('🎉 [CLEAN] Haar cascade loaded from URL!');
-                showStatus('Ready! Using Haar cascade detection.', 'success');
-                return;
+                const loaded = faceCascade.load('haarcascade.xml');
+
+                if (loaded && !faceCascade.empty()) {
+                    console.log('🎉 [CLEAN] Haar cascade loaded from URL!');
+                    showStatus('Ready! Using Haar cascade detection.', 'success');
+                    return;
+                } else {
+                    throw new Error('Cascade loaded but is empty');
+                }
             }
         } catch (urlError) {
             console.log('⚠️ [CLEAN] Could not load cascade from URL:', urlError.message);
         }
 
         // If URL loading fails, just use simple detection
+        faceCascade = null;
         console.log('📝 [CLEAN] Using simple detection method');
         showStatus('Ready! Using simple detection method.', 'success');
 
     } catch (error) {
         console.error('❌ [CLEAN] Haar cascade loading failed:', error);
+        faceCascade = null;
         showStatus('Ready! Using simple detection method.', 'success');
     }
 }
@@ -290,30 +374,22 @@ function processImage() {
 }
 
 function detectFaces() {
+    if (!net || net.empty()) {
+        showStatus('YuNet model not loaded. Please refresh the page.', 'error');
+        return;
+    }
+
     const inputCanvas = document.getElementById('inputCanvas');
     const outputCanvas = document.getElementById('outputCanvas');
 
     const src = cv.imread(inputCanvas);
     const faces = new cv.RectVector();
 
-    // Use FaceDetectorYN if available, otherwise fall back to DNN
-    if (faceDetector && !faceDetector.empty()) {
-        detectWithFaceDetectorYN(src, faces);
-    } else if (net && !net.empty()) {
-        detectWithDNN(src, faces);
-    } else {
-        // Final fallback detection
-        const faceWidth = Math.min(src.cols * 0.3, 200);
-        const faceHeight = faceWidth * 1.2;
-        const x = (src.cols - faceWidth) / 2;
-        const y = (src.rows - faceHeight) / 2;
-        const face = new cv.Rect(x, y, faceWidth, faceHeight);
-        faces.push_back(face);
-        console.log('🔄 [CLEAN] Using fallback detection');
-    }
+    // Use only DNN with YuNet
+    detectWithDNN(src, faces);
 
     if (faces.size() === 0) {
-        showStatus('No faces detected.', 'error');
+        showStatus('No faces detected. Try adjusting confidence threshold.', 'error');
         src.delete();
         faces.delete();
         return;
@@ -374,33 +450,94 @@ function detectWithFaceDetectorYN(src, faces) {
 
 function detectWithDNN(src, faces) {
     try {
-        console.log('🔍 [CLEAN] Using DNN detection');
-        const blob = cv.dnn.blobFromImage(src, 1.0, new cv.Size(320, 320), new cv.Scalar(0, 0, 0), true, false);
+        console.log('🔍 [CLEAN] Using DNN detection with YuNet post-processing');
+
+        // Convert RGBA to RGB for YuNet
+        let rgb = new cv.Mat();
+        cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
+
+        // Create blob: YuNet expects RGB, 0–255 scale, resized to INPUT_W×INPUT_H
+        const inputSize = new cv.Size(INPUT_W, INPUT_H);
+        const blob = cv.dnn.blobFromImage(rgb, 1.0, inputSize, new cv.Scalar(), false, false);
+
         net.setInput(blob);
-        const detections = net.forward();
 
-        const threshold = parseFloat(document.getElementById('confidenceSlider').value);
-
-        for (let i = 0; i < detections.rows; i++) {
-            const data = detections.data32F.subarray(i * detections.cols, (i + 1) * detections.cols);
-            const confidence = data[14];
-
-            if (confidence > threshold) {
-                const x = data[0] * src.cols;
-                const y = data[1] * src.rows;
-                const w = data[2] * src.cols;
-                const h = data[3] * src.rows;
-
-                const face = new cv.Rect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h));
-                faces.push_back(face);
-                console.log('👤 [CLEAN] DNN face:', confidence.toFixed(3));
+        // Get outputs - handle both single Mat and multiple outputs
+        let outputs = [];
+        try {
+            const out = net.forward();  // Mat or MatVector in newer builds
+            if (out instanceof cv.Mat) {
+                outputs = [out];
+            } else {
+                // MatVector case
+                for (let i = 0; i < out.size(); ++i) {
+                    outputs.push(out.get(i));
+                }
+                out.delete();
+            }
+        } catch {
+            // Fallback: try layer names if needed
+            const names = net.getUnconnectedOutLayersNames();
+            for (const name of names) {
+                outputs.push(net.forward(name));
             }
         }
 
-        detections.delete();
+        console.log(`📊 [CLEAN] Got ${outputs.length} output blobs`);
+        outputs.forEach((out, i) => {
+            console.log(`   Output ${i}: ${out.rows}×${out.cols}`);
+        });
+
+        // Use our YuNet post-processing
+        const threshold = parseFloat(document.getElementById('confidenceSlider').value);
+        const detections = postprocessYuNet(outputs, INPUT_W, INPUT_H, src.cols, src.rows, threshold, 0.3);
+
+        console.log(`👤 [CLEAN] Found ${detections.length} faces after post-processing`);
+
+        // Convert to OpenCV Rect format
+        for (const det of detections) {
+            const face = new cv.Rect(Math.floor(det.x), Math.floor(det.y), Math.floor(det.w), Math.floor(det.h));
+            faces.push_back(face);
+            console.log(`   Face: score=${det.score.toFixed(3)}, box=[${det.x.toFixed(1)}, ${det.y.toFixed(1)}, ${det.w.toFixed(1)}, ${det.h.toFixed(1)}]`);
+        }
+
+        // Cleanup
         blob.delete();
+        rgb.delete();
+        outputs.forEach(out => out.delete && out.delete());
+
     } catch (error) {
         console.error('❌ [CLEAN] DNN error:', error);
+    }
+}
+
+function detectWithHaarCascade(src, faces) {
+    try {
+        console.log('🔍 [CLEAN] Using Haar cascade detection');
+
+        // Convert to grayscale for Haar cascade
+        let gray = new cv.Mat();
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+        // Detect faces
+        const scaleFactor = 1.1;
+        const minNeighbors = 3;
+        const minSize = new cv.Size(30, 30);
+        const maxSize = new cv.Size();
+
+        faceCascade.detectMultiScale(gray, faces, scaleFactor, minNeighbors, 0, minSize, maxSize);
+
+        console.log(`👤 [CLEAN] Haar cascade found ${faces.size()} faces`);
+
+        // Log face details
+        for (let i = 0; i < faces.size(); i++) {
+            const face = faces.get(i);
+            console.log(`   Face ${i}: [${face.x}, ${face.y}, ${face.width}, ${face.height}]`);
+        }
+
+        gray.delete();
+    } catch (error) {
+        console.error('❌ [CLEAN] Haar cascade error:', error);
     }
 }
 
