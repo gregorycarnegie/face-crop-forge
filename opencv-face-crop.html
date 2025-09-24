@@ -38,24 +38,9 @@
                 <input type="range" id="paddingSlider" min="0" max="50" step="5" value="20" 
                        oninput="document.getElementById('paddingValue').textContent = this.value">
             </div>
-            <div class="slider-container">
-                <label for="facePercentSlider">Face Percentage: <span id="facePercentValue">50</span>%</label>
-                <input type="range" id="facePercentSlider" min="20" max="80" step="5" value="50" 
-                       oninput="document.getElementById('facePercentValue').textContent = this.value">
-            </div>
-            <div class="slider-container">
-                <label for="gammaSlider">Gamma Correction: <span id="gammaValue">1.0</span></label>
-                <input type="range" id="gammaSlider" min="25" max="150" step="5" value="50" 
-                       oninput="document.getElementById('gammaValue').textContent = (this.value / 50.0).toFixed(1)">
-            </div>
             <div class="checkbox-container">
                 <label>
                     <input type="checkbox" id="multiFaceCheckbox"> Multi-face detection
-                </label>
-            </div>
-            <div class="checkbox-container">
-                <label>
-                    <input type="checkbox" id="autoTiltCheckbox"> Auto-tilt correction
                 </label>
             </div>
             <div class="dimension-controls">
@@ -96,6 +81,6 @@
         <div id="croppedFaces" class="cropped-faces"></div>
     </div>
 
-    <script src="script_working.js?v=6"></script>
+    <script src="script.js"></script>
 </body>
 </html>
