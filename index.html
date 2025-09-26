@@ -30,11 +30,30 @@
         </div>
 
         <div class="crop-settings">
-            <h3>Crop Settings</h3>
+            <h3>Smart Cropping Settings</h3>
+
+            <div class="preset-controls">
+                <div class="setting-group full-width">
+                    <label for="sizePreset">Size Presets</label>
+                    <select id="sizePreset">
+                        <option value="custom">Custom</option>
+                        <option value="linkedin">LinkedIn Profile (400×400)</option>
+                        <option value="passport">Passport Photo (413×531)</option>
+                        <option value="instagram">Instagram Square (1080×1080)</option>
+                        <option value="idcard">ID Card (332×498)</option>
+                        <option value="avatar">Avatar (512×512)</option>
+                        <option value="headshot">Professional Headshot (600×800)</option>
+                    </select>
+                </div>
+            </div>
+
             <div class="settings-grid">
                 <div class="setting-group">
                     <label for="outputWidth">Output Width (px)</label>
-                    <input type="number" id="outputWidth" value="256" min="64" max="2048" step="32">
+                    <div class="input-with-lock">
+                        <input type="number" id="outputWidth" value="256" min="64" max="2048" step="32">
+                        <button type="button" id="aspectRatioLock" class="lock-button" title="Lock aspect ratio">🔓</button>
+                    </div>
                 </div>
                 <div class="setting-group">
                     <label for="outputHeight">Output Height (px)</label>
@@ -45,14 +64,42 @@
                     <input type="number" id="faceHeightPct" value="70" min="10" max="100" step="5">
                 </div>
                 <div class="setting-group">
-                    <label for="fitMode">Fit Mode</label>
-                    <select id="fitMode">
-                        <option value="contain">Contain (preserve aspect ratio)</option>
+                    <label for="positioningMode">Positioning Mode</label>
+                    <select id="positioningMode">
+                        <option value="center">Center Face</option>
+                        <option value="rule-of-thirds">Rule of Thirds</option>
+                        <option value="custom">Custom Position</option>
                     </select>
                 </div>
             </div>
+
+            <div class="advanced-positioning" id="advancedPositioning">
+                <div class="setting-group">
+                    <label for="verticalOffset">Vertical Offset</label>
+                    <div class="offset-slider-container">
+                        <input type="range" id="verticalOffset" min="-50" max="50" value="0">
+                        <span class="offset-value" id="verticalOffsetValue">0%</span>
+                    </div>
+                    <div class="offset-help">Negative: up, Positive: down</div>
+                </div>
+                <div class="setting-group">
+                    <label for="horizontalOffset">Horizontal Offset</label>
+                    <div class="offset-slider-container">
+                        <input type="range" id="horizontalOffset" min="-50" max="50" value="0">
+                        <span class="offset-value" id="horizontalOffsetValue">0%</span>
+                    </div>
+                    <div class="offset-help">Negative: left, Positive: right</div>
+                </div>
+            </div>
+
+            <div class="preset-actions">
+                <button type="button" id="applyToAllBtn" class="apply-button">Apply Settings to All Images</button>
+                <button type="button" id="resetSettingsBtn" class="reset-button">Reset to Defaults</button>
+            </div>
+
             <div class="setting-preview">
-                <span>Preview: <span id="previewText">256×256px, face at 70% height</span></span>
+                <span>Preview: <span id="previewText">256×256px, face at 70% height, PNG format</span></span>
+                <span class="aspect-ratio" id="aspectRatioText">1:1 ratio</span>
             </div>
         </div>
 

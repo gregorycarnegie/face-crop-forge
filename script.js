@@ -5,6 +5,8 @@ class FaceCropper {
         this.processingQueue = [];
         this.isProcessing = false;
         this.currentProcessingId = null;
+        this.aspectRatioLocked = false;
+        this.currentAspectRatio = 1;
 
         this.initializeElements();
         this.setupEventListeners();
@@ -47,8 +49,20 @@ class FaceCropper {
         this.outputWidth = document.getElementById('outputWidth');
         this.outputHeight = document.getElementById('outputHeight');
         this.faceHeightPct = document.getElementById('faceHeightPct');
-        this.fitMode = document.getElementById('fitMode');
         this.previewText = document.getElementById('previewText');
+
+        // Smart cropping elements
+        this.sizePreset = document.getElementById('sizePreset');
+        this.aspectRatioLock = document.getElementById('aspectRatioLock');
+        this.positioningMode = document.getElementById('positioningMode');
+        this.verticalOffset = document.getElementById('verticalOffset');
+        this.horizontalOffset = document.getElementById('horizontalOffset');
+        this.verticalOffsetValue = document.getElementById('verticalOffsetValue');
+        this.horizontalOffsetValue = document.getElementById('horizontalOffsetValue');
+        this.advancedPositioning = document.getElementById('advancedPositioning');
+        this.applyToAllBtn = document.getElementById('applyToAllBtn');
+        this.resetSettingsBtn = document.getElementById('resetSettingsBtn');
+        this.aspectRatioText = document.getElementById('aspectRatioText');
 
         // Output settings elements
         this.outputFormat = document.getElementById('outputFormat');
@@ -81,17 +95,29 @@ class FaceCropper {
         this.outputWidth.addEventListener('input', () => this.updatePreview());
         this.outputHeight.addEventListener('input', () => this.updatePreview());
         this.faceHeightPct.addEventListener('input', () => this.updatePreview());
-        this.fitMode.addEventListener('change', () => this.updatePreview());
 
         // Output settings listeners
         this.outputFormat.addEventListener('change', () => this.updateFormatControls());
         this.jpegQuality.addEventListener('input', () => this.updateQualityDisplay());
         this.individualDownload.addEventListener('change', () => this.toggleIndividualDownloadButtons());
 
+        // Smart cropping listeners
+        this.sizePreset.addEventListener('change', () => this.applyPreset());
+        this.aspectRatioLock.addEventListener('click', () => this.toggleAspectRatioLock());
+        this.outputWidth.addEventListener('input', () => this.handleDimensionChange('width'));
+        this.outputHeight.addEventListener('input', () => this.handleDimensionChange('height'));
+        this.positioningMode.addEventListener('change', () => this.updatePositioningControls());
+        this.verticalOffset.addEventListener('input', () => this.updateOffsetDisplay('vertical'));
+        this.horizontalOffset.addEventListener('input', () => this.updateOffsetDisplay('horizontal'));
+        this.applyToAllBtn.addEventListener('click', () => this.applySettingsToAll());
+        this.resetSettingsBtn.addEventListener('click', () => this.resetToDefaults());
+
         // Initialize controls
         this.updatePreview();
         this.updateFormatControls();
         this.updateQualityDisplay();
+        this.updatePositioningControls();
+        this.updateOffsetDisplays();
     }
 
     updateStatus(message, type = '') {
@@ -104,8 +130,25 @@ class FaceCropper {
         const height = parseInt(this.outputHeight.value);
         const faceHeight = parseInt(this.faceHeightPct.value);
         const format = this.outputFormat.value.toUpperCase();
+        const positionMode = this.positioningMode.value;
 
-        this.previewText.textContent = `${width}×${height}px, face at ${faceHeight}% height, ${format} format`;
+        this.previewText.textContent = `${width}×${height}px, face at ${faceHeight}% height, ${format} format, ${positionMode} positioning`;
+        this.updateAspectRatioDisplay();
+    }
+
+    updateAspectRatioDisplay() {
+        const width = parseInt(this.outputWidth.value);
+        const height = parseInt(this.outputHeight.value);
+        const ratio = width / height;
+
+        let ratioText = `${ratio.toFixed(2)}:1`;
+        if (Math.abs(ratio - 1) < 0.01) ratioText = '1:1 (Square)';
+        else if (Math.abs(ratio - 4/3) < 0.01) ratioText = '4:3 (Standard)';
+        else if (Math.abs(ratio - 16/9) < 0.01) ratioText = '16:9 (Widescreen)';
+        else if (Math.abs(ratio - 3/4) < 0.01) ratioText = '3:4 (Portrait)';
+
+        this.aspectRatioText.textContent = `${ratioText} ratio`;
+        this.currentAspectRatio = ratio;
     }
 
     updateFormatControls() {
@@ -126,24 +169,225 @@ class FaceCropper {
         }
     }
 
+    // Smart cropping methods
+    applyPreset() {
+        const preset = this.sizePreset.value;
+        const presets = {
+            custom: { width: 256, height: 256 },
+            linkedin: { width: 400, height: 400 },
+            passport: { width: 413, height: 531 },
+            instagram: { width: 1080, height: 1080 },
+            idcard: { width: 332, height: 498 },
+            avatar: { width: 512, height: 512 },
+            headshot: { width: 600, height: 800 }
+        };
+
+        if (presets[preset]) {
+            this.outputWidth.value = presets[preset].width;
+            this.outputHeight.value = presets[preset].height;
+            this.updatePreview();
+        }
+    }
+
+    toggleAspectRatioLock() {
+        this.aspectRatioLocked = !this.aspectRatioLocked;
+
+        if (this.aspectRatioLocked) {
+            this.aspectRatioLock.classList.add('locked');
+            this.aspectRatioLock.textContent = '🔒';
+            this.aspectRatioLock.title = 'Unlock aspect ratio';
+            this.currentAspectRatio = parseInt(this.outputWidth.value) / parseInt(this.outputHeight.value);
+        } else {
+            this.aspectRatioLock.classList.remove('locked');
+            this.aspectRatioLock.textContent = '🔓';
+            this.aspectRatioLock.title = 'Lock aspect ratio';
+        }
+    }
+
+    handleDimensionChange(changedDimension) {
+        if (this.aspectRatioLocked) {
+            if (changedDimension === 'width') {
+                const newWidth = parseInt(this.outputWidth.value);
+                const newHeight = Math.round(newWidth / this.currentAspectRatio);
+                this.outputHeight.value = Math.max(64, Math.min(2048, newHeight));
+            } else {
+                const newHeight = parseInt(this.outputHeight.value);
+                const newWidth = Math.round(newHeight * this.currentAspectRatio);
+                this.outputWidth.value = Math.max(64, Math.min(2048, newWidth));
+            }
+        }
+
+        // Update preset to custom if dimensions don't match any preset
+        const width = parseInt(this.outputWidth.value);
+        const height = parseInt(this.outputHeight.value);
+
+        const matchingPreset = this.findMatchingPreset(width, height);
+        this.sizePreset.value = matchingPreset;
+
+        this.updatePreview();
+    }
+
+    findMatchingPreset(width, height) {
+        const presets = {
+            linkedin: { width: 400, height: 400 },
+            passport: { width: 413, height: 531 },
+            instagram: { width: 1080, height: 1080 },
+            idcard: { width: 332, height: 498 },
+            avatar: { width: 512, height: 512 },
+            headshot: { width: 600, height: 800 }
+        };
+
+        for (const [name, dimensions] of Object.entries(presets)) {
+            if (dimensions.width === width && dimensions.height === height) {
+                return name;
+            }
+        }
+
+        return 'custom';
+    }
+
+    updatePositioningControls() {
+        const mode = this.positioningMode.value;
+        this.advancedPositioning.style.display =
+            (mode === 'custom' || mode === 'rule-of-thirds') ? 'block' : 'none';
+        this.updatePreview();
+    }
+
+    updateOffsetDisplay(direction) {
+        if (direction === 'vertical') {
+            this.verticalOffsetValue.textContent = this.verticalOffset.value + '%';
+        } else {
+            this.horizontalOffsetValue.textContent = this.horizontalOffset.value + '%';
+        }
+    }
+
+    updateOffsetDisplays() {
+        this.updateOffsetDisplay('vertical');
+        this.updateOffsetDisplay('horizontal');
+    }
+
+    applySettingsToAll() {
+        // Get current settings
+        const settings = {
+            width: parseInt(this.outputWidth.value),
+            height: parseInt(this.outputHeight.value),
+            faceHeightPct: parseInt(this.faceHeightPct.value),
+            positioningMode: this.positioningMode.value,
+            verticalOffset: parseInt(this.verticalOffset.value),
+            horizontalOffset: parseInt(this.horizontalOffset.value),
+            format: this.outputFormat.value,
+            jpegQuality: parseInt(this.jpegQuality.value),
+            preset: this.sizePreset.value
+        };
+
+        // Apply to all image processing settings
+        // This will be used during batch processing
+        this.globalSettings = settings;
+
+        this.updateStatus(`Applied settings to all images: ${settings.width}×${settings.height}px, ${settings.positioningMode} positioning`, 'success');
+    }
+
+    resetToDefaults() {
+        this.outputWidth.value = 256;
+        this.outputHeight.value = 256;
+        this.faceHeightPct.value = 70;
+        this.sizePreset.value = 'custom';
+        this.positioningMode.value = 'center';
+        this.verticalOffset.value = 0;
+        this.horizontalOffset.value = 0;
+        this.aspectRatioLocked = false;
+        this.aspectRatioLock.classList.remove('locked');
+        this.aspectRatioLock.textContent = '🔓';
+
+        this.updatePreview();
+        this.updatePositioningControls();
+        this.updateOffsetDisplays();
+
+        this.updateStatus('Settings reset to defaults', 'success');
+    }
+
+    calculateSmartCropPosition(face, cropWidth, cropHeight, imageWidth, imageHeight) {
+        const mode = this.positioningMode.value;
+        const vOffset = parseInt(this.verticalOffset.value) / 100;
+        const hOffset = parseInt(this.horizontalOffset.value) / 100;
+
+        const faceCenterX = face.x + face.width / 2;
+        const faceCenterY = face.y + face.height / 2;
+
+        let targetX, targetY;
+
+        switch (mode) {
+            case 'rule-of-thirds':
+                // Position eyes at rule of thirds points
+                // Eyes are typically at about 65% from top of face bounding box
+                const eyesY = face.y + face.height * 0.35;
+
+                // Place eyes at 1/3 from top of crop
+                targetX = faceCenterX + (hOffset * cropWidth / 2);
+                targetY = eyesY - (cropHeight / 3);
+                break;
+
+            case 'custom':
+                // Use manual offsets from center
+                targetX = faceCenterX + (hOffset * cropWidth / 2);
+                targetY = faceCenterY + (vOffset * cropHeight / 2);
+                break;
+
+            case 'center':
+            default:
+                // Center the face
+                targetX = faceCenterX;
+                targetY = faceCenterY;
+                break;
+        }
+
+        // Calculate crop position (top-left corner of crop area)
+        let cropX = targetX - cropWidth / 2;
+        let cropY = targetY - cropHeight / 2;
+
+        // Clamp to image boundaries
+        cropX = Math.max(0, Math.min(imageWidth - cropWidth, cropX));
+        cropY = Math.max(0, Math.min(imageHeight - cropHeight, cropY));
+
+        return { cropX, cropY };
+    }
+
     async loadModel() {
         try {
             this.updateStatus('Loading MediaPipe face detection model...', 'loading');
 
+            // Wait for TensorFlow to be ready
             await tf.ready();
+            console.log('TensorFlow.js ready');
+
+            // Check if faceLandmarksDetection is available
+            if (typeof faceLandmarksDetection === 'undefined') {
+                throw new Error('MediaPipe face landmarks detection library not loaded');
+            }
 
             const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
             const detectorConfig = {
                 runtime: 'tfjs',
                 refineLandmarks: false,
-                maxFaces: 20
+                maxFaces: 20,
+                solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh'
             };
 
+            console.log('Creating detector with config:', detectorConfig);
             this.detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
+            console.log('Detector created successfully');
+
             this.updateStatus('MediaPipe model loaded successfully. Ready to process images!', 'success');
         } catch (error) {
             console.error('Error loading MediaPipe model:', error);
-            this.updateStatus(`Error loading model: ${error.message}`, 'error');
+            this.updateStatus(`Error loading model: ${error.message}. Please refresh the page.`, 'error');
+
+            // Try to provide helpful error information
+            if (typeof tf === 'undefined') {
+                this.updateStatus('TensorFlow.js not loaded. Please refresh the page.', 'error');
+            } else if (typeof faceLandmarksDetection === 'undefined') {
+                this.updateStatus('MediaPipe face detection library not loaded. Please refresh the page.', 'error');
+            }
         }
     }
 
@@ -308,6 +552,11 @@ class FaceCropper {
     async processImages(imagesToProcess) {
         if (this.isProcessing) return;
 
+        if (!this.detector) {
+            this.updateStatus('Face detection model not loaded. Please wait and try again.', 'error');
+            return;
+        }
+
         this.isProcessing = true;
         this.processingQueue = imagesToProcess;
         this.progressSection.style.display = 'block';
@@ -362,6 +611,10 @@ class FaceCropper {
     }
 
     async detectFacesWithQuality(image) {
+        if (!this.detector) {
+            throw new Error('Face detection model not loaded. Please wait for model to load.');
+        }
+
         const faces = await this.detector.estimateFaces(image);
         const detectedFaces = [];
 
@@ -686,18 +939,10 @@ class FaceCropper {
             const cropWidthSrc = outputWidth / scale;
             const cropHeightSrc = outputHeight / scale;
 
-            // Center crop on face
-            const faceCenterX = face.x + face.width / 2;
-            const faceCenterY = face.y + face.height / 2;
-
-            const cropX = Math.max(0, Math.min(
-                imageData.image.width - cropWidthSrc,
-                faceCenterX - cropWidthSrc / 2
-            ));
-            const cropY = Math.max(0, Math.min(
-                imageData.image.height - cropHeightSrc,
-                faceCenterY - cropHeightSrc / 2
-            ));
+            // Calculate face position based on positioning mode
+            const { cropX, cropY } = this.calculateSmartCropPosition(
+                face, cropWidthSrc, cropHeightSrc, imageData.image.width, imageData.image.height
+            );
 
             const finalCropWidth = Math.min(cropWidthSrc, imageData.image.width - cropX);
             const finalCropHeight = Math.min(cropHeightSrc, imageData.image.height - cropY);
@@ -872,17 +1117,10 @@ class FaceCropper {
         const cropWidthSrc = outputWidth / scale;
         const cropHeightSrc = outputHeight / scale;
 
-        const faceCenterX = face.x + face.width / 2;
-        const faceCenterY = face.y + face.height / 2;
-
-        const cropX = Math.max(0, Math.min(
-            imageData.image.width - cropWidthSrc,
-            faceCenterX - cropWidthSrc / 2
-        ));
-        const cropY = Math.max(0, Math.min(
-            imageData.image.height - cropHeightSrc,
-            faceCenterY - cropHeightSrc / 2
-        ));
+        // Calculate face position based on positioning mode
+        const { cropX, cropY } = this.calculateSmartCropPosition(
+            face, cropWidthSrc, cropHeightSrc, imageData.image.width, imageData.image.height
+        );
 
         const finalCropWidth = Math.min(cropWidthSrc, imageData.image.width - cropX);
         const finalCropHeight = Math.min(cropHeightSrc, imageData.image.height - cropY);
