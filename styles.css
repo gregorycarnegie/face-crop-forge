@@ -324,6 +324,204 @@ button:hover:not(:disabled) {
     margin-bottom: 20px;
 }
 
+.canvas-wrapper {
+    position: relative;
+    display: inline-block;
+    border: 3px solid #ddd;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.face-overlays {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.face-box {
+    position: absolute;
+    border: 3px solid #00FF00;
+    pointer-events: all;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.face-box.selected {
+    border-color: #007bff;
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.face-box.unselected {
+    border-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.face-box:hover {
+    border-width: 4px;
+}
+
+.face-checkbox {
+    position: absolute;
+    top: -12px;
+    left: -12px;
+    width: 24px;
+    height: 24px;
+    background: white;
+    border: 3px solid #00FF00;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #00FF00;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    z-index: 15;
+}
+
+.face-checkbox.selected {
+    background: #007bff;
+    border-color: #007bff;
+    color: white;
+}
+
+.face-checkbox.selected::after {
+    content: '✓';
+    font-size: 14px;
+}
+
+.face-index {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    width: 24px;
+    height: 24px;
+    background: #333;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    z-index: 15;
+}
+
+.face-confidence {
+    position: absolute;
+    bottom: -25px;
+    left: 0;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 15;
+}
+
+.face-quality {
+    position: absolute;
+    bottom: -25px;
+    right: 0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    z-index: 15;
+}
+
+.face-quality.high {
+    background: #28a745;
+    color: white;
+}
+
+.face-quality.medium {
+    background: #ffc107;
+    color: #333;
+}
+
+.face-quality.low {
+    background: #dc3545;
+    color: white;
+}
+
+.resize-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border: 2px solid #007bff;
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: 20;
+}
+
+.resize-handle.nw { top: -6px; left: -6px; cursor: nw-resize; }
+.resize-handle.ne { top: -6px; right: -6px; cursor: ne-resize; }
+.resize-handle.sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+.resize-handle.se { bottom: -6px; right: -6px; cursor: se-resize; }
+
+.face-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#faceCounter {
+    color: #555;
+    font-weight: 500;
+}
+
+.separator {
+    color: #ccc;
+    margin: 0 8px;
+}
+
+.face-selection-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.small-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #6c757d;
+    color: white;
+}
+
+.small-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.small-btn.primary {
+    background: linear-gradient(45deg, #4CAF50, #45a049);
+}
+
+.small-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
 #inputCanvas {
     max-width: 100%;
     height: auto;

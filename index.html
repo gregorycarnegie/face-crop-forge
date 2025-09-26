@@ -68,10 +68,22 @@
 
         <div class="canvas-container" id="canvasContainer" style="display: none;">
             <h3>Current Image Preview</h3>
-            <canvas id="inputCanvas"></canvas>
-            <canvas id="outputCanvas" style="display: none;"></canvas>
-            <div id="faceCounter">
-                <span>Detected faces: <span id="faceCount">0</span></span>
+            <div class="canvas-wrapper">
+                <canvas id="inputCanvas"></canvas>
+                <div id="faceOverlays" class="face-overlays"></div>
+                <canvas id="outputCanvas" style="display: none;"></canvas>
+            </div>
+            <div class="face-controls">
+                <div id="faceCounter">
+                    <span>Detected faces: <span id="faceCount">0</span></span>
+                    <span class="separator">•</span>
+                    <span>Selected: <span id="selectedFaceCount">0</span></span>
+                </div>
+                <div class="face-selection-controls">
+                    <button id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
+                    <button id="selectNoneFacesBtn" class="small-btn">Select None</button>
+                    <button id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
+                </div>
             </div>
         </div>
 
