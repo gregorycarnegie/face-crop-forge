@@ -8,8 +8,17 @@ class FaceCropper {
         this.aspectRatioLocked = false;
         this.currentAspectRatio = 1;
 
+        // UI state
+        this.currentImageIndex = 0;
+        this.currentFaceIndex = 0;
+        this.undoStack = [];
+        this.redoStack = [];
+        this.isDarkMode = false;
+        this.splitViewEnabled = false;
+
         this.initializeElements();
         this.setupEventListeners();
+        this.setupKeyboardShortcuts();
         this.loadModel();
     }
 
@@ -73,6 +82,13 @@ class FaceCropper {
         this.zipDownload = document.getElementById('zipDownload');
         this.individualDownload = document.getElementById('individualDownload');
 
+        // UI enhancement elements
+        this.splitViewBtn = document.getElementById('splitViewBtn');
+        this.darkModeBtn = document.getElementById('darkModeBtn');
+        this.canvasWrapper = document.getElementById('canvasWrapper');
+        this.originalPanel = document.getElementById('originalPanel');
+        this.processedPanel = document.getElementById('processedPanel');
+
         this.ctx = this.inputCanvas.getContext('2d');
     }
 
@@ -112,12 +128,597 @@ class FaceCropper {
         this.applyToAllBtn.addEventListener('click', () => this.applySettingsToAll());
         this.resetSettingsBtn.addEventListener('click', () => this.resetToDefaults());
 
+        // UI enhancement listeners
+        this.splitViewBtn.addEventListener('click', () => this.toggleSplitView());
+        this.darkModeBtn.addEventListener('click', () => this.toggleDarkMode());
+
         // Initialize controls
         this.updatePreview();
         this.updateFormatControls();
         this.updateQualityDisplay();
         this.updatePositioningControls();
         this.updateOffsetDisplays();
+        this.setupDragAndDrop();
+        this.setupTooltips();
+        this.setupCollapsiblePanels();
+        this.loadThemePreference();
+    }
+
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Don't handle shortcuts when typing in input fields
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+                return;
+            }
+
+            const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+            const currentImage = selectedImages.length > 0 ? selectedImages[0] : null;
+
+            switch (e.key) {
+                case ' ': // Space - Toggle current face selection
+                    e.preventDefault();
+                    if (currentImage && currentImage.faces && currentImage.faces.length > 0) {
+                        this.toggleCurrentFaceSelection();
+                    }
+                    break;
+
+                case 'ArrowLeft': // Navigate to previous face
+                    e.preventDefault();
+                    this.navigateFace(-1);
+                    break;
+
+                case 'ArrowRight': // Navigate to next face
+                    e.preventDefault();
+                    this.navigateFace(1);
+                    break;
+
+                case 'ArrowUp': // Navigate to previous image
+                    e.preventDefault();
+                    this.navigateImage(-1);
+                    break;
+
+                case 'ArrowDown': // Navigate to next image
+                    e.preventDefault();
+                    this.navigateImage(1);
+                    break;
+
+                case 'Enter': // Process selected
+                    e.preventDefault();
+                    if (!this.isProcessing) {
+                        this.processSelected();
+                    }
+                    break;
+
+                case 'Delete': // Remove current image
+                    e.preventDefault();
+                    if (currentImage) {
+                        this.removeCurrentImage();
+                    }
+                    break;
+
+                case 'a': // Ctrl+A - Select all faces
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        this.selectAllFaces();
+                    }
+                    break;
+
+                case 'z': // Ctrl+Z - Undo
+                    if (e.ctrlKey && !e.shiftKey) {
+                        e.preventDefault();
+                        this.undo();
+                    }
+                    break;
+
+                case 'y': // Ctrl+Y - Redo
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        this.redo();
+                    }
+                    break;
+
+                case 'Z': // Ctrl+Shift+Z - Redo (alternative)
+                    if (e.ctrlKey && e.shiftKey) {
+                        e.preventDefault();
+                        this.redo();
+                    }
+                    break;
+
+                case 'Escape': // Clear selection/cancel
+                    e.preventDefault();
+                    this.clearFaceSelection();
+                    break;
+            }
+        });
+    }
+
+    toggleCurrentFaceSelection() {
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length === 0) return;
+
+        const currentImage = selectedImages[0];
+        if (!currentImage.faces || currentImage.faces.length === 0) return;
+
+        const face = currentImage.faces[this.currentFaceIndex];
+        if (face) {
+            this.saveState(); // Save state for undo
+            face.selected = !face.selected;
+            this.displayImageWithFaceOverlays(currentImage);
+            this.updateFaceCounter();
+            this.highlightCurrentFace();
+        }
+    }
+
+    navigateFace(direction) {
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length === 0) return;
+
+        const currentImage = selectedImages[0];
+        if (!currentImage.faces || currentImage.faces.length === 0) return;
+
+        this.currentFaceIndex += direction;
+        if (this.currentFaceIndex < 0) {
+            this.currentFaceIndex = currentImage.faces.length - 1;
+        } else if (this.currentFaceIndex >= currentImage.faces.length) {
+            this.currentFaceIndex = 0;
+        }
+
+        this.highlightCurrentFace();
+    }
+
+    navigateImage(direction) {
+        const imageArray = Array.from(this.images.values());
+        if (imageArray.length === 0) return;
+
+        this.currentImageIndex += direction;
+        if (this.currentImageIndex < 0) {
+            this.currentImageIndex = imageArray.length - 1;
+        } else if (this.currentImageIndex >= imageArray.length) {
+            this.currentImageIndex = 0;
+        }
+
+        // Select the new current image
+        imageArray.forEach((img, index) => {
+            img.selected = index === this.currentImageIndex;
+        });
+
+        this.currentFaceIndex = 0; // Reset face index
+        this.updateGallery();
+        this.updateControls();
+
+        // Display the new current image if it has faces
+        const currentImage = imageArray[this.currentImageIndex];
+        if (currentImage.faces && currentImage.faces.length > 0) {
+            this.displayImageWithFaceOverlays(currentImage);
+            this.highlightCurrentFace();
+        }
+    }
+
+    removeCurrentImage() {
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length === 0) return;
+
+        const currentImage = selectedImages[0];
+        this.saveState(); // Save state for undo
+
+        // Clean up object URL
+        if (currentImage.image.src.startsWith('blob:')) {
+            URL.revokeObjectURL(currentImage.image.src);
+        }
+
+        this.images.delete(currentImage.id);
+        this.updateGallery();
+        this.updateControls();
+
+        // Navigate to next image if available
+        const remainingImages = Array.from(this.images.values());
+        if (remainingImages.length > 0) {
+            this.currentImageIndex = Math.min(this.currentImageIndex, remainingImages.length - 1);
+            remainingImages[this.currentImageIndex].selected = true;
+            this.updateGallery();
+        } else {
+            this.canvasContainer.style.display = 'none';
+            this.imageGallery.style.display = 'none';
+        }
+
+        this.updateStatus(`Removed image. ${this.images.size} images remaining.`, 'success');
+    }
+
+    highlightCurrentFace() {
+        // Remove existing highlights
+        document.querySelectorAll('.face-box').forEach(box => {
+            box.classList.remove('keyboard-selected');
+        });
+
+        // Highlight current face
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length === 0) return;
+
+        const currentImage = selectedImages[0];
+        if (!currentImage.faces || currentImage.faces.length === 0) return;
+
+        const currentFace = currentImage.faces[this.currentFaceIndex];
+        if (currentFace) {
+            const faceBox = document.querySelector(`[data-face-id="${currentFace.id}"]`);
+            if (faceBox) {
+                faceBox.classList.add('keyboard-selected');
+                faceBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    }
+
+    clearFaceSelection() {
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length === 0) return;
+
+        const currentImage = selectedImages[0];
+        if (currentImage.faces) {
+            this.saveState(); // Save state for undo
+            currentImage.faces.forEach(face => face.selected = false);
+            this.displayImageWithFaceOverlays(currentImage);
+            this.updateFaceCounter();
+        }
+    }
+
+    saveState() {
+        // Save current state for undo functionality
+        const state = {
+            images: new Map(),
+            currentImageIndex: this.currentImageIndex,
+            currentFaceIndex: this.currentFaceIndex
+        };
+
+        // Deep copy the images state
+        for (const [id, imageData] of this.images) {
+            state.images.set(id, {
+                ...imageData,
+                faces: imageData.faces ? imageData.faces.map(face => ({ ...face })) : [],
+                results: [...imageData.results]
+            });
+        }
+
+        this.undoStack.push(state);
+
+        // Limit undo stack size
+        if (this.undoStack.length > 50) {
+            this.undoStack.shift();
+        }
+
+        // Clear redo stack when new action is performed
+        this.redoStack = [];
+    }
+
+    undo() {
+        if (this.undoStack.length === 0) {
+            this.updateStatus('Nothing to undo', 'info');
+            return;
+        }
+
+        // Save current state to redo stack
+        this.saveCurrentStateToRedo();
+
+        // Restore previous state
+        const previousState = this.undoStack.pop();
+        this.images = previousState.images;
+        this.currentImageIndex = previousState.currentImageIndex;
+        this.currentFaceIndex = previousState.currentFaceIndex;
+
+        this.updateGallery();
+        this.updateControls();
+
+        // Refresh display if there's a selected image
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length > 0 && selectedImages[0].faces) {
+            this.displayImageWithFaceOverlays(selectedImages[0]);
+            this.highlightCurrentFace();
+        }
+
+        this.updateStatus('Undid last action', 'success');
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) {
+            this.updateStatus('Nothing to redo', 'info');
+            return;
+        }
+
+        // Save current state to undo stack
+        this.saveState();
+
+        // Restore next state
+        const nextState = this.redoStack.pop();
+        this.images = nextState.images;
+        this.currentImageIndex = nextState.currentImageIndex;
+        this.currentFaceIndex = nextState.currentFaceIndex;
+
+        this.updateGallery();
+        this.updateControls();
+
+        // Refresh display if there's a selected image
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length > 0 && selectedImages[0].faces) {
+            this.displayImageWithFaceOverlays(selectedImages[0]);
+            this.highlightCurrentFace();
+        }
+
+        this.updateStatus('Redid last action', 'success');
+    }
+
+    saveCurrentStateToRedo() {
+        const state = {
+            images: new Map(),
+            currentImageIndex: this.currentImageIndex,
+            currentFaceIndex: this.currentFaceIndex
+        };
+
+        // Deep copy the images state
+        for (const [id, imageData] of this.images) {
+            state.images.set(id, {
+                ...imageData,
+                faces: imageData.faces ? imageData.faces.map(face => ({ ...face })) : [],
+                results: [...imageData.results]
+            });
+        }
+
+        this.redoStack.push(state);
+
+        // Limit redo stack size
+        if (this.redoStack.length > 50) {
+            this.redoStack.shift();
+        }
+    }
+
+    // UI Enhancement Methods
+    toggleSplitView() {
+        this.splitViewEnabled = !this.splitViewEnabled;
+        this.splitViewBtn.classList.toggle('active', this.splitViewEnabled);
+        this.canvasWrapper.classList.toggle('split-view', this.splitViewEnabled);
+
+        if (this.splitViewEnabled) {
+            this.processedPanel.style.display = 'block';
+            this.splitViewBtn.textContent = 'Single View';
+            this.updateSplitViewContent();
+        } else {
+            this.processedPanel.style.display = 'none';
+            this.splitViewBtn.textContent = 'Split View';
+        }
+    }
+
+    toggleDarkMode() {
+        this.isDarkMode = !this.isDarkMode;
+        const theme = this.isDarkMode ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        this.darkModeBtn.textContent = this.isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
+
+        // Save preference
+        localStorage.setItem('faceCropperTheme', theme);
+
+        this.updateStatus(`Switched to ${theme} mode`, 'success');
+    }
+
+    loadThemePreference() {
+        const savedTheme = localStorage.getItem('faceCropperTheme');
+        if (savedTheme === 'dark') {
+            this.isDarkMode = true;
+            document.documentElement.setAttribute('data-theme', 'dark');
+            this.darkModeBtn.textContent = '☀️ Light Mode';
+        }
+    }
+
+    updateSplitViewContent() {
+        if (!this.splitViewEnabled) return;
+
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length === 0 || !selectedImages[0].results || selectedImages[0].results.length === 0) {
+            return;
+        }
+
+        const currentImage = selectedImages[0];
+        const outputCanvas = document.getElementById('outputCanvas');
+        const outputCtx = outputCanvas.getContext('2d');
+
+        // Display first processed result
+        const result = currentImage.results[0];
+        const img = new Image();
+        img.onload = () => {
+            outputCanvas.width = img.width;
+            outputCanvas.height = img.height;
+            outputCtx.drawImage(img, 0, 0);
+        };
+        img.src = result.dataUrl;
+    }
+
+    setupDragAndDrop() {
+        const uploadSection = document.querySelector('.upload-section');
+
+        // Add drag message
+        const dragMessage = document.createElement('div');
+        dragMessage.className = 'drag-message';
+        dragMessage.textContent = 'Drop your images here!';
+        uploadSection.appendChild(dragMessage);
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, this.preventDefaults, false);
+            document.body.addEventListener(eventName, this.preventDefaults, false);
+        });
+
+        // Highlight drop area when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, () => {
+                uploadSection.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, () => {
+                uploadSection.classList.remove('drag-over');
+            }, false);
+        });
+
+        // Handle dropped files
+        uploadSection.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            this.handleDroppedFiles(files);
+        }, false);
+    }
+
+    preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    async handleDroppedFiles(files) {
+        const fileArray = Array.from(files).filter(file => file.type.startsWith('image/'));
+
+        if (fileArray.length === 0) {
+            this.updateStatus('Please drop image files only', 'error');
+            return;
+        }
+
+        this.updateStatus(`Loading ${fileArray.length} dropped images...`, 'loading');
+
+        for (const file of fileArray) {
+            const imageId = this.generateImageId();
+
+            try {
+                const image = await this.loadImageFromFile(file);
+                this.images.set(imageId, {
+                    id: imageId,
+                    file: file,
+                    image: image,
+                    faces: [],
+                    results: [],
+                    selected: true,
+                    processed: false,
+                    status: 'loaded'
+                });
+            } catch (error) {
+                console.error('Error loading dropped image:', file.name, error);
+            }
+        }
+
+        this.updateGallery();
+        this.updateControls();
+        this.imageGallery.style.display = 'block';
+        this.updateStatus(`Loaded ${fileArray.length} images via drag & drop!`, 'success');
+    }
+
+    setupTooltips() {
+        const tooltipData = {
+            'processAllBtn': 'Process all images in the gallery (Enter)',
+            'processSelectedBtn': 'Process only selected images',
+            'clearAllBtn': 'Clear all images from the workspace',
+            'downloadAllBtn': 'Download all processed faces',
+            'splitViewBtn': 'Toggle split view to compare original vs processed',
+            'darkModeBtn': 'Switch between light and dark themes',
+            'outputWidth': 'Set the width of cropped face images',
+            'outputHeight': 'Set the height of cropped face images',
+            'faceHeightPct': 'Percentage of output height the face should occupy',
+            'sizePreset': 'Quick size presets for common use cases',
+            'aspectRatioLock': 'Lock aspect ratio when changing dimensions',
+            'positioningMode': 'How to position the face in the crop area',
+            'outputFormat': 'Image format for saved faces',
+            'jpegQuality': 'Quality setting for JPEG images (1-100)',
+            'namingTemplate': 'Template for naming output files',
+            'zipDownload': 'Package all results in a ZIP file',
+            'individualDownload': 'Show download buttons for each face',
+            'selectAllFacesBtn': 'Select all detected faces (Ctrl+A)',
+            'selectNoneFacesBtn': 'Deselect all faces (Escape)',
+            'detectFacesBtn': 'Detect faces in the current image'
+        };
+
+        Object.entries(tooltipData).forEach(([id, text]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                this.addTooltip(element, text);
+            }
+        });
+
+        // Add keyboard shortcuts help
+        this.createKeyboardHelp();
+    }
+
+    addTooltip(element, text) {
+        element.classList.add('tooltip');
+
+        const tooltipText = document.createElement('span');
+        tooltipText.className = 'tooltiptext';
+        tooltipText.textContent = text;
+
+        element.appendChild(tooltipText);
+    }
+
+    createKeyboardHelp() {
+        const helpDiv = document.createElement('div');
+        helpDiv.className = 'keyboard-help';
+        helpDiv.innerHTML = `
+            <h4>Keyboard Shortcuts</h4>
+            <div class="shortcut">
+                <span>Toggle face selection</span>
+                <span class="key">Space</span>
+            </div>
+            <div class="shortcut">
+                <span>Navigate faces</span>
+                <span class="key">← →</span>
+            </div>
+            <div class="shortcut">
+                <span>Navigate images</span>
+                <span class="key">↑ ↓</span>
+            </div>
+            <div class="shortcut">
+                <span>Process selected</span>
+                <span class="key">Enter</span>
+            </div>
+            <div class="shortcut">
+                <span>Remove image</span>
+                <span class="key">Delete</span>
+            </div>
+            <div class="shortcut">
+                <span>Select all faces</span>
+                <span class="key">Ctrl+A</span>
+            </div>
+            <div class="shortcut">
+                <span>Undo / Redo</span>
+                <span class="key">Ctrl+Z/Y</span>
+            </div>
+            <div class="shortcut">
+                <span>Clear selection</span>
+                <span class="key">Esc</span>
+            </div>
+        `;
+
+        document.body.appendChild(helpDiv);
+
+        // Show/hide on ? key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '?' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                helpDiv.classList.toggle('show');
+            }
+        });
+    }
+
+    setupCollapsiblePanels() {
+        const headers = document.querySelectorAll('.collapsible-header');
+
+        headers.forEach(header => {
+            header.addEventListener('click', () => {
+                const content = header.nextElementSibling;
+                const isCollapsed = header.classList.contains('collapsed');
+
+                if (isCollapsed) {
+                    // Expand
+                    header.classList.remove('collapsed');
+                    content.classList.remove('collapsed');
+                } else {
+                    // Collapse
+                    header.classList.add('collapsed');
+                    content.classList.add('collapsed');
+                }
+            });
+        });
     }
 
     updateStatus(message, type = '') {
@@ -608,6 +1209,11 @@ class FaceCropper {
 
         // Crop faces (only selected ones)
         imageData.results = await this.cropFacesFromImageData(imageData);
+
+        // Update split view if enabled
+        if (this.splitViewEnabled) {
+            this.updateSplitViewContent();
+        }
     }
 
     async detectFacesWithQuality(image) {

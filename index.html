@@ -20,6 +20,8 @@
             <button id="processSelectedBtn" disabled>Process Selected</button>
             <button id="clearAllBtn" disabled>Clear All</button>
             <button id="downloadAllBtn" disabled>Download All Results</button>
+            <button id="splitViewBtn" class="split-view-btn">Split View</button>
+            <button id="darkModeBtn" class="dark-mode-btn">🌙 Dark Mode</button>
         </div>
 
         <div class="progress-section" id="progressSection" style="display: none;">
@@ -30,7 +32,11 @@
         </div>
 
         <div class="crop-settings">
-            <h3>Smart Cropping Settings</h3>
+            <h3 class="collapsible-header">
+                Smart Cropping Settings
+                <span class="collapse-icon">▼</span>
+            </h3>
+            <div class="collapsible-content">
 
             <div class="preset-controls">
                 <div class="setting-group full-width">
@@ -101,10 +107,15 @@
                 <span>Preview: <span id="previewText">256×256px, face at 70% height, PNG format</span></span>
                 <span class="aspect-ratio" id="aspectRatioText">1:1 ratio</span>
             </div>
+            </div>
         </div>
 
         <div class="output-settings">
-            <h3>Output Settings</h3>
+            <h3 class="collapsible-header">
+                Output Settings
+                <span class="collapse-icon">▼</span>
+            </h3>
+            <div class="collapsible-content">
             <div class="settings-grid">
                 <div class="setting-group">
                     <label for="outputFormat">Output Format</label>
@@ -139,6 +150,7 @@
                     <label for="individualDownload">Show individual download buttons</label>
                 </div>
             </div>
+            </div>
         </div>
 
         <div class="image-gallery" id="imageGallery" style="display: none;">
@@ -152,11 +164,21 @@
         </div>
 
         <div class="canvas-container" id="canvasContainer" style="display: none;">
-            <h3>Current Image Preview</h3>
-            <div class="canvas-wrapper">
-                <canvas id="inputCanvas"></canvas>
-                <div id="faceOverlays" class="face-overlays"></div>
-                <canvas id="outputCanvas" style="display: none;"></canvas>
+            <h3 id="canvasTitle">Current Image Preview</h3>
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <div class="canvas-panel" id="originalPanel">
+                    <h4 class="panel-title">Original</h4>
+                    <div class="panel-content">
+                        <canvas id="inputCanvas"></canvas>
+                        <div id="faceOverlays" class="face-overlays"></div>
+                    </div>
+                </div>
+                <div class="canvas-panel" id="processedPanel" style="display: none;">
+                    <h4 class="panel-title">Processed</h4>
+                    <div class="panel-content">
+                        <canvas id="outputCanvas"></canvas>
+                    </div>
+                </div>
             </div>
             <div class="face-controls">
                 <div id="faceCounter">
