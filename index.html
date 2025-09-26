@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Face Cropping Tool</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -65,11 +66,13 @@
                         </div>
 
                         <div class="settings-actions">
+                            <label for="settingsName" class="sr-only">Configuration name</label>
                             <input type="text" id="settingsName" placeholder="Configuration name..." maxlength="50">
                             <button type="button" id="saveSettingsBtn" class="save-btn">Save Settings</button>
                             <button type="button" id="exportSettingsBtn" class="export-btn">Export JSON</button>
                             <button type="button" id="importSettingsBtn" class="import-btn">Import JSON</button>
-                            <input type="file" id="importSettingsFile" accept=".json" style="display: none;">
+                            <label for="importSettingsFile" class="sr-only">Import settings file</label>
+                            <input type="file" id="importSettingsFile" accept=".json" class="hidden">
                         </div>
                     </div>
                 </div>
@@ -122,6 +125,7 @@
 
                         <div class="setting-group">
                             <label for="retryAttempts">Retry Attempts</label>
+                            <label for="retryAttempts" class="sr-only">Retry attempts</label>
                             <input type="number" id="retryAttempts" min="0" max="5" value="2">
                             <div class="setting-help">Number of retry attempts for failed detections</div>
                         </div>
@@ -153,7 +157,7 @@
             </div>
         </div>
 
-        <div class="progress-section" id="progressSection" style="display: none;">
+        <div class="progress-section hidden" id="progressSection">
             <div class="progress-bar">
                 <div class="progress-fill" id="progressFill"></div>
             </div>
@@ -186,16 +190,19 @@
                 <div class="setting-group">
                     <label for="outputWidth">Output Width (px)</label>
                     <div class="input-with-lock">
+                        <label for="outputWidth" class="sr-only">Output width</label>
                         <input type="number" id="outputWidth" value="256" min="64" max="2048" step="32">
                         <button type="button" id="aspectRatioLock" class="lock-button" title="Lock aspect ratio">🔓</button>
                     </div>
                 </div>
                 <div class="setting-group">
                     <label for="outputHeight">Output Height (px)</label>
+                    <label for="outputHeight" class="sr-only">Output height</label>
                     <input type="number" id="outputHeight" value="256" min="64" max="2048" step="32">
                 </div>
                 <div class="setting-group">
                     <label for="faceHeightPct">Face Height %</label>
+                    <label for="faceHeightPct" class="sr-only">Face height percentage</label>
                     <input type="number" id="faceHeightPct" value="70" min="10" max="100" step="5">
                 </div>
                 <div class="setting-group">
@@ -337,7 +344,7 @@
                         <option value="webp">WebP (Modern)</option>
                     </select>
                 </div>
-                <div class="setting-group" id="jpegQualityGroup" style="display: none;">
+                <div class="setting-group hidden" id="jpegQualityGroup">
                     <label for="jpegQuality">JPEG Quality</label>
                     <div class="quality-slider-container">
                         <input type="range" id="jpegQuality" min="1" max="100" value="85">
@@ -365,7 +372,7 @@
             </div>
         </div>
 
-        <div class="image-gallery" id="imageGallery" style="display: none;">
+        <div class="image-gallery hidden" id="imageGallery">
             <h3>Image Gallery</h3>
             <div class="gallery-controls">
                 <button id="selectAllBtn">Select All</button>
@@ -375,7 +382,7 @@
             <div class="gallery-grid" id="galleryGrid"></div>
         </div>
 
-        <div class="canvas-container" id="canvasContainer" style="display: none;">
+        <div class="canvas-container hidden" id="canvasContainer">
             <h3 id="canvasTitle">Current Image Preview</h3>
             <div class="canvas-wrapper" id="canvasWrapper">
                 <div class="canvas-panel" id="originalPanel">
@@ -385,7 +392,7 @@
                         <div id="faceOverlays" class="face-overlays"></div>
                     </div>
                 </div>
-                <div class="canvas-panel" id="processedPanel" style="display: none;">
+                <div class="canvas-panel hidden" id="processedPanel">
                     <h4 class="panel-title">Processed</h4>
                     <div class="panel-content">
                         <canvas id="outputCanvas"></canvas>

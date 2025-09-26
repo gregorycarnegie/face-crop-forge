@@ -420,8 +420,8 @@ class FaceCropper {
             remainingImages[this.currentImageIndex].selected = true;
             this.updateGallery();
         } else {
-            this.canvasContainer.style.display = 'none';
-            this.imageGallery.style.display = 'none';
+            this.canvasContainer.classList.add('hidden');
+            this.imageGallery.classList.add('hidden');
         }
 
         this.updateStatus(`Removed image. ${this.images.size} images remaining.`, 'success');
@@ -578,11 +578,11 @@ class FaceCropper {
         this.canvasWrapper.classList.toggle('split-view', this.splitViewEnabled);
 
         if (this.splitViewEnabled) {
-            this.processedPanel.style.display = 'block';
+            this.processedPanel.classList.remove('hidden');
             this.splitViewBtn.textContent = 'Single View';
             this.updateSplitViewContent();
         } else {
-            this.processedPanel.style.display = 'none';
+            this.processedPanel.classList.add('hidden');
             this.splitViewBtn.textContent = 'Split View';
         }
     }
@@ -704,7 +704,7 @@ class FaceCropper {
 
         this.updateGallery();
         this.updateControls();
-        this.imageGallery.style.display = 'block';
+        this.imageGallery.classList.remove('hidden');
         this.updateStatus(`Loaded ${fileArray.length} images via drag & drop!`, 'success');
     }
 
@@ -2060,7 +2060,7 @@ class FaceCropper {
 
         this.updateGallery();
         this.updateControls();
-        this.imageGallery.style.display = 'block';
+        this.imageGallery.classList.remove('hidden');
     }
 
     async loadImageFromFileWithErrorHandling(file) {
@@ -2162,7 +2162,7 @@ class FaceCropper {
 
         this.isProcessing = true;
         this.processingQueue = imagesToProcess;
-        this.progressSection.style.display = 'block';
+        this.progressSection.classList.remove('hidden');
 
         this.updateControls();
         this.addToProcessingLog(`Starting batch processing of ${imagesToProcess.length} images`, 'info');
@@ -2219,7 +2219,7 @@ class FaceCropper {
 
         this.isProcessing = false;
         this.currentProcessingId = null;
-        this.progressSection.style.display = 'none';
+        this.progressSection.classList.add('hidden');
 
         this.updateControls();
 
@@ -2276,7 +2276,11 @@ class FaceCropper {
 
     updateFormatControls() {
         const format = this.outputFormat.value;
-        this.jpegQualityGroup.style.display = format === 'jpeg' ? 'flex' : 'none';
+        if (format === 'jpeg') {
+            this.jpegQualityGroup.classList.remove('hidden');
+        } else {
+            this.jpegQualityGroup.classList.add('hidden');
+        }
         this.updatePreview();
     }
 
@@ -2371,8 +2375,11 @@ class FaceCropper {
 
     updatePositioningControls() {
         const mode = this.positioningMode.value;
-        this.advancedPositioning.style.display =
-            (mode === 'custom' || mode === 'rule-of-thirds') ? 'block' : 'none';
+        if (mode === 'custom' || mode === 'rule-of-thirds') {
+            this.advancedPositioning.classList.remove('hidden');
+        } else {
+            this.advancedPositioning.classList.add('hidden');
+        }
         this.updatePreview();
     }
 
@@ -2542,7 +2549,7 @@ class FaceCropper {
 
         this.updateGallery();
         this.updateControls();
-        this.imageGallery.style.display = 'block';
+        this.imageGallery.classList.remove('hidden');
         this.updateStatus(`Loaded ${this.images.size} images. Select images and click "Process Selected" or "Process All".`, 'success');
     }
 
@@ -2692,7 +2699,7 @@ class FaceCropper {
 
         this.isProcessing = true;
         this.processingQueue = imagesToProcess;
-        this.progressSection.style.display = 'block';
+        this.progressSection.classList.remove('hidden');
 
         this.updateControls();
         this.addToProcessingLog(`Starting batch processing of ${imagesToProcess.length} images`, 'info');
@@ -2730,7 +2737,7 @@ class FaceCropper {
 
         this.isProcessing = false;
         this.currentProcessingId = null;
-        this.progressSection.style.display = 'none';
+        this.progressSection.classList.add('hidden');
 
         this.updateControls();
 
@@ -2877,7 +2884,7 @@ class FaceCropper {
             currentImage.faces = await this.detectFacesWithQuality(currentImage.image);
             this.displayImageWithFaceOverlays(currentImage);
             this.updateFaceCounter();
-            this.canvasContainer.style.display = 'block';
+            this.canvasContainer.classList.remove('hidden');
             this.updateStatus(`Detected ${currentImage.faces.length} faces with quality analysis`, 'success');
         } catch (error) {
             console.error('Error detecting faces:', error);
@@ -3314,9 +3321,9 @@ class FaceCropper {
         this.isProcessing = false;
         this.currentProcessingId = null;
 
-        this.imageGallery.style.display = 'none';
-        this.canvasContainer.style.display = 'none';
-        this.progressSection.style.display = 'none';
+        this.imageGallery.classList.add('hidden');
+        this.canvasContainer.classList.add('hidden');
+        this.progressSection.classList.add('hidden');
         this.croppedContainer.innerHTML = '';
 
         this.updateControls();

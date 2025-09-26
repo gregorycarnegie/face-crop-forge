@@ -1132,6 +1132,7 @@ button:hover:not(:disabled) {
 /* Collapsible panels */
 .collapsible-header {
     cursor: pointer;
+    -webkit-user-select: none;
     user-select: none;
     display: flex;
     justify-content: space-between;
@@ -1751,4 +1752,9 @@ button:hover:not(:disabled) {
 .worker-status.initializing {
     background: #ffc107;
     animation: pulse 1s ease-in-out infinite;
+}
+
+/* Utility classes */
+.hidden {
+    display: none;
 }
