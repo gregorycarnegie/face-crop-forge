@@ -251,7 +251,7 @@ button:hover:not(:disabled) {
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
-.crop-settings {
+.crop-settings, .output-settings {
     background: #f8f9fa;
     border: 2px solid #e9ecef;
     border-radius: 15px;
@@ -259,7 +259,7 @@ button:hover:not(:disabled) {
     margin-bottom: 30px;
 }
 
-.crop-settings h3 {
+.crop-settings h3, .output-settings h3 {
     color: #333;
     margin-bottom: 20px;
     font-size: 1.3rem;
@@ -317,6 +317,83 @@ button:hover:not(:disabled) {
 #previewText {
     font-weight: bold;
     color: #667eea;
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+.quality-slider-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quality-slider-container input[type="range"] {
+    flex: 1;
+    margin: 0;
+}
+
+.quality-value {
+    font-weight: bold;
+    color: #667eea;
+    min-width: 40px;
+    text-align: center;
+}
+
+.template-help {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 5px;
+    font-style: italic;
+}
+
+.download-options {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+}
+
+.download-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.download-option input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+
+.download-option label {
+    color: #555;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.individual-download-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 20px;
+    height: 20px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 25;
+    transition: all 0.3s ease;
+}
+
+.individual-download-btn:hover {
+    background: #0056b3;
+    transform: scale(1.1);
 }
 
 .canvas-container {

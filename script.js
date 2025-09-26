@@ -50,6 +50,15 @@ class FaceCropper {
         this.fitMode = document.getElementById('fitMode');
         this.previewText = document.getElementById('previewText');
 
+        // Output settings elements
+        this.outputFormat = document.getElementById('outputFormat');
+        this.jpegQuality = document.getElementById('jpegQuality');
+        this.jpegQualityGroup = document.getElementById('jpegQualityGroup');
+        this.qualityValue = document.getElementById('qualityValue');
+        this.namingTemplate = document.getElementById('namingTemplate');
+        this.zipDownload = document.getElementById('zipDownload');
+        this.individualDownload = document.getElementById('individualDownload');
+
         this.ctx = this.inputCanvas.getContext('2d');
     }
 
@@ -74,8 +83,15 @@ class FaceCropper {
         this.faceHeightPct.addEventListener('input', () => this.updatePreview());
         this.fitMode.addEventListener('change', () => this.updatePreview());
 
-        // Initialize preview
+        // Output settings listeners
+        this.outputFormat.addEventListener('change', () => this.updateFormatControls());
+        this.jpegQuality.addEventListener('input', () => this.updateQualityDisplay());
+        this.individualDownload.addEventListener('change', () => this.toggleIndividualDownloadButtons());
+
+        // Initialize controls
         this.updatePreview();
+        this.updateFormatControls();
+        this.updateQualityDisplay();
     }
 
     updateStatus(message, type = '') {
@@ -87,8 +103,27 @@ class FaceCropper {
         const width = parseInt(this.outputWidth.value);
         const height = parseInt(this.outputHeight.value);
         const faceHeight = parseInt(this.faceHeightPct.value);
+        const format = this.outputFormat.value.toUpperCase();
 
-        this.previewText.textContent = `${width}×${height}px, face at ${faceHeight}% height`;
+        this.previewText.textContent = `${width}×${height}px, face at ${faceHeight}% height, ${format} format`;
+    }
+
+    updateFormatControls() {
+        const format = this.outputFormat.value;
+        this.jpegQualityGroup.style.display = format === 'jpeg' ? 'flex' : 'none';
+        this.updatePreview();
+    }
+
+    updateQualityDisplay() {
+        this.qualityValue.textContent = this.jpegQuality.value + '%';
+    }
+
+    toggleIndividualDownloadButtons() {
+        // Refresh face overlays to show/hide individual download buttons
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length > 0 && selectedImages[0].faces) {
+            this.displayImageWithFaceOverlays(selectedImages[0]);
+        }
     }
 
     async loadModel() {
@@ -531,6 +566,19 @@ class FaceCropper {
         // Add click to select
         faceBox.addEventListener('click', () => this.toggleFaceSelection(face.id));
 
+        // Create individual download button if enabled
+        if (this.individualDownload.checked) {
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'individual-download-btn';
+            downloadBtn.innerHTML = '↓';
+            downloadBtn.title = 'Download this face';
+            downloadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.downloadIndividualFace(face.id);
+            });
+            faceBox.appendChild(downloadBtn);
+        }
+
         // Append all elements
         faceBox.appendChild(checkbox);
         faceBox.appendChild(index);
@@ -661,36 +709,207 @@ class FaceCropper {
                 0, 0, outputWidth, outputHeight
             );
 
-            const croppedDataUrl = cropCanvas.toDataURL('image/png');
+            // Generate image with selected format and quality
+            const format = this.outputFormat.value;
+            const quality = format === 'jpeg' ? this.jpegQuality.value / 100 : 1.0;
+
+            let mimeType = 'image/png';
+            if (format === 'jpeg') mimeType = 'image/jpeg';
+            if (format === 'webp') mimeType = 'image/webp';
+
+            const croppedDataUrl = cropCanvas.toDataURL(mimeType, quality);
+
+            // Generate filename using template
+            const filename = this.generateFilename(imageData.file.name, face.index, outputWidth, outputHeight);
+
             results.push({
                 dataUrl: croppedDataUrl,
-                faceIndex: i + 1,
-                sourceImage: imageData.file.name
+                faceIndex: face.index,
+                faceId: face.id,
+                sourceImage: imageData.file.name,
+                filename: filename,
+                format: format,
+                quality: format === 'jpeg' ? this.jpegQuality.value : 100
             });
         }
 
         return results;
     }
 
-    downloadAllResults() {
-        let totalDownloads = 0;
+    generateFilename(originalName, faceIndex, width, height) {
+        const template = this.namingTemplate.value;
+        const format = this.outputFormat.value;
+        const baseName = originalName.replace(/\.[^/.]+$/, ''); // Remove extension
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
 
+        return template
+            .replace(/{original}/g, baseName)
+            .replace(/{index}/g, faceIndex)
+            .replace(/{timestamp}/g, timestamp)
+            .replace(/{width}/g, width)
+            .replace(/{height}/g, height) + '.' + format;
+    }
+
+    async downloadAllResults() {
+        const allResults = [];
+
+        // Collect all results
         for (const imageData of this.images.values()) {
             if (imageData.results.length > 0) {
-                imageData.results.forEach((result, index) => {
-                    const link = document.createElement('a');
-                    const filename = `${imageData.file.name.split('.')[0]}_face_${result.faceIndex}.png`;
-                    link.download = filename;
-                    link.href = result.dataUrl;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    totalDownloads++;
-                });
+                allResults.push(...imageData.results);
             }
         }
 
+        if (allResults.length === 0) {
+            this.updateStatus('No results to download', 'error');
+            return;
+        }
+
+        if (this.zipDownload.checked) {
+            await this.downloadAsZip(allResults);
+        } else {
+            this.downloadIndividually(allResults);
+        }
+    }
+
+    async downloadAsZip(results) {
+        try {
+            this.updateStatus('Creating ZIP archive...', 'loading');
+
+            const zip = new JSZip();
+
+            results.forEach((result, index) => {
+                // Convert data URL to binary data
+                const base64Data = result.dataUrl.split(',')[1];
+                zip.file(result.filename, base64Data, { base64: true });
+            });
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipUrl = URL.createObjectURL(zipBlob);
+
+            const link = document.createElement('a');
+            link.download = `cropped_faces_${new Date().toISOString().slice(0, 10)}.zip`;
+            link.href = zipUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            URL.revokeObjectURL(zipUrl);
+
+            this.updateStatus(`Downloaded ${results.length} cropped faces as ZIP archive!`, 'success');
+        } catch (error) {
+            console.error('Error creating ZIP:', error);
+            this.updateStatus(`Error creating ZIP: ${error.message}`, 'error');
+        }
+    }
+
+    downloadIndividually(results) {
+        let totalDownloads = 0;
+
+        results.forEach((result) => {
+            const link = document.createElement('a');
+            link.download = result.filename;
+            link.href = result.dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            totalDownloads++;
+        });
+
         this.updateStatus(`Downloaded ${totalDownloads} cropped faces!`, 'success');
+    }
+
+    async downloadIndividualFace(faceId) {
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length === 0) return;
+
+        const currentImage = selectedImages[0];
+        const face = currentImage.faces.find(f => f.id === faceId);
+        if (!face) return;
+
+        try {
+            this.updateStatus('Cropping individual face...', 'loading');
+
+            // Crop just this face
+            const result = await this.cropSingleFace(currentImage, face);
+
+            // Download directly
+            const link = document.createElement('a');
+            link.download = result.filename;
+            link.href = result.dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            this.updateStatus('Individual face downloaded!', 'success');
+        } catch (error) {
+            console.error('Error downloading individual face:', error);
+            this.updateStatus(`Error downloading face: ${error.message}`, 'error');
+        }
+    }
+
+    async cropSingleFace(imageData, face) {
+        const outputWidth = parseInt(this.outputWidth.value);
+        const outputHeight = parseInt(this.outputHeight.value);
+        const faceHeightPct = parseInt(this.faceHeightPct.value) / 100;
+
+        // Create temporary canvas for processing
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = imageData.image.width;
+        tempCanvas.height = imageData.image.height;
+        tempCtx.drawImage(imageData.image, 0, 0);
+
+        // Create crop canvas
+        const cropCanvas = document.createElement('canvas');
+        const cropCtx = cropCanvas.getContext('2d');
+        cropCanvas.width = outputWidth;
+        cropCanvas.height = outputHeight;
+
+        // Calculate crop parameters
+        const targetFaceHeight = outputHeight * faceHeightPct;
+        const scale = targetFaceHeight / face.height;
+        const cropWidthSrc = outputWidth / scale;
+        const cropHeightSrc = outputHeight / scale;
+
+        const faceCenterX = face.x + face.width / 2;
+        const faceCenterY = face.y + face.height / 2;
+
+        const cropX = Math.max(0, Math.min(
+            imageData.image.width - cropWidthSrc,
+            faceCenterX - cropWidthSrc / 2
+        ));
+        const cropY = Math.max(0, Math.min(
+            imageData.image.height - cropHeightSrc,
+            faceCenterY - cropHeightSrc / 2
+        ));
+
+        const finalCropWidth = Math.min(cropWidthSrc, imageData.image.width - cropX);
+        const finalCropHeight = Math.min(cropHeightSrc, imageData.image.height - cropY);
+
+        // Crop and resize
+        cropCtx.drawImage(
+            tempCanvas,
+            cropX, cropY, finalCropWidth, finalCropHeight,
+            0, 0, outputWidth, outputHeight
+        );
+
+        // Generate image with selected format and quality
+        const format = this.outputFormat.value;
+        const quality = format === 'jpeg' ? this.jpegQuality.value / 100 : 1.0;
+
+        let mimeType = 'image/png';
+        if (format === 'jpeg') mimeType = 'image/jpeg';
+        if (format === 'webp') mimeType = 'image/webp';
+
+        const croppedDataUrl = cropCanvas.toDataURL(mimeType, quality);
+        const filename = this.generateFilename(imageData.file.name, face.index, outputWidth, outputHeight);
+
+        return {
+            dataUrl: croppedDataUrl,
+            filename: filename,
+            faceId: face.id
+        };
     }
 
     clearAll() {
