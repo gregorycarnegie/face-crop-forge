@@ -1320,3 +1320,241 @@ button:hover:not(:disabled) {
     color: var(--text-primary);
     font-weight: 500;
 }
+
+/* Workflow tools styles */
+.workflow-tools {
+    margin-bottom: 30px;
+    padding: 25px;
+    background: var(--panel-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 15px;
+}
+
+.workflow-section {
+    margin-bottom: 25px;
+}
+
+.workflow-section:last-child {
+    margin-bottom: 0;
+}
+
+.workflow-section h4 {
+    color: var(--text-primary);
+    margin-bottom: 15px;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+/* Statistics grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.stat-item {
+    background: var(--container-bg);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    color: var(--text-primary);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Settings management */
+.settings-management {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.recent-settings {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.recent-settings label {
+    color: var(--text-primary);
+    font-weight: 500;
+    min-width: 120px;
+}
+
+.recent-settings select {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--container-bg);
+    color: var(--text-primary);
+}
+
+.settings-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.settings-actions input[type="text"] {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--container-bg);
+    color: var(--text-primary);
+}
+
+.save-btn, .export-btn, .import-btn, .small-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    font-size: 13px;
+}
+
+.save-btn {
+    background: var(--face-selected);
+    color: white;
+}
+
+.save-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(52, 152, 219, 0.3);
+}
+
+.export-btn {
+    background: var(--button-primary);
+    color: white;
+}
+
+.export-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px var(--button-hover-shadow);
+}
+
+.import-btn {
+    background: #28a745;
+    color: white;
+}
+
+.import-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(40, 167, 69, 0.3);
+}
+
+.small-btn {
+    background: var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 12px;
+}
+
+.small-btn:hover {
+    background: var(--face-selected);
+    color: white;
+}
+
+/* Export tools */
+.export-tools {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* Processing log */
+.processing-log {
+    background: var(--container-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.log-entry {
+    padding: 3px 0;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-entry.success {
+    color: #28a745;
+}
+
+.log-entry.error {
+    color: var(--face-unselected);
+}
+
+.log-entry.warning {
+    color: #ffc107;
+}
+
+.log-entry.info {
+    color: var(--face-selected);
+}
+
+.log-timestamp {
+    color: var(--text-secondary);
+    opacity: 0.7;
+    margin-right: 8px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .settings-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .settings-actions input[type="text"] {
+        min-width: auto;
+    }
+
+    .export-tools {
+        flex-direction: column;
+    }
+}

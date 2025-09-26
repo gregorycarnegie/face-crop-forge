@@ -16,6 +16,19 @@ class FaceCropper {
         this.isDarkMode = false;
         this.splitViewEnabled = false;
 
+        // Workflow statistics
+        this.statistics = {
+            totalFacesDetected: 0,
+            imagesProcessed: 0,
+            successfulProcessing: 0,
+            processingTimes: [],
+            startTime: null
+        };
+
+        this.processingLog = [];
+        this.savedSettings = new Map();
+        this.recentSettings = [];
+
         this.initializeElements();
         this.setupEventListeners();
         this.setupKeyboardShortcuts();
@@ -107,6 +120,23 @@ class FaceCropper {
         this.applyToAllImagesBtn = document.getElementById('applyToAllImagesBtn');
         this.enhancementSummary = document.getElementById('enhancementSummary');
 
+        // Workflow tools elements
+        this.totalFacesDetected = document.getElementById('totalFacesDetected');
+        this.successRate = document.getElementById('successRate');
+        this.avgProcessingTime = document.getElementById('avgProcessingTime');
+        this.imagesProcessed = document.getElementById('imagesProcessed');
+        this.recentSettingsDropdown = document.getElementById('recentSettingsDropdown');
+        this.loadRecentBtn = document.getElementById('loadRecentBtn');
+        this.settingsName = document.getElementById('settingsName');
+        this.saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        this.exportSettingsBtn = document.getElementById('exportSettingsBtn');
+        this.importSettingsBtn = document.getElementById('importSettingsBtn');
+        this.importSettingsFile = document.getElementById('importSettingsFile');
+        this.exportLogBtn = document.getElementById('exportLogBtn');
+        this.exportCsvBtn = document.getElementById('exportCsvBtn');
+        this.clearStatsBtn = document.getElementById('clearStatsBtn');
+        this.processingLogElement = document.getElementById('processingLog');
+
         this.ctx = this.inputCanvas.getContext('2d');
     }
 
@@ -162,6 +192,16 @@ class FaceCropper {
         this.resetEnhancementsBtn.addEventListener('click', () => this.resetEnhancements());
         this.applyToAllImagesBtn.addEventListener('click', () => this.applyEnhancementsToAll());
 
+        // Workflow tools listeners
+        this.loadRecentBtn.addEventListener('click', () => this.loadRecentSettings());
+        this.saveSettingsBtn.addEventListener('click', () => this.saveCurrentSettings());
+        this.exportSettingsBtn.addEventListener('click', () => this.exportSettingsToJSON());
+        this.importSettingsBtn.addEventListener('click', () => this.importSettingsFile.click());
+        this.importSettingsFile.addEventListener('change', (e) => this.importSettingsFromJSON(e));
+        this.exportLogBtn.addEventListener('click', () => this.exportProcessingLog());
+        this.exportCsvBtn.addEventListener('click', () => this.exportCSVReport());
+        this.clearStatsBtn.addEventListener('click', () => this.clearStatistics());
+
         // Initialize controls
         this.updatePreview();
         this.updateFormatControls();
@@ -174,6 +214,8 @@ class FaceCropper {
         this.loadThemePreference();
         this.updateAllSliderValues();
         this.updateEnhancementSummary();
+        this.loadSavedSettings();
+        this.updateStatisticsDisplay();
     }
 
     setupKeyboardShortcuts() {
@@ -668,7 +710,16 @@ class FaceCropper {
             'backgroundBlur': 'Blur background around faces (0-10px)',
             'previewEnhancementsBtn': 'Preview enhancements on selected image',
             'resetEnhancementsBtn': 'Reset all enhancements to defaults',
-            'applyToAllImagesBtn': 'Apply current enhancement settings to all images'
+            'applyToAllImagesBtn': 'Apply current enhancement settings to all images',
+            'recentSettingsDropdown': 'Load previously saved configurations',
+            'loadRecentBtn': 'Load the selected configuration',
+            'settingsName': 'Enter a name for this configuration',
+            'saveSettingsBtn': 'Save current settings for later use',
+            'exportSettingsBtn': 'Export settings as JSON file',
+            'importSettingsBtn': 'Import settings from JSON file',
+            'exportLogBtn': 'Export detailed processing log',
+            'exportCsvBtn': 'Export processing statistics as CSV',
+            'clearStatsBtn': 'Clear all statistics and logs'
         };
 
         Object.entries(tooltipData).forEach(([id, text]) => {
@@ -1168,6 +1219,404 @@ class FaceCropper {
         }
     }
 
+    // Workflow Tools Methods
+    addToProcessingLog(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = {
+            timestamp,
+            message,
+            type
+        };
+
+        this.processingLog.push(entry);
+
+        // Keep only last 100 entries
+        if (this.processingLog.length > 100) {
+            this.processingLog.shift();
+        }
+
+        // Update display
+        this.updateProcessingLogDisplay();
+    }
+
+    updateProcessingLogDisplay() {
+        const logHtml = this.processingLog
+            .slice(-10) // Show last 10 entries
+            .map(entry => `
+                <div class="log-entry ${entry.type}">
+                    <span class="log-timestamp">${entry.timestamp}</span>
+                    ${entry.message}
+                </div>
+            `)
+            .join('');
+
+        this.processingLogElement.innerHTML = logHtml || '<div class="log-entry">No processing activity yet...</div>';
+
+        // Auto-scroll to bottom
+        this.processingLogElement.scrollTop = this.processingLogElement.scrollHeight;
+    }
+
+    updateStatisticsDisplay() {
+        this.totalFacesDetected.textContent = this.statistics.totalFacesDetected;
+        this.imagesProcessed.textContent = this.statistics.imagesProcessed;
+
+        // Calculate success rate
+        const successRate = this.statistics.imagesProcessed > 0
+            ? (this.statistics.successfulProcessing / this.statistics.imagesProcessed * 100).toFixed(1)
+            : 0;
+        this.successRate.textContent = `${successRate}%`;
+
+        // Calculate average processing time
+        const avgTime = this.statistics.processingTimes.length > 0
+            ? (this.statistics.processingTimes.reduce((a, b) => a + b, 0) / this.statistics.processingTimes.length).toFixed(0)
+            : 0;
+        this.avgProcessingTime.textContent = `${avgTime}ms`;
+    }
+
+    recordProcessingStart() {
+        this.statistics.startTime = Date.now();
+    }
+
+    recordProcessingEnd(success, facesDetected = 0) {
+        if (this.statistics.startTime) {
+            const processingTime = Date.now() - this.statistics.startTime;
+            this.statistics.processingTimes.push(processingTime);
+
+            // Keep only last 50 processing times for average calculation
+            if (this.statistics.processingTimes.length > 50) {
+                this.statistics.processingTimes.shift();
+            }
+        }
+
+        this.statistics.imagesProcessed++;
+        this.statistics.totalFacesDetected += facesDetected;
+
+        if (success) {
+            this.statistics.successfulProcessing++;
+        }
+
+        this.updateStatisticsDisplay();
+    }
+
+    clearStatistics() {
+        this.statistics = {
+            totalFacesDetected: 0,
+            imagesProcessed: 0,
+            successfulProcessing: 0,
+            processingTimes: [],
+            startTime: null
+        };
+
+        this.processingLog = [];
+        this.updateStatisticsDisplay();
+        this.updateProcessingLogDisplay();
+        this.addToProcessingLog('Statistics cleared', 'info');
+        this.updateStatus('Statistics cleared successfully', 'success');
+    }
+
+    getCurrentSettings() {
+        return {
+            // Smart cropping settings
+            outputWidth: parseInt(this.outputWidth.value),
+            outputHeight: parseInt(this.outputHeight.value),
+            faceHeightPct: parseInt(this.faceHeightPct.value),
+            sizePreset: this.sizePreset.value,
+            positioningMode: this.positioningMode.value,
+            verticalOffset: parseInt(this.verticalOffset.value),
+            horizontalOffset: parseInt(this.horizontalOffset.value),
+            aspectRatioLocked: this.aspectRatioLocked,
+
+            // Output settings
+            outputFormat: this.outputFormat.value,
+            jpegQuality: parseInt(this.jpegQuality.value),
+            namingTemplate: this.namingTemplate.value,
+            zipDownload: this.zipDownload.checked,
+            individualDownload: this.individualDownload.checked,
+
+            // Preprocessing settings
+            autoColorCorrection: this.autoColorCorrection.checked,
+            exposureAdjustment: parseFloat(this.exposureAdjustment.value),
+            contrastAdjustment: parseFloat(this.contrastAdjustment.value),
+            sharpnessControl: parseFloat(this.sharpnessControl.value),
+            skinSmoothing: parseFloat(this.skinSmoothing.value),
+            redEyeRemoval: this.redEyeRemoval.checked,
+            backgroundBlur: parseFloat(this.backgroundBlur.value)
+        };
+    }
+
+    applySettings(settings) {
+        // Smart cropping settings
+        this.outputWidth.value = settings.outputWidth || 256;
+        this.outputHeight.value = settings.outputHeight || 256;
+        this.faceHeightPct.value = settings.faceHeightPct || 70;
+        this.sizePreset.value = settings.sizePreset || 'custom';
+        this.positioningMode.value = settings.positioningMode || 'center';
+        this.verticalOffset.value = settings.verticalOffset || 0;
+        this.horizontalOffset.value = settings.horizontalOffset || 0;
+        this.aspectRatioLocked = settings.aspectRatioLocked || false;
+
+        // Output settings
+        this.outputFormat.value = settings.outputFormat || 'png';
+        this.jpegQuality.value = settings.jpegQuality || 85;
+        this.namingTemplate.value = settings.namingTemplate || 'face_{original}_{index}';
+        this.zipDownload.checked = settings.zipDownload !== undefined ? settings.zipDownload : true;
+        this.individualDownload.checked = settings.individualDownload || false;
+
+        // Preprocessing settings
+        this.autoColorCorrection.checked = settings.autoColorCorrection !== undefined ? settings.autoColorCorrection : true;
+        this.exposureAdjustment.value = settings.exposureAdjustment || 0;
+        this.contrastAdjustment.value = settings.contrastAdjustment || 1;
+        this.sharpnessControl.value = settings.sharpnessControl || 0;
+        this.skinSmoothing.value = settings.skinSmoothing || 0;
+        this.redEyeRemoval.checked = settings.redEyeRemoval || false;
+        this.backgroundBlur.value = settings.backgroundBlur || 0;
+
+        // Update UI
+        this.updatePreview();
+        this.updateFormatControls();
+        this.updateQualityDisplay();
+        this.updatePositioningControls();
+        this.updateOffsetDisplays();
+        this.updateAllSliderValues();
+        this.updateEnhancementSummary();
+
+        // Update aspect ratio lock UI
+        if (this.aspectRatioLocked) {
+            this.aspectRatioLock.classList.add('locked');
+            this.aspectRatioLock.textContent = '🔒';
+            this.aspectRatioLock.title = 'Unlock aspect ratio';
+        } else {
+            this.aspectRatioLock.classList.remove('locked');
+            this.aspectRatioLock.textContent = '🔓';
+            this.aspectRatioLock.title = 'Lock aspect ratio';
+        }
+    }
+
+    saveCurrentSettings() {
+        const settingsName = this.settingsName.value.trim();
+        if (!settingsName) {
+            this.updateStatus('Please enter a configuration name', 'error');
+            return;
+        }
+
+        const settings = this.getCurrentSettings();
+        settings.name = settingsName;
+        settings.timestamp = new Date().toISOString();
+
+        // Save to local storage
+        this.savedSettings.set(settingsName, settings);
+        this.addToRecentSettings(settingsName);
+
+        // Update localStorage
+        localStorage.setItem('faceCropperSettings', JSON.stringify([...this.savedSettings]));
+
+        this.updateRecentSettingsDropdown();
+        this.settingsName.value = '';
+        this.addToProcessingLog(`Saved settings: ${settingsName}`, 'success');
+        this.updateStatus(`Settings saved as "${settingsName}"`, 'success');
+    }
+
+    loadRecentSettings() {
+        const selectedName = this.recentSettingsDropdown.value;
+        if (!selectedName) {
+            this.updateStatus('Please select a configuration to load', 'error');
+            return;
+        }
+
+        const settings = this.savedSettings.get(selectedName);
+        if (settings) {
+            this.applySettings(settings);
+            this.addToRecentSettings(selectedName);
+            this.addToProcessingLog(`Loaded settings: ${selectedName}`, 'success');
+            this.updateStatus(`Loaded settings: "${selectedName}"`, 'success');
+        } else {
+            this.updateStatus('Configuration not found', 'error');
+        }
+    }
+
+    addToRecentSettings(settingsName) {
+        // Remove if already exists
+        this.recentSettings = this.recentSettings.filter(name => name !== settingsName);
+        // Add to beginning
+        this.recentSettings.unshift(settingsName);
+        // Keep only last 10
+        this.recentSettings = this.recentSettings.slice(0, 10);
+
+        localStorage.setItem('faceCropperRecentSettings', JSON.stringify(this.recentSettings));
+        this.updateRecentSettingsDropdown();
+    }
+
+    updateRecentSettingsDropdown() {
+        const dropdown = this.recentSettingsDropdown;
+        dropdown.innerHTML = '<option value="">Select a saved configuration...</option>';
+
+        this.recentSettings.forEach(settingsName => {
+            if (this.savedSettings.has(settingsName)) {
+                const option = document.createElement('option');
+                option.value = settingsName;
+                option.textContent = settingsName;
+                dropdown.appendChild(option);
+            }
+        });
+    }
+
+    loadSavedSettings() {
+        try {
+            // Load saved settings
+            const saved = localStorage.getItem('faceCropperSettings');
+            if (saved) {
+                const settingsArray = JSON.parse(saved);
+                this.savedSettings = new Map(settingsArray);
+            }
+
+            // Load recent settings
+            const recent = localStorage.getItem('faceCropperRecentSettings');
+            if (recent) {
+                this.recentSettings = JSON.parse(recent);
+            }
+
+            this.updateRecentSettingsDropdown();
+        } catch (error) {
+            console.error('Error loading saved settings:', error);
+        }
+    }
+
+    exportSettingsToJSON() {
+        const settings = this.getCurrentSettings();
+        settings.exportedAt = new Date().toISOString();
+        settings.version = '1.0';
+
+        const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.download = `face-cropper-settings-${new Date().toISOString().slice(0, 10)}.json`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+        this.addToProcessingLog('Settings exported to JSON', 'success');
+        this.updateStatus('Settings exported successfully', 'success');
+    }
+
+    async importSettingsFromJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const settings = JSON.parse(text);
+
+            this.applySettings(settings);
+            this.addToProcessingLog(`Settings imported from ${file.name}`, 'success');
+            this.updateStatus('Settings imported successfully', 'success');
+        } catch (error) {
+            console.error('Error importing settings:', error);
+            this.addToProcessingLog(`Failed to import settings: ${error.message}`, 'error');
+            this.updateStatus('Failed to import settings. Please check the file format.', 'error');
+        }
+
+        // Reset file input
+        event.target.value = '';
+    }
+
+    exportProcessingLog() {
+        const logData = {
+            exportedAt: new Date().toISOString(),
+            statistics: this.statistics,
+            settings: this.getCurrentSettings(),
+            log: this.processingLog
+        };
+
+        const blob = new Blob([JSON.stringify(logData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.download = `face-cropper-log-${new Date().toISOString().slice(0, 10)}.json`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+        this.addToProcessingLog('Processing log exported', 'success');
+        this.updateStatus('Processing log exported successfully', 'success');
+    }
+
+    exportCSVReport() {
+        const csvData = [];
+        const headers = [
+            'Timestamp',
+            'Images Processed',
+            'Total Faces Detected',
+            'Success Rate (%)',
+            'Avg Processing Time (ms)',
+            'Output Format',
+            'Output Dimensions',
+            'Face Height %',
+            'Positioning Mode',
+            'Auto Color Correction',
+            'Exposure Adjustment',
+            'Contrast Adjustment',
+            'Sharpness',
+            'Skin Smoothing',
+            'Red-eye Removal',
+            'Background Blur'
+        ];
+
+        csvData.push(headers);
+
+        const settings = this.getCurrentSettings();
+        const successRate = this.statistics.imagesProcessed > 0
+            ? (this.statistics.successfulProcessing / this.statistics.imagesProcessed * 100).toFixed(1)
+            : 0;
+        const avgTime = this.statistics.processingTimes.length > 0
+            ? (this.statistics.processingTimes.reduce((a, b) => a + b, 0) / this.statistics.processingTimes.length).toFixed(0)
+            : 0;
+
+        const row = [
+            new Date().toISOString(),
+            this.statistics.imagesProcessed,
+            this.statistics.totalFacesDetected,
+            successRate,
+            avgTime,
+            settings.outputFormat.toUpperCase(),
+            `${settings.outputWidth}×${settings.outputHeight}`,
+            settings.faceHeightPct,
+            settings.positioningMode,
+            settings.autoColorCorrection ? 'Yes' : 'No',
+            settings.exposureAdjustment,
+            settings.contrastAdjustment,
+            settings.sharpnessControl,
+            settings.skinSmoothing,
+            settings.redEyeRemoval ? 'Yes' : 'No',
+            settings.backgroundBlur
+        ];
+
+        csvData.push(row);
+
+        // Convert to CSV string
+        const csvString = csvData.map(row =>
+            row.map(cell => `"${cell}"`).join(',')
+        ).join('\n');
+
+        const blob = new Blob([csvString], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.download = `face-cropper-report-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+        this.addToProcessingLog('CSV report exported', 'success');
+        this.updateStatus('CSV report exported successfully', 'success');
+    }
+
     updateStatus(message, type = '') {
         this.status.textContent = message;
         this.status.className = `status ${type}`;
@@ -1610,6 +2059,7 @@ class FaceCropper {
         this.progressSection.style.display = 'block';
 
         this.updateControls();
+        this.addToProcessingLog(`Starting batch processing of ${imagesToProcess.length} images`, 'info');
 
         for (let i = 0; i < imagesToProcess.length; i++) {
             const imageData = imagesToProcess[i];
@@ -1623,12 +2073,17 @@ class FaceCropper {
             this.progressText.textContent = `Processing image ${i + 1} of ${imagesToProcess.length}: ${imageData.file.name}`;
 
             try {
+                this.recordProcessingStart();
                 await this.processImageData(imageData);
                 imageData.processed = true;
                 imageData.status = 'completed';
+                this.recordProcessingEnd(true, imageData.faces.length);
+                this.addToProcessingLog(`✓ Processed ${imageData.file.name}: ${imageData.faces.length} faces found`, 'success');
             } catch (error) {
                 console.error('Error processing image:', imageData.file.name, error);
                 imageData.status = 'error';
+                this.recordProcessingEnd(false, 0);
+                this.addToProcessingLog(`✗ Failed to process ${imageData.file.name}: ${error.message}`, 'error');
             }
 
             this.updateGallery();
@@ -1646,6 +2101,7 @@ class FaceCropper {
         const successCount = imagesToProcess.filter(img => img.status === 'completed').length;
         const totalFaces = imagesToProcess.reduce((sum, img) => sum + img.results.length, 0);
 
+        this.addToProcessingLog(`Batch processing completed: ${successCount}/${imagesToProcess.length} images successful, ${totalFaces} total faces cropped`, 'info');
         this.updateStatus(`Processed ${successCount} images and found ${totalFaces} faces total!`, 'success');
     }
 
