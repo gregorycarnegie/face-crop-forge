@@ -21,6 +21,33 @@
             <button id="downloadBtn" disabled>Download Cropped Images</button>
         </div>
 
+        <div class="crop-settings">
+            <h3>Crop Settings</h3>
+            <div class="settings-grid">
+                <div class="setting-group">
+                    <label for="outputWidth">Output Width (px)</label>
+                    <input type="number" id="outputWidth" value="256" min="64" max="2048" step="32">
+                </div>
+                <div class="setting-group">
+                    <label for="outputHeight">Output Height (px)</label>
+                    <input type="number" id="outputHeight" value="256" min="64" max="2048" step="32">
+                </div>
+                <div class="setting-group">
+                    <label for="faceHeightPct">Face Height %</label>
+                    <input type="number" id="faceHeightPct" value="70" min="10" max="100" step="5">
+                </div>
+                <div class="setting-group">
+                    <label for="fitMode">Fit Mode</label>
+                    <select id="fitMode">
+                        <option value="contain">Contain (preserve aspect ratio)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-preview">
+                <span>Preview: <span id="previewText">256×256px, face at 70% height</span></span>
+            </div>
+        </div>
+
         <div class="canvas-container">
             <canvas id="inputCanvas"></canvas>
             <canvas id="outputCanvas" style="display: none;"></canvas>

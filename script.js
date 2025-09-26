@@ -21,6 +21,13 @@ class FaceCropper {
         this.croppedContainer = document.getElementById('croppedContainer');
         this.status = document.getElementById('status');
 
+        // Crop settings elements
+        this.outputWidth = document.getElementById('outputWidth');
+        this.outputHeight = document.getElementById('outputHeight');
+        this.faceHeightPct = document.getElementById('faceHeightPct');
+        this.fitMode = document.getElementById('fitMode');
+        this.previewText = document.getElementById('previewText');
+
         this.ctx = this.inputCanvas.getContext('2d');
     }
 
@@ -29,11 +36,28 @@ class FaceCropper {
         this.detectBtn.addEventListener('click', () => this.detectFaces());
         this.cropBtn.addEventListener('click', () => this.cropFaces());
         this.downloadBtn.addEventListener('click', () => this.downloadCroppedFaces());
+
+        // Crop settings listeners
+        this.outputWidth.addEventListener('input', () => this.updatePreview());
+        this.outputHeight.addEventListener('input', () => this.updatePreview());
+        this.faceHeightPct.addEventListener('input', () => this.updatePreview());
+        this.fitMode.addEventListener('change', () => this.updatePreview());
+
+        // Initialize preview
+        this.updatePreview();
     }
 
     updateStatus(message, type = '') {
         this.status.textContent = message;
         this.status.className = `status ${type}`;
+    }
+
+    updatePreview() {
+        const width = parseInt(this.outputWidth.value);
+        const height = parseInt(this.outputHeight.value);
+        const faceHeight = parseInt(this.faceHeightPct.value);
+
+        this.previewText.textContent = `${width}×${height}px, face at ${faceHeight}% height`;
     }
 
     async loadModel() {
@@ -194,6 +218,11 @@ class FaceCropper {
             this.croppedFaces = [];
             this.croppedContainer.innerHTML = '';
 
+            // Get crop settings
+            const outputWidth = parseInt(this.outputWidth.value);
+            const outputHeight = parseInt(this.outputHeight.value);
+            const faceHeightPct = parseInt(this.faceHeightPct.value) / 100;
+
             // Create a temporary canvas to draw the displayed image
             const tempDisplayCanvas = document.createElement('canvas');
             const tempDisplayCtx = tempDisplayCanvas.getContext('2d');
@@ -203,26 +232,45 @@ class FaceCropper {
             // Draw the image exactly as displayed on the canvas
             tempDisplayCtx.drawImage(this.currentImage, 0, 0, this.inputCanvas.width, this.inputCanvas.height);
 
-            // Create crop canvas
+            // Create crop canvas with fixed output dimensions
             const cropCanvas = document.createElement('canvas');
             const cropCtx = cropCanvas.getContext('2d');
+            cropCanvas.width = outputWidth;
+            cropCanvas.height = outputHeight;
 
             this.detectedFaces.forEach((face, index) => {
-                // Use exact bounding box coordinates - no padding
-                const cropX = face.x;
-                const cropY = face.y;
-                const cropWidth = face.width;
-                const cropHeight = face.height;
+                // 1. Calculate target face height in output
+                const targetFaceHeight = outputHeight * faceHeightPct;
 
-                // Set crop canvas size
-                cropCanvas.width = cropWidth;
-                cropCanvas.height = cropHeight;
+                // 2. Find scale needed so detected face height becomes target height
+                const scale = targetFaceHeight / face.height;
 
-                // Crop directly from the displayed canvas using exact preview coordinates
+                // 3. Define crop box dimensions in source with output aspect ratio
+                const cropWidthSrc = outputWidth / scale;
+                const cropHeightSrc = outputHeight / scale;
+
+                // 4. Center crop box on the face, clamped to canvas bounds
+                const faceCenterX = face.x + face.width / 2;
+                const faceCenterY = face.y + face.height / 2;
+
+                const cropX = Math.max(0, Math.min(
+                    this.inputCanvas.width - cropWidthSrc,
+                    faceCenterX - cropWidthSrc / 2
+                ));
+                const cropY = Math.max(0, Math.min(
+                    this.inputCanvas.height - cropHeightSrc,
+                    faceCenterY - cropHeightSrc / 2
+                ));
+
+                // Ensure crop dimensions don't exceed canvas bounds
+                const finalCropWidth = Math.min(cropWidthSrc, this.inputCanvas.width - cropX);
+                const finalCropHeight = Math.min(cropHeightSrc, this.inputCanvas.height - cropY);
+
+                // 5. Crop from source, then resize to output dimensions
                 cropCtx.drawImage(
                     tempDisplayCanvas,
-                    cropX, cropY, cropWidth, cropHeight,
-                    0, 0, cropWidth, cropHeight
+                    cropX, cropY, finalCropWidth, finalCropHeight,
+                    0, 0, outputWidth, outputHeight
                 );
 
                 const croppedDataUrl = cropCanvas.toDataURL('image/png');
