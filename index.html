@@ -110,6 +110,89 @@
             </div>
         </div>
 
+        <div class="preprocessing-settings">
+            <h3 class="collapsible-header">
+                Image Preprocessing
+                <span class="collapse-icon">▼</span>
+            </h3>
+            <div class="collapsible-content">
+
+                <div class="preprocessing-controls">
+                    <div class="setting-group">
+                        <label>
+                            <input type="checkbox" id="autoColorCorrection" checked>
+                            Auto Color Correction
+                        </label>
+                        <div class="setting-help">Automatic brightness/contrast normalization</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="exposureAdjustment">Exposure</label>
+                        <div class="slider-container">
+                            <input type="range" id="exposureAdjustment" min="-2" max="2" step="0.1" value="0">
+                            <span class="slider-value" id="exposureValue">0</span>
+                        </div>
+                        <div class="setting-help">Adjust image brightness (-2 to +2)</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="contrastAdjustment">Contrast</label>
+                        <div class="slider-container">
+                            <input type="range" id="contrastAdjustment" min="0.5" max="2" step="0.1" value="1">
+                            <span class="slider-value" id="contrastValue">1.0</span>
+                        </div>
+                        <div class="setting-help">Adjust image contrast (0.5 to 2.0)</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="sharpnessControl">Sharpness</label>
+                        <div class="slider-container">
+                            <input type="range" id="sharpnessControl" min="0" max="2" step="0.1" value="0">
+                            <span class="slider-value" id="sharpnessValue">0</span>
+                        </div>
+                        <div class="setting-help">Apply unsharp mask filter (0 to 2)</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="skinSmoothing">Skin Smoothing</label>
+                        <div class="slider-container">
+                            <input type="range" id="skinSmoothing" min="0" max="5" step="0.5" value="0">
+                            <span class="slider-value" id="skinSmoothingValue">0</span>
+                        </div>
+                        <div class="setting-help">Smooth skin tones (0 to 5)</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>
+                            <input type="checkbox" id="redEyeRemoval">
+                            Red-eye Removal
+                        </label>
+                        <div class="setting-help">Detect and correct red-eye effect</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="backgroundBlur">Background Blur</label>
+                        <div class="slider-container">
+                            <input type="range" id="backgroundBlur" min="0" max="10" step="0.5" value="0">
+                            <span class="slider-value" id="backgroundBlurValue">0px</span>
+                        </div>
+                        <div class="setting-help">Blur background around faces (0-10px)</div>
+                    </div>
+                </div>
+
+                <div class="preprocessing-actions">
+                    <button type="button" id="previewEnhancementsBtn" class="preview-button">Preview Enhancements</button>
+                    <button type="button" id="resetEnhancementsBtn" class="reset-button">Reset All</button>
+                    <button type="button" id="applyToAllImagesBtn" class="apply-button">Apply to All Images</button>
+                </div>
+
+                <div class="enhancement-preview">
+                    <span>Preview: </span>
+                    <span id="enhancementSummary">No enhancements applied</span>
+                </div>
+            </div>
+        </div>
+
         <div class="output-settings">
             <h3 class="collapsible-header">
                 Output Settings

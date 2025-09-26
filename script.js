@@ -89,6 +89,24 @@ class FaceCropper {
         this.originalPanel = document.getElementById('originalPanel');
         this.processedPanel = document.getElementById('processedPanel');
 
+        // Preprocessing elements
+        this.autoColorCorrection = document.getElementById('autoColorCorrection');
+        this.exposureAdjustment = document.getElementById('exposureAdjustment');
+        this.exposureValue = document.getElementById('exposureValue');
+        this.contrastAdjustment = document.getElementById('contrastAdjustment');
+        this.contrastValue = document.getElementById('contrastValue');
+        this.sharpnessControl = document.getElementById('sharpnessControl');
+        this.sharpnessValue = document.getElementById('sharpnessValue');
+        this.skinSmoothing = document.getElementById('skinSmoothing');
+        this.skinSmoothingValue = document.getElementById('skinSmoothingValue');
+        this.redEyeRemoval = document.getElementById('redEyeRemoval');
+        this.backgroundBlur = document.getElementById('backgroundBlur');
+        this.backgroundBlurValue = document.getElementById('backgroundBlurValue');
+        this.previewEnhancementsBtn = document.getElementById('previewEnhancementsBtn');
+        this.resetEnhancementsBtn = document.getElementById('resetEnhancementsBtn');
+        this.applyToAllImagesBtn = document.getElementById('applyToAllImagesBtn');
+        this.enhancementSummary = document.getElementById('enhancementSummary');
+
         this.ctx = this.inputCanvas.getContext('2d');
     }
 
@@ -132,6 +150,18 @@ class FaceCropper {
         this.splitViewBtn.addEventListener('click', () => this.toggleSplitView());
         this.darkModeBtn.addEventListener('click', () => this.toggleDarkMode());
 
+        // Preprocessing listeners
+        this.autoColorCorrection.addEventListener('change', () => this.updateEnhancementSummary());
+        this.exposureAdjustment.addEventListener('input', () => this.updateSliderValue('exposure'));
+        this.contrastAdjustment.addEventListener('input', () => this.updateSliderValue('contrast'));
+        this.sharpnessControl.addEventListener('input', () => this.updateSliderValue('sharpness'));
+        this.skinSmoothing.addEventListener('input', () => this.updateSliderValue('skinSmoothing'));
+        this.redEyeRemoval.addEventListener('change', () => this.updateEnhancementSummary());
+        this.backgroundBlur.addEventListener('input', () => this.updateSliderValue('backgroundBlur'));
+        this.previewEnhancementsBtn.addEventListener('click', () => this.previewEnhancements());
+        this.resetEnhancementsBtn.addEventListener('click', () => this.resetEnhancements());
+        this.applyToAllImagesBtn.addEventListener('click', () => this.applyEnhancementsToAll());
+
         // Initialize controls
         this.updatePreview();
         this.updateFormatControls();
@@ -142,6 +172,8 @@ class FaceCropper {
         this.setupTooltips();
         this.setupCollapsiblePanels();
         this.loadThemePreference();
+        this.updateAllSliderValues();
+        this.updateEnhancementSummary();
     }
 
     setupKeyboardShortcuts() {
@@ -626,7 +658,17 @@ class FaceCropper {
             'individualDownload': 'Show download buttons for each face',
             'selectAllFacesBtn': 'Select all detected faces (Ctrl+A)',
             'selectNoneFacesBtn': 'Deselect all faces (Escape)',
-            'detectFacesBtn': 'Detect faces in the current image'
+            'detectFacesBtn': 'Detect faces in the current image',
+            'autoColorCorrection': 'Automatically adjust brightness and contrast',
+            'exposureAdjustment': 'Adjust image brightness (-2 to +2 stops)',
+            'contrastAdjustment': 'Adjust image contrast (0.5 to 2.0)',
+            'sharpnessControl': 'Apply unsharp mask filter (0 to 2)',
+            'skinSmoothing': 'Smooth skin tones with selective blur (0 to 5)',
+            'redEyeRemoval': 'Detect and correct red-eye effect',
+            'backgroundBlur': 'Blur background around faces (0-10px)',
+            'previewEnhancementsBtn': 'Preview enhancements on selected image',
+            'resetEnhancementsBtn': 'Reset all enhancements to defaults',
+            'applyToAllImagesBtn': 'Apply current enhancement settings to all images'
         };
 
         Object.entries(tooltipData).forEach(([id, text]) => {
@@ -719,6 +761,411 @@ class FaceCropper {
                 }
             });
         });
+    }
+
+    // Preprocessing Methods
+    updateSliderValue(type) {
+        switch (type) {
+            case 'exposure':
+                this.exposureValue.textContent = parseFloat(this.exposureAdjustment.value).toFixed(1);
+                break;
+            case 'contrast':
+                this.contrastValue.textContent = parseFloat(this.contrastAdjustment.value).toFixed(1);
+                break;
+            case 'sharpness':
+                this.sharpnessValue.textContent = parseFloat(this.sharpnessControl.value).toFixed(1);
+                break;
+            case 'skinSmoothing':
+                this.skinSmoothingValue.textContent = parseFloat(this.skinSmoothing.value).toFixed(1);
+                break;
+            case 'backgroundBlur':
+                this.backgroundBlurValue.textContent = parseFloat(this.backgroundBlur.value).toFixed(1) + 'px';
+                break;
+        }
+        this.updateEnhancementSummary();
+    }
+
+    updateAllSliderValues() {
+        this.updateSliderValue('exposure');
+        this.updateSliderValue('contrast');
+        this.updateSliderValue('sharpness');
+        this.updateSliderValue('skinSmoothing');
+        this.updateSliderValue('backgroundBlur');
+    }
+
+    updateEnhancementSummary() {
+        const enhancements = [];
+
+        if (this.autoColorCorrection.checked) {
+            enhancements.push('Auto Color');
+        }
+        if (parseFloat(this.exposureAdjustment.value) !== 0) {
+            enhancements.push(`Exposure ${this.exposureAdjustment.value}`);
+        }
+        if (parseFloat(this.contrastAdjustment.value) !== 1) {
+            enhancements.push(`Contrast ${this.contrastAdjustment.value}`);
+        }
+        if (parseFloat(this.sharpnessControl.value) !== 0) {
+            enhancements.push(`Sharpness ${this.sharpnessControl.value}`);
+        }
+        if (parseFloat(this.skinSmoothing.value) !== 0) {
+            enhancements.push(`Skin Smoothing ${this.skinSmoothing.value}`);
+        }
+        if (this.redEyeRemoval.checked) {
+            enhancements.push('Red-eye Removal');
+        }
+        if (parseFloat(this.backgroundBlur.value) !== 0) {
+            enhancements.push(`Background Blur ${this.backgroundBlur.value}px`);
+        }
+
+        this.enhancementSummary.textContent = enhancements.length > 0
+            ? enhancements.join(', ')
+            : 'No enhancements applied';
+    }
+
+    resetEnhancements() {
+        this.autoColorCorrection.checked = true;
+        this.exposureAdjustment.value = 0;
+        this.contrastAdjustment.value = 1;
+        this.sharpnessControl.value = 0;
+        this.skinSmoothing.value = 0;
+        this.redEyeRemoval.checked = false;
+        this.backgroundBlur.value = 0;
+
+        this.updateAllSliderValues();
+        this.updateEnhancementSummary();
+        this.updateStatus('Enhancements reset to defaults', 'success');
+    }
+
+    async previewEnhancements() {
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        if (selectedImages.length === 0) {
+            this.updateStatus('Please select an image to preview enhancements', 'error');
+            return;
+        }
+
+        const currentImage = selectedImages[0];
+        this.updateStatus('Applying enhancements for preview...', 'loading');
+
+        try {
+            const enhancedImage = await this.applyImageEnhancements(currentImage.image);
+            this.displayEnhancedPreview(enhancedImage, currentImage);
+            this.updateStatus('Enhancement preview applied!', 'success');
+        } catch (error) {
+            console.error('Error applying enhancements:', error);
+            this.updateStatus(`Error applying enhancements: ${error.message}`, 'error');
+        }
+    }
+
+    async applyEnhancementsToAll() {
+        const allImages = Array.from(this.images.values());
+        if (allImages.length === 0) {
+            this.updateStatus('No images to enhance', 'error');
+            return;
+        }
+
+        this.updateStatus('Applying enhancements to all images...', 'loading');
+
+        try {
+            for (const imageData of allImages) {
+                imageData.enhancedImage = await this.applyImageEnhancements(imageData.image);
+            }
+            this.updateStatus(`Applied enhancements to ${allImages.length} images!`, 'success');
+        } catch (error) {
+            console.error('Error applying enhancements to all images:', error);
+            this.updateStatus(`Error applying enhancements: ${error.message}`, 'error');
+        }
+    }
+
+    async applyImageEnhancements(image) {
+        // Create canvas for processing
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        ctx.drawImage(image, 0, 0);
+
+        // Get image data
+        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // Apply auto color correction
+        if (this.autoColorCorrection.checked) {
+            imageData = this.applyAutoColorCorrection(imageData);
+        }
+
+        // Apply exposure adjustment
+        const exposure = parseFloat(this.exposureAdjustment.value);
+        if (exposure !== 0) {
+            imageData = this.applyExposureAdjustment(imageData, exposure);
+        }
+
+        // Apply contrast adjustment
+        const contrast = parseFloat(this.contrastAdjustment.value);
+        if (contrast !== 1) {
+            imageData = this.applyContrastAdjustment(imageData, contrast);
+        }
+
+        // Apply sharpness
+        const sharpness = parseFloat(this.sharpnessControl.value);
+        if (sharpness > 0) {
+            imageData = this.applySharpness(imageData, sharpness);
+        }
+
+        // Apply skin smoothing
+        const skinSmoothingAmount = parseFloat(this.skinSmoothing.value);
+        if (skinSmoothingAmount > 0) {
+            imageData = await this.applySkinSmoothing(imageData, skinSmoothingAmount);
+        }
+
+        // Apply red-eye removal
+        if (this.redEyeRemoval.checked) {
+            imageData = await this.applyRedEyeRemoval(imageData);
+        }
+
+        // Apply background blur
+        const blurAmount = parseFloat(this.backgroundBlur.value);
+        if (blurAmount > 0) {
+            imageData = await this.applyBackgroundBlur(imageData, blurAmount);
+        }
+
+        // Put enhanced data back to canvas
+        ctx.putImageData(imageData, 0, 0);
+
+        // Return enhanced image
+        return new Promise((resolve) => {
+            const enhancedImg = new Image();
+            enhancedImg.onload = () => resolve(enhancedImg);
+            enhancedImg.src = canvas.toDataURL();
+        });
+    }
+
+    applyAutoColorCorrection(imageData) {
+        const data = imageData.data;
+        const length = data.length;
+
+        // Calculate histogram for each channel
+        const rHist = new Array(256).fill(0);
+        const gHist = new Array(256).fill(0);
+        const bHist = new Array(256).fill(0);
+
+        for (let i = 0; i < length; i += 4) {
+            rHist[data[i]]++;
+            gHist[data[i + 1]]++;
+            bHist[data[i + 2]]++;
+        }
+
+        // Calculate cumulative distribution
+        const totalPixels = length / 4;
+        const getCumulativeValue = (hist, targetPercentile) => {
+            let cumulative = 0;
+            for (let i = 0; i < 256; i++) {
+                cumulative += hist[i];
+                if (cumulative / totalPixels >= targetPercentile) {
+                    return i;
+                }
+            }
+            return 255;
+        };
+
+        // Get 1% and 99% percentiles for each channel
+        const rMin = getCumulativeValue(rHist, 0.01);
+        const rMax = getCumulativeValue(rHist, 0.99);
+        const gMin = getCumulativeValue(gHist, 0.01);
+        const gMax = getCumulativeValue(gHist, 0.99);
+        const bMin = getCumulativeValue(bHist, 0.01);
+        const bMax = getCumulativeValue(bHist, 0.99);
+
+        // Apply histogram stretching
+        for (let i = 0; i < length; i += 4) {
+            data[i] = Math.min(255, Math.max(0, ((data[i] - rMin) / (rMax - rMin)) * 255));
+            data[i + 1] = Math.min(255, Math.max(0, ((data[i + 1] - gMin) / (gMax - gMin)) * 255));
+            data[i + 2] = Math.min(255, Math.max(0, ((data[i + 2] - bMin) / (bMax - bMin)) * 255));
+        }
+
+        return imageData;
+    }
+
+    applyExposureAdjustment(imageData, exposure) {
+        const data = imageData.data;
+        const exposureFactor = Math.pow(2, exposure);
+
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, data[i] * exposureFactor);
+            data[i + 1] = Math.min(255, data[i + 1] * exposureFactor);
+            data[i + 2] = Math.min(255, data[i + 2] * exposureFactor);
+        }
+
+        return imageData;
+    }
+
+    applyContrastAdjustment(imageData, contrast) {
+        const data = imageData.data;
+        const contrastFactor = contrast;
+
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor) + 128));
+            data[i + 1] = Math.min(255, Math.max(0, ((data[i + 1] - 128) * contrastFactor) + 128));
+            data[i + 2] = Math.min(255, Math.max(0, ((data[i + 2] - 128) * contrastFactor) + 128));
+        }
+
+        return imageData;
+    }
+
+    applySharpness(imageData, amount) {
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+        const outputData = new Uint8ClampedArray(data);
+
+        // Unsharp mask kernel
+        const kernel = [
+            0, -amount, 0,
+            -amount, 1 + 4 * amount, -amount,
+            0, -amount, 0
+        ];
+
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                for (let c = 0; c < 3; c++) {
+                    let sum = 0;
+                    for (let ky = -1; ky <= 1; ky++) {
+                        for (let kx = -1; kx <= 1; kx++) {
+                            const idx = ((y + ky) * width + (x + kx)) * 4 + c;
+                            sum += data[idx] * kernel[(ky + 1) * 3 + (kx + 1)];
+                        }
+                    }
+                    const outputIdx = (y * width + x) * 4 + c;
+                    outputData[outputIdx] = Math.min(255, Math.max(0, sum));
+                }
+            }
+        }
+
+        return new ImageData(outputData, width, height);
+    }
+
+    async applySkinSmoothing(imageData, amount) {
+        // Simple gaussian blur on skin tone regions
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+
+        // Create skin mask based on color range
+        const skinMask = new Uint8Array(width * height);
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Simple skin tone detection
+            const isSkin = (r > 60 && g > 40 && b > 20 && r > b && r > g * 0.8 && (r - g) > 15);
+            skinMask[Math.floor(i / 4)] = isSkin ? 1 : 0;
+        }
+
+        // Apply blur only to skin regions
+        const blurRadius = Math.round(amount);
+        if (blurRadius > 0) {
+            return this.applySelectiveBlur(imageData, skinMask, blurRadius);
+        }
+
+        return imageData;
+    }
+
+    applySelectiveBlur(imageData, mask, radius) {
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+        const outputData = new Uint8ClampedArray(data);
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = y * width + x;
+                if (mask[idx]) {
+                    let r = 0, g = 0, b = 0, count = 0;
+
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const ny = y + dy;
+                            const nx = x + dx;
+                            if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+                                const nidx = (ny * width + nx) * 4;
+                                r += data[nidx];
+                                g += data[nidx + 1];
+                                b += data[nidx + 2];
+                                count++;
+                            }
+                        }
+                    }
+
+                    const pixelIdx = idx * 4;
+                    outputData[pixelIdx] = r / count;
+                    outputData[pixelIdx + 1] = g / count;
+                    outputData[pixelIdx + 2] = b / count;
+                }
+            }
+        }
+
+        return new ImageData(outputData, width, height);
+    }
+
+    async applyRedEyeRemoval(imageData) {
+        // Simple red-eye detection and correction
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Detect red-eye: high red, low green/blue
+            if (r > 150 && r > g * 2 && r > b * 2) {
+                // Replace with more natural color
+                data[i] = Math.min(r * 0.7, g * 1.2);
+                data[i + 1] = g;
+                data[i + 2] = Math.max(b, g * 0.8);
+            }
+        }
+
+        return imageData;
+    }
+
+    async applyBackgroundBlur(imageData, blurAmount) {
+        // This is a simplified background blur - in a real application,
+        // you'd want to use proper segmentation
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+
+        // Create a simple edge-based mask (assuming faces are in center)
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
+
+        const backgroundMask = new Uint8Array(width * height);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+                const isBackground = distance > maxDistance * 0.4;
+                backgroundMask[y * width + x] = isBackground ? 1 : 0;
+            }
+        }
+
+        return this.applySelectiveBlur(imageData, backgroundMask, Math.round(blurAmount));
+    }
+
+    displayEnhancedPreview(enhancedImage, originalImageData) {
+        // If split view is enabled, show enhanced version in processed panel
+        if (this.splitViewEnabled) {
+            const outputCanvas = document.getElementById('outputCanvas');
+            const outputCtx = outputCanvas.getContext('2d');
+
+            outputCanvas.width = enhancedImage.width;
+            outputCanvas.height = enhancedImage.height;
+            outputCtx.drawImage(enhancedImage, 0, 0);
+        } else {
+            // Otherwise, temporarily replace the main canvas
+            this.displayImageWithFaceOverlays(originalImageData, enhancedImage);
+        }
     }
 
     updateStatus(message, type = '') {
@@ -1521,12 +1968,18 @@ class FaceCropper {
         const outputHeight = parseInt(this.outputHeight.value);
         const faceHeightPct = parseInt(this.faceHeightPct.value) / 100;
 
+        // Use enhanced image if available, otherwise use original
+        let sourceImage = imageData.image;
+        if (imageData.enhancedImage) {
+            sourceImage = imageData.enhancedImage;
+        }
+
         // Create temporary canvas for processing
         const tempCanvas = document.createElement('canvas');
         const tempCtx = tempCanvas.getContext('2d');
-        tempCanvas.width = imageData.image.width;
-        tempCanvas.height = imageData.image.height;
-        tempCtx.drawImage(imageData.image, 0, 0);
+        tempCanvas.width = sourceImage.width;
+        tempCanvas.height = sourceImage.height;
+        tempCtx.drawImage(sourceImage, 0, 0);
 
         // Create crop canvas
         const cropCanvas = document.createElement('canvas');
@@ -1547,11 +2000,11 @@ class FaceCropper {
 
             // Calculate face position based on positioning mode
             const { cropX, cropY } = this.calculateSmartCropPosition(
-                face, cropWidthSrc, cropHeightSrc, imageData.image.width, imageData.image.height
+                face, cropWidthSrc, cropHeightSrc, sourceImage.width, sourceImage.height
             );
 
-            const finalCropWidth = Math.min(cropWidthSrc, imageData.image.width - cropX);
-            const finalCropHeight = Math.min(cropHeightSrc, imageData.image.height - cropY);
+            const finalCropWidth = Math.min(cropWidthSrc, sourceImage.width - cropX);
+            const finalCropHeight = Math.min(cropHeightSrc, sourceImage.height - cropY);
 
             // Crop and resize
             cropCtx.drawImage(
