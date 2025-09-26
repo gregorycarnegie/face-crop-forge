@@ -29,6 +29,16 @@ class FaceCropper {
         this.savedSettings = new Map();
         this.recentSettings = [];
 
+        // Production optimization state
+        this.errorLog = [];
+        this.faceDetectionWorker = null;
+        this.workerInitialized = false;
+        this.memoryUsage = { images: 0, processed: 0 };
+        this.galleryPage = 0;
+        this.galleryPageSize = 20;
+        this.imageLoadQueue = [];
+        this.isLoadingImages = false;
+
         this.initializeElements();
         this.setupEventListeners();
         this.setupKeyboardShortcuts();
@@ -137,11 +147,21 @@ class FaceCropper {
         this.clearStatsBtn = document.getElementById('clearStatsBtn');
         this.processingLogElement = document.getElementById('processingLog');
 
+        // Production optimization elements
+        this.continueOnError = document.getElementById('continueOnError');
+        this.reducedResolution = document.getElementById('reducedResolution');
+        this.enableWebWorkers = document.getElementById('enableWebWorkers');
+        this.memoryManagement = document.getElementById('memoryManagement');
+        this.retryAttempts = document.getElementById('retryAttempts');
+        this.errorLogElement = document.getElementById('errorLog');
+        this.clearErrorsBtn = document.getElementById('clearErrorsBtn');
+        this.exportErrorsBtn = document.getElementById('exportErrorsBtn');
+
         this.ctx = this.inputCanvas.getContext('2d');
     }
 
     setupEventListeners() {
-        this.imageInput.addEventListener('change', (e) => this.handleMultipleImageUpload(e));
+        this.imageInput.addEventListener('change', (e) => this.handleMultipleImageUploadProduction(e));
         this.processAllBtn.addEventListener('click', () => this.processAll());
         this.processSelectedBtn.addEventListener('click', () => this.processSelected());
         this.clearAllBtn.addEventListener('click', () => this.clearAll());
@@ -202,6 +222,12 @@ class FaceCropper {
         this.exportCsvBtn.addEventListener('click', () => this.exportCSVReport());
         this.clearStatsBtn.addEventListener('click', () => this.clearStatistics());
 
+        // Production optimization listeners
+        this.enableWebWorkers.addEventListener('change', () => this.toggleWebWorkers());
+        this.memoryManagement.addEventListener('change', () => this.updateMemorySettings());
+        this.clearErrorsBtn.addEventListener('click', () => this.clearErrorLog());
+        this.exportErrorsBtn.addEventListener('click', () => this.exportErrorLog());
+
         // Initialize controls
         this.updatePreview();
         this.updateFormatControls();
@@ -216,6 +242,9 @@ class FaceCropper {
         this.updateEnhancementSummary();
         this.loadSavedSettings();
         this.updateStatisticsDisplay();
+        this.initializeWebWorker();
+        this.createMemoryIndicator();
+        this.setupErrorLogCollapsible();
     }
 
     setupKeyboardShortcuts() {
@@ -1617,6 +1646,603 @@ class FaceCropper {
         this.updateStatus('CSV report exported successfully', 'success');
     }
 
+    // Production Optimization Methods
+    async initializeWebWorker() {
+        if (!this.enableWebWorkers.checked) return;
+
+        try {
+            this.faceDetectionWorker = new Worker('face-detection-worker.js');
+
+            this.faceDetectionWorker.onmessage = (e) => {
+                const { type, data, id, success, faces, error } = e.data;
+
+                switch (type) {
+                    case 'initialized':
+                        this.workerInitialized = success;
+                        if (success) {
+                            this.addToProcessingLog('Web Worker initialized successfully', 'success');
+                        } else {
+                            this.addToErrorLog('Web Worker initialization failed', error, 'critical');
+                            this.enableWebWorkers.checked = false;
+                        }
+                        break;
+
+                    case 'faceDetectionResult':
+                        this.handleWorkerDetectionResult(id, faces);
+                        break;
+
+                    case 'error':
+                        this.addToErrorLog(`Worker error for task ${id}`, error, 'critical');
+                        break;
+                }
+            };
+
+            this.faceDetectionWorker.onerror = (error) => {
+                this.addToErrorLog('Web Worker error', error.message, 'critical');
+                this.workerInitialized = false;
+                this.enableWebWorkers.checked = false;
+            };
+
+            // Initialize the worker
+            this.faceDetectionWorker.postMessage({ type: 'initialize' });
+
+        } catch (error) {
+            this.addToErrorLog('Failed to create Web Worker', error.message, 'critical');
+            this.enableWebWorkers.checked = false;
+        }
+    }
+
+    toggleWebWorkers() {
+        if (this.enableWebWorkers.checked) {
+            this.initializeWebWorker();
+        } else {
+            if (this.faceDetectionWorker) {
+                this.faceDetectionWorker.terminate();
+                this.faceDetectionWorker = null;
+                this.workerInitialized = false;
+                this.addToProcessingLog('Web Worker disabled', 'info');
+            }
+        }
+    }
+
+    async detectFacesWithQualityProduction(image, imageId) {
+        // Enhanced version with error handling and retry logic
+        const maxRetries = parseInt(this.retryAttempts.value) || 0;
+        let lastError = null;
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                if (attempt > 0) {
+                    this.addToProcessingLog(`Retry attempt ${attempt} for ${imageId}`, 'warning');
+                    await this.delay(1000 * attempt); // Progressive delay
+                }
+
+                let processedImage = image;
+
+                // Apply reduced resolution if enabled
+                if (this.reducedResolution.checked) {
+                    processedImage = await this.createReducedResolutionImage(image);
+                }
+
+                let faces;
+
+                if (this.enableWebWorkers.checked && this.workerInitialized) {
+                    faces = await this.detectFacesWithWorker(processedImage, imageId);
+                } else {
+                    faces = await this.detectFacesWithQuality(processedImage);
+                }
+
+                // If we used reduced resolution, scale back the coordinates
+                if (this.reducedResolution.checked) {
+                    const scale = image.width / processedImage.width;
+                    faces = faces.map(face => ({
+                        ...face,
+                        x: face.x * scale,
+                        y: face.y * scale,
+                        width: face.width * scale,
+                        height: face.height * scale
+                    }));
+                }
+
+                return faces;
+
+            } catch (error) {
+                lastError = error;
+                this.addToErrorLog(`Detection attempt ${attempt + 1} failed for ${imageId}`, error.message, 'error');
+
+                if (attempt === maxRetries) {
+                    throw new Error(`Face detection failed after ${maxRetries + 1} attempts: ${error.message}`);
+                }
+            }
+        }
+    }
+
+    async detectFacesWithWorker(image, imageId) {
+        return new Promise((resolve, reject) => {
+            if (!this.workerInitialized) {
+                reject(new Error('Worker not initialized'));
+                return;
+            }
+
+            // Create canvas to get image data
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            ctx.drawImage(image, 0, 0);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            // Store callback for this request
+            const requestId = `${imageId}_${Date.now()}`;
+            this.workerCallbacks = this.workerCallbacks || new Map();
+            this.workerCallbacks.set(requestId, { resolve, reject });
+
+            // Send to worker
+            this.faceDetectionWorker.postMessage({
+                type: 'detectFaces',
+                id: requestId,
+                data: {
+                    imageData: {
+                        data: imageData.data,
+                        width: imageData.width,
+                        height: imageData.height
+                    },
+                    options: { includeQuality: true }
+                }
+            });
+
+            // Set timeout
+            setTimeout(() => {
+                if (this.workerCallbacks.has(requestId)) {
+                    this.workerCallbacks.delete(requestId);
+                    reject(new Error('Worker detection timeout'));
+                }
+            }, 30000); // 30 second timeout
+        });
+    }
+
+    handleWorkerDetectionResult(requestId, faces) {
+        if (this.workerCallbacks && this.workerCallbacks.has(requestId)) {
+            const { resolve } = this.workerCallbacks.get(requestId);
+            this.workerCallbacks.delete(requestId);
+            resolve(faces);
+        }
+    }
+
+    async createReducedResolutionImage(image) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = Math.floor(image.width * 0.5);
+        canvas.height = Math.floor(image.height * 0.5);
+
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        return new Promise((resolve) => {
+            const reducedImage = new Image();
+            reducedImage.onload = () => resolve(reducedImage);
+            reducedImage.src = canvas.toDataURL();
+        });
+    }
+
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    addToErrorLog(title, details, severity = 'error') {
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = {
+            timestamp,
+            title,
+            details,
+            severity
+        };
+
+        this.errorLog.push(entry);
+
+        // Keep only last 50 error entries
+        if (this.errorLog.length > 50) {
+            this.errorLog.shift();
+        }
+
+        this.updateErrorLogDisplay();
+    }
+
+    updateErrorLogDisplay() {
+        const logHtml = this.errorLog
+            .slice(-10) // Show last 10 entries
+            .map(entry => `
+                <div class="log-entry ${entry.severity}">
+                    <span class="log-timestamp">${entry.timestamp}</span>
+                    <strong>${entry.title}</strong>: ${entry.details}
+                </div>
+            `)
+            .join('');
+
+        this.errorLogElement.innerHTML = logHtml || '<div class="log-entry">No errors detected</div>';
+
+        // Auto-scroll to bottom
+        this.errorLogElement.scrollTop = this.errorLogElement.scrollHeight;
+    }
+
+    clearErrorLog() {
+        this.errorLog = [];
+        this.updateErrorLogDisplay();
+        this.addToProcessingLog('Error log cleared', 'info');
+        this.updateStatus('Error log cleared successfully', 'success');
+    }
+
+    exportErrorLog() {
+        const errorData = {
+            exportedAt: new Date().toISOString(),
+            totalErrors: this.errorLog.length,
+            errors: this.errorLog
+        };
+
+        const blob = new Blob([JSON.stringify(errorData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.download = `face-cropper-errors-${new Date().toISOString().slice(0, 10)}.json`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+        this.addToProcessingLog('Error log exported', 'success');
+        this.updateStatus('Error log exported successfully', 'success');
+    }
+
+    setupErrorLogCollapsible() {
+        const errorHeader = document.querySelector('.error-log-header');
+        if (errorHeader) {
+            errorHeader.addEventListener('click', () => {
+                const content = errorHeader.nextElementSibling;
+                const isCollapsed = errorHeader.classList.contains('collapsed');
+
+                if (isCollapsed) {
+                    errorHeader.classList.remove('collapsed');
+                    content.classList.remove('collapsed');
+                } else {
+                    errorHeader.classList.add('collapsed');
+                    content.classList.add('collapsed');
+                }
+            });
+        }
+    }
+
+    createMemoryIndicator() {
+        const indicator = document.createElement('div');
+        indicator.className = 'memory-indicator';
+        indicator.id = 'memoryIndicator';
+        document.body.appendChild(indicator);
+
+        // Update memory indicator periodically
+        setInterval(() => this.updateMemoryIndicator(), 5000);
+    }
+
+    updateMemoryIndicator() {
+        const indicator = document.getElementById('memoryIndicator');
+        if (!indicator) return;
+
+        const memoryInfo = {
+            images: this.images.size,
+            processed: Array.from(this.images.values()).filter(img => img.processed).length,
+            errors: this.errorLog.length
+        };
+
+        const memoryScore = memoryInfo.images * 10 + memoryInfo.processed * 5;
+        indicator.textContent = `Memory: ${memoryInfo.images} images, ${memoryInfo.processed} processed`;
+
+        indicator.classList.remove('warning', 'critical', 'show');
+
+        if (memoryScore > 200) {
+            indicator.classList.add('critical', 'show');
+        } else if (memoryScore > 100) {
+            indicator.classList.add('warning', 'show');
+        } else if (memoryInfo.images > 0) {
+            indicator.classList.add('show');
+        }
+    }
+
+    updateMemorySettings() {
+        const mode = this.memoryManagement.value;
+        switch (mode) {
+            case 'aggressive':
+                this.cleanupMemoryAggressive();
+                break;
+            case 'auto':
+                this.cleanupMemoryAuto();
+                break;
+            case 'manual':
+                // Do nothing, user handles cleanup
+                break;
+        }
+    }
+
+    cleanupMemoryAuto() {
+        // Clean up processed images older than 5 minutes
+        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+
+        for (const [id, imageData] of this.images) {
+            if (imageData.processed && imageData.processedAt && imageData.processedAt < fiveMinutesAgo) {
+                this.cleanupImageData(imageData);
+            }
+        }
+    }
+
+    cleanupMemoryAggressive() {
+        // Clean up all processed images immediately
+        for (const [id, imageData] of this.images) {
+            if (imageData.processed) {
+                this.cleanupImageData(imageData);
+            }
+        }
+    }
+
+    cleanupImageData(imageData) {
+        // Clean up blob URLs
+        if (imageData.image && imageData.image.src.startsWith('blob:')) {
+            URL.revokeObjectURL(imageData.image.src);
+        }
+
+        if (imageData.enhancedImage && imageData.enhancedImage.src.startsWith('blob:')) {
+            URL.revokeObjectURL(imageData.enhancedImage.src);
+        }
+
+        // Clear large data
+        imageData.image = null;
+        imageData.enhancedImage = null;
+
+        // Mark as cleaned
+        imageData.memoryCleanedUp = true;
+    }
+
+    async handleMultipleImageUploadProduction(event) {
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
+
+        this.updateStatus('Loading images...', 'loading');
+
+        // Use lazy loading for large batches
+        if (files.length > this.galleryPageSize) {
+            await this.handleLargeImageBatch(files);
+        } else {
+            await this.handleStandardImageBatch(files);
+        }
+    }
+
+    async handleLargeImageBatch(files) {
+        this.addToProcessingLog(`Loading large batch: ${files.length} images`, 'info');
+
+        // Load first page immediately
+        const firstPage = files.slice(0, this.galleryPageSize);
+        await this.loadImagePage(firstPage, 0);
+
+        // Queue remaining files
+        for (let i = this.galleryPageSize; i < files.length; i += this.galleryPageSize) {
+            const page = files.slice(i, i + this.galleryPageSize);
+            this.imageLoadQueue.push({ files: page, page: Math.floor(i / this.galleryPageSize) });
+        }
+
+        this.setupLazyLoading();
+        this.updateStatus(`Loaded first ${firstPage.length} images. ${files.length - firstPage.length} queued for lazy loading.`, 'success');
+    }
+
+    async handleStandardImageBatch(files) {
+        await this.loadImagePage(files, 0);
+        this.updateStatus(`Loaded ${files.length} images.`, 'success');
+    }
+
+    async loadImagePage(files, pageIndex) {
+        for (const file of files) {
+            const imageId = this.generateImageId();
+
+            try {
+                const image = await this.loadImageFromFileWithErrorHandling(file);
+                this.images.set(imageId, {
+                    id: imageId,
+                    file: file,
+                    image: image,
+                    faces: [],
+                    results: [],
+                    selected: true,
+                    processed: false,
+                    status: 'loaded',
+                    page: pageIndex
+                });
+            } catch (error) {
+                this.addToErrorLog(`Failed to load image: ${file.name}`, error.message, 'error');
+            }
+        }
+
+        this.updateGallery();
+        this.updateControls();
+        this.imageGallery.style.display = 'block';
+    }
+
+    async loadImageFromFileWithErrorHandling(file) {
+        return new Promise((resolve, reject) => {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                reject(new Error('Invalid file type. Please select an image file.'));
+                return;
+            }
+
+            // Validate file size (max 50MB)
+            if (file.size > 50 * 1024 * 1024) {
+                reject(new Error('File too large. Maximum size is 50MB.'));
+                return;
+            }
+
+            const img = new Image();
+
+            img.onload = () => {
+                // Validate image dimensions
+                if (img.width < 50 || img.height < 50) {
+                    reject(new Error('Image too small. Minimum size is 50x50 pixels.'));
+                    return;
+                }
+
+                if (img.width > 8192 || img.height > 8192) {
+                    reject(new Error('Image too large. Maximum size is 8192x8192 pixels.'));
+                    return;
+                }
+
+                resolve(img);
+            };
+
+            img.onerror = () => {
+                reject(new Error('Corrupted or invalid image file.'));
+            };
+
+            try {
+                img.src = URL.createObjectURL(file);
+            } catch (error) {
+                reject(new Error('Failed to create object URL for image.'));
+            }
+        });
+    }
+
+    setupLazyLoading() {
+        // Add lazy loading indicator to gallery
+        const indicator = document.createElement('div');
+        indicator.className = 'gallery-lazy-loading';
+        indicator.innerHTML = 'Scroll to load more images...';
+        this.galleryGrid.appendChild(indicator);
+
+        // Setup intersection observer for lazy loading
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !this.isLoadingImages && this.imageLoadQueue.length > 0) {
+                    this.loadNextImagePage();
+                }
+            });
+        });
+
+        observer.observe(indicator);
+    }
+
+    async loadNextImagePage() {
+        if (this.imageLoadQueue.length === 0) return;
+
+        this.isLoadingImages = true;
+        const indicator = document.querySelector('.gallery-lazy-loading');
+
+        if (indicator) {
+            indicator.className = 'gallery-lazy-loading loading';
+            indicator.innerHTML = '<span class="spinner"></span>Loading more images...';
+        }
+
+        const { files, page } = this.imageLoadQueue.shift();
+        await this.loadImagePage(files, page);
+
+        this.isLoadingImages = false;
+
+        if (indicator) {
+            if (this.imageLoadQueue.length > 0) {
+                indicator.className = 'gallery-lazy-loading';
+                indicator.innerHTML = `Scroll to load more images... (${this.imageLoadQueue.length} pages remaining)`;
+            } else {
+                indicator.remove();
+            }
+        }
+    }
+
+    // Enhanced processImages with production optimizations
+    async processImagesProduction(imagesToProcess) {
+        if (this.isProcessing) return;
+
+        if (!this.detector && (!this.enableWebWorkers.checked || !this.workerInitialized)) {
+            this.updateStatus('Face detection not available. Please wait or check settings.', 'error');
+            return;
+        }
+
+        this.isProcessing = true;
+        this.processingQueue = imagesToProcess;
+        this.progressSection.style.display = 'block';
+
+        this.updateControls();
+        this.addToProcessingLog(`Starting batch processing of ${imagesToProcess.length} images`, 'info');
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (let i = 0; i < imagesToProcess.length; i++) {
+            const imageData = imagesToProcess[i];
+            const progress = ((i + 1) / imagesToProcess.length) * 100;
+
+            this.currentProcessingId = imageData.id;
+            imageData.status = 'processing';
+            this.updateGallery();
+
+            this.progressFill.style.width = `${progress}%`;
+            this.progressText.textContent = `Processing image ${i + 1} of ${imagesToProcess.length}: ${imageData.file.name}`;
+
+            try {
+                this.recordProcessingStart();
+                await this.processImageDataProduction(imageData);
+                imageData.processed = true;
+                imageData.status = 'completed';
+                imageData.processedAt = Date.now();
+                this.recordProcessingEnd(true, imageData.faces.length);
+                this.addToProcessingLog(`✓ Processed ${imageData.file.name}: ${imageData.faces.length} faces found`, 'success');
+                successCount++;
+
+                // Auto cleanup if enabled
+                if (this.memoryManagement.value === 'auto') {
+                    this.cleanupImageData(imageData);
+                }
+
+            } catch (error) {
+                console.error('Error processing image:', imageData.file.name, error);
+                imageData.status = 'error';
+                this.recordProcessingEnd(false, 0);
+                this.addToProcessingLog(`✗ Failed to process ${imageData.file.name}: ${error.message}`, 'error');
+                this.addToErrorLog(`Processing failed: ${imageData.file.name}`, error.message, 'error');
+                errorCount++;
+
+                // Continue on error if enabled
+                if (!this.continueOnError.checked) {
+                    this.addToProcessingLog('Processing stopped due to error (Continue on Error disabled)', 'warning');
+                    break;
+                }
+            }
+
+            this.updateGallery();
+
+            // Small delay to prevent UI blocking
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        this.isProcessing = false;
+        this.currentProcessingId = null;
+        this.progressSection.style.display = 'none';
+
+        this.updateControls();
+
+        const totalFaces = imagesToProcess.reduce((sum, img) => sum + (img.results?.length || 0), 0);
+
+        this.addToProcessingLog(`Batch processing completed: ${successCount} successful, ${errorCount} failed, ${totalFaces} total faces cropped`, 'info');
+        this.updateStatus(`Processed ${successCount} images (${errorCount} failed) and found ${totalFaces} faces total!`, successCount > 0 ? 'success' : 'error');
+    }
+
+    async processImageDataProduction(imageData) {
+        // Detect faces with enhanced error handling
+        const faces = await this.detectFacesWithQualityProduction(imageData.image, imageData.id);
+        imageData.faces = faces;
+
+        // Crop faces (only selected ones)
+        imageData.results = await this.cropFacesFromImageData(imageData);
+
+        // Update split view if enabled
+        if (this.splitViewEnabled) {
+            this.updateSplitViewContent();
+        }
+    }
+
     updateStatus(message, type = '') {
         this.status.textContent = message;
         this.status.className = `status ${type}`;
@@ -1960,7 +2586,17 @@ class FaceCropper {
         }
 
         const img = document.createElement('img');
-        img.src = imageData.image.src;
+        try {
+            if (imageData.image && imageData.image.src) {
+                img.src = imageData.image.src;
+            } else {
+                // Create placeholder or try to load from file
+                img.src = URL.createObjectURL(imageData.file);
+            }
+        } catch (error) {
+            // Fallback: show placeholder
+            img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM5OTkiPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
+        }
         img.alt = imageData.file.name;
 
         const info = document.createElement('div');
@@ -2038,12 +2674,12 @@ class FaceCropper {
 
     async processAll() {
         const allImages = Array.from(this.images.values());
-        await this.processImages(allImages);
+        await this.processImagesProduction(allImages);
     }
 
     async processSelected() {
         const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
-        await this.processImages(selectedImages);
+        await this.processImagesProduction(selectedImages);
     }
 
     async processImages(imagesToProcess) {

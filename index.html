@@ -84,9 +84,70 @@
                 </div>
 
                 <div class="workflow-section">
+                    <h4>Performance Settings</h4>
+                    <div class="performance-settings">
+                        <div class="setting-group">
+                            <label>
+                                <input type="checkbox" id="continueOnError" checked>
+                                Continue on Error
+                            </label>
+                            <div class="setting-help">Continue processing other images when one fails</div>
+                        </div>
+
+                        <div class="setting-group">
+                            <label>
+                                <input type="checkbox" id="reducedResolution">
+                                Fast Detection Mode
+                            </label>
+                            <div class="setting-help">Process at 50% resolution for faster detection</div>
+                        </div>
+
+                        <div class="setting-group">
+                            <label>
+                                <input type="checkbox" id="enableWebWorkers" checked>
+                                Use Web Workers
+                            </label>
+                            <div class="setting-help">Prevent UI blocking during processing</div>
+                        </div>
+
+                        <div class="setting-group">
+                            <label for="memoryManagement">Memory Management</label>
+                            <select id="memoryManagement">
+                                <option value="auto">Auto Cleanup</option>
+                                <option value="aggressive">Aggressive Cleanup</option>
+                                <option value="manual">Manual Only</option>
+                            </select>
+                            <div class="setting-help">How aggressively to free memory</div>
+                        </div>
+
+                        <div class="setting-group">
+                            <label for="retryAttempts">Retry Attempts</label>
+                            <input type="number" id="retryAttempts" min="0" max="5" value="2">
+                            <div class="setting-help">Number of retry attempts for failed detections</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="workflow-section">
                     <h4>Processing Log</h4>
                     <div class="processing-log" id="processingLog">
                         <div class="log-entry">Ready to process images...</div>
+                    </div>
+                </div>
+
+                <div class="workflow-section">
+                    <h4 class="collapsible-header error-log-header">
+                        Error Details
+                        <span class="collapse-icon">▼</span>
+                    </h4>
+                    <div class="collapsible-content error-log-panel">
+                        <div class="error-log" id="errorLog">
+                            <div class="log-entry">No errors detected</div>
+                        </div>
+                        <div class="error-actions">
+                            <button type="button" id="clearErrorsBtn" class="reset-button">Clear Errors</button>
+                            <button type="button" id="exportErrorsBtn" class="export-btn">Export Error Log</button>
+                        </div>
                     </div>
                 </div>
             </div>

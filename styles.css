@@ -1558,3 +1558,197 @@ button:hover:not(:disabled) {
         flex-direction: column;
     }
 }
+
+/* Performance settings */
+.performance-settings {
+    display: grid;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.performance-settings .setting-group {
+    background: var(--container-bg);
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.performance-settings select,
+.performance-settings input[type="number"] {
+    margin-top: 5px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--panel-bg);
+    color: var(--text-primary);
+    width: 100%;
+}
+
+/* Error log styles */
+.error-log-header {
+    color: var(--face-unselected) !important;
+    cursor: pointer;
+}
+
+.error-log-panel {
+    background: rgba(220, 53, 69, 0.05);
+    border: 1px solid var(--face-unselected);
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.error-log {
+    background: var(--container-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    max-height: 150px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    margin-bottom: 15px;
+}
+
+.error-log .log-entry {
+    padding: 3px 0;
+    color: var(--face-unselected);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.error-log .log-entry:last-child {
+    border-bottom: none;
+}
+
+.error-log .log-entry.critical {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.error-log .log-entry.warning {
+    color: #ffc107;
+}
+
+.error-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+/* Lazy loading indicator */
+.gallery-lazy-loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.gallery-lazy-loading.loading {
+    color: var(--face-selected);
+}
+
+.gallery-lazy-loading .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--border-color);
+    border-radius: 50%;
+    border-top-color: var(--face-selected);
+    animation: spin 1s ease-in-out infinite;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Memory usage indicator */
+.memory-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--container-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.memory-indicator.show {
+    opacity: 1;
+}
+
+.memory-indicator.warning {
+    border-color: #ffc107;
+    color: #ffc107;
+}
+
+.memory-indicator.critical {
+    border-color: var(--face-unselected);
+    color: var(--face-unselected);
+}
+
+/* Processing status indicators */
+.processing-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.processing-status .status-icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--border-color);
+}
+
+.processing-status .status-icon.processing {
+    background: var(--face-selected);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.processing-status .status-icon.success {
+    background: #28a745;
+}
+
+.processing-status .status-icon.error {
+    background: var(--face-unselected);
+}
+
+.processing-status .status-icon.retry {
+    background: #ffc107;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Worker status indicator */
+.worker-status {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-color);
+}
+
+.worker-status.active {
+    background: #28a745;
+}
+
+.worker-status.error {
+    background: var(--face-unselected);
+}
+
+.worker-status.initializing {
+    background: #ffc107;
+    animation: pulse 1s ease-in-out infinite;
+}
