@@ -132,6 +132,7 @@ class FaceCropper {
                     const minY = Math.min(...ys);
                     const maxY = Math.max(...ys);
 
+                    // Scale to canvas coordinates for display
                     const scaleX = this.inputCanvas.width / this.currentImage.width;
                     const scaleY = this.inputCanvas.height / this.currentImage.height;
 
@@ -139,11 +140,7 @@ class FaceCropper {
                         x: minX * scaleX,
                         y: minY * scaleY,
                         width: (maxX - minX) * scaleX,
-                        height: (maxY - minY) * scaleY,
-                        originalX: minX,
-                        originalY: minY,
-                        originalWidth: maxX - minX,
-                        originalHeight: maxY - minY
+                        height: (maxY - minY) * scaleY
                     });
                 }
             }
@@ -197,33 +194,38 @@ class FaceCropper {
             this.croppedFaces = [];
             this.croppedContainer.innerHTML = '';
 
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
+            // Create a temporary canvas to draw the displayed image
+            const tempDisplayCanvas = document.createElement('canvas');
+            const tempDisplayCtx = tempDisplayCanvas.getContext('2d');
+            tempDisplayCanvas.width = this.inputCanvas.width;
+            tempDisplayCanvas.height = this.inputCanvas.height;
+
+            // Draw the image exactly as displayed on the canvas
+            tempDisplayCtx.drawImage(this.currentImage, 0, 0, this.inputCanvas.width, this.inputCanvas.height);
+
+            // Create crop canvas
+            const cropCanvas = document.createElement('canvas');
+            const cropCtx = cropCanvas.getContext('2d');
 
             this.detectedFaces.forEach((face, index) => {
-                const padding = Math.min(face.originalWidth, face.originalHeight) * 0.2;
+                // Use exact bounding box coordinates - no padding
+                const cropX = face.x;
+                const cropY = face.y;
+                const cropWidth = face.width;
+                const cropHeight = face.height;
 
-                const cropX = Math.max(0, face.originalX - padding);
-                const cropY = Math.max(0, face.originalY - padding);
-                const cropWidth = Math.min(
-                    face.originalWidth + 2 * padding,
-                    this.currentImage.width - cropX
-                );
-                const cropHeight = Math.min(
-                    face.originalHeight + 2 * padding,
-                    this.currentImage.height - cropY
-                );
+                // Set crop canvas size
+                cropCanvas.width = cropWidth;
+                cropCanvas.height = cropHeight;
 
-                tempCanvas.width = cropWidth;
-                tempCanvas.height = cropHeight;
-
-                tempCtx.drawImage(
-                    this.currentImage,
+                // Crop directly from the displayed canvas using exact preview coordinates
+                cropCtx.drawImage(
+                    tempDisplayCanvas,
                     cropX, cropY, cropWidth, cropHeight,
                     0, 0, cropWidth, cropHeight
                 );
 
-                const croppedDataUrl = tempCanvas.toDataURL('image/png');
+                const croppedDataUrl = cropCanvas.toDataURL('image/png');
                 this.croppedFaces.push(croppedDataUrl);
 
                 this.displayCroppedFace(croppedDataUrl, index + 1);
