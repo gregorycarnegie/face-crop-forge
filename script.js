@@ -1,9 +1,10 @@
 class FaceCropper {
     constructor() {
         this.detector = null;
-        this.currentImage = null;
-        this.detectedFaces = [];
-        this.croppedFaces = [];
+        this.images = new Map(); // imageId -> { file, image, faces, results, selected, processed }
+        this.processingQueue = [];
+        this.isProcessing = false;
+        this.currentProcessingId = null;
 
         this.initializeElements();
         this.setupEventListeners();
@@ -12,9 +13,23 @@ class FaceCropper {
 
     initializeElements() {
         this.imageInput = document.getElementById('imageInput');
-        this.detectBtn = document.getElementById('detectBtn');
-        this.cropBtn = document.getElementById('cropBtn');
-        this.downloadBtn = document.getElementById('downloadBtn');
+        this.processAllBtn = document.getElementById('processAllBtn');
+        this.processSelectedBtn = document.getElementById('processSelectedBtn');
+        this.clearAllBtn = document.getElementById('clearAllBtn');
+        this.downloadAllBtn = document.getElementById('downloadAllBtn');
+
+        this.progressSection = document.getElementById('progressSection');
+        this.progressFill = document.getElementById('progressFill');
+        this.progressText = document.getElementById('progressText');
+
+        this.imageGallery = document.getElementById('imageGallery');
+        this.galleryGrid = document.getElementById('galleryGrid');
+        this.selectAllBtn = document.getElementById('selectAllBtn');
+        this.selectNoneBtn = document.getElementById('selectNoneBtn');
+        this.selectedCount = document.getElementById('selectedCount');
+        this.totalCount = document.getElementById('totalCount');
+
+        this.canvasContainer = document.getElementById('canvasContainer');
         this.inputCanvas = document.getElementById('inputCanvas');
         this.outputCanvas = document.getElementById('outputCanvas');
         this.faceCount = document.getElementById('faceCount');
@@ -32,10 +47,14 @@ class FaceCropper {
     }
 
     setupEventListeners() {
-        this.imageInput.addEventListener('change', (e) => this.handleImageUpload(e));
-        this.detectBtn.addEventListener('click', () => this.detectFaces());
-        this.cropBtn.addEventListener('click', () => this.cropFaces());
-        this.downloadBtn.addEventListener('click', () => this.downloadCroppedFaces());
+        this.imageInput.addEventListener('change', (e) => this.handleMultipleImageUpload(e));
+        this.processAllBtn.addEventListener('click', () => this.processAll());
+        this.processSelectedBtn.addEventListener('click', () => this.processSelected());
+        this.clearAllBtn.addEventListener('click', () => this.clearAll());
+        this.downloadAllBtn.addEventListener('click', () => this.downloadAllResults());
+
+        this.selectAllBtn.addEventListener('click', () => this.selectAll());
+        this.selectNoneBtn.addEventListener('click', () => this.selectNone());
 
         // Crop settings listeners
         this.outputWidth.addEventListener('input', () => this.updatePreview());
@@ -74,255 +93,356 @@ class FaceCropper {
             };
 
             this.detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
-            this.updateStatus('MediaPipe model loaded successfully. Ready to detect faces!', 'success');
+            this.updateStatus('MediaPipe model loaded successfully. Ready to process images!', 'success');
         } catch (error) {
             console.error('Error loading MediaPipe model:', error);
             this.updateStatus(`Error loading model: ${error.message}`, 'error');
         }
     }
 
-    handleImageUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
+    async handleMultipleImageUpload(event) {
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
 
-        this.updateStatus('Loading image...', 'loading');
+        this.updateStatus('Loading images...', 'loading');
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
+        for (const file of files) {
+            const imageId = this.generateImageId();
+
+            try {
+                const image = await this.loadImageFromFile(file);
+                this.images.set(imageId, {
+                    id: imageId,
+                    file: file,
+                    image: image,
+                    faces: [],
+                    results: [],
+                    selected: true,
+                    processed: false,
+                    status: 'loaded'
+                });
+            } catch (error) {
+                console.error('Error loading image:', file.name, error);
+            }
+        }
+
+        this.updateGallery();
+        this.updateControls();
+        this.imageGallery.style.display = 'block';
+        this.updateStatus(`Loaded ${this.images.size} images. Select images and click "Process Selected" or "Process All".`, 'success');
+    }
+
+    async loadImageFromFile(file) {
+        return new Promise((resolve, reject) => {
             const img = new Image();
-            img.onload = () => {
-                this.currentImage = img;
-                this.displayImage(img);
-                this.resetDetection();
-                this.detectBtn.disabled = false;
-                this.updateStatus('Image loaded. Click "Detect Faces" to find faces.', 'success');
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-
-    displayImage(img) {
-        const maxWidth = 800;
-        const maxHeight = 600;
-
-        let { width, height } = img;
-
-        if (width > maxWidth || height > maxHeight) {
-            const ratio = Math.min(maxWidth / width, maxHeight / height);
-            width *= ratio;
-            height *= ratio;
-        }
-
-        this.inputCanvas.width = width;
-        this.inputCanvas.height = height;
-
-        this.ctx.clearRect(0, 0, width, height);
-        this.ctx.drawImage(img, 0, 0, width, height);
-    }
-
-    resetDetection() {
-        this.detectedFaces = [];
-        this.croppedFaces = [];
-        this.faceCount.textContent = '0';
-        this.croppedContainer.innerHTML = '';
-        this.cropBtn.disabled = true;
-        this.downloadBtn.disabled = true;
-    }
-
-    async detectFaces() {
-        if (!this.currentImage || !this.detector) {
-            this.updateStatus('Please load an image and wait for the model to load', 'error');
-            return;
-        }
-
-        try {
-            this.updateStatus('Detecting faces...', 'loading');
-            this.detectBtn.disabled = true;
-
-            const faces = await this.detector.estimateFaces(this.currentImage);
-
-            this.detectedFaces = [];
-
-            if (faces.length > 0) {
-                for (const face of faces) {
-                    const keypoints = face.keypoints;
-
-                    const xs = keypoints.map(point => point.x);
-                    const ys = keypoints.map(point => point.y);
-
-                    const minX = Math.min(...xs);
-                    const maxX = Math.max(...xs);
-                    const minY = Math.min(...ys);
-                    const maxY = Math.max(...ys);
-
-                    // Scale to canvas coordinates for display
-                    const scaleX = this.inputCanvas.width / this.currentImage.width;
-                    const scaleY = this.inputCanvas.height / this.currentImage.height;
-
-                    this.detectedFaces.push({
-                        x: minX * scaleX,
-                        y: minY * scaleY,
-                        width: (maxX - minX) * scaleX,
-                        height: (maxY - minY) * scaleY
-                    });
-                }
-            }
-
-            this.drawFaceBoxes();
-            this.faceCount.textContent = this.detectedFaces.length;
-
-            if (this.detectedFaces.length > 0) {
-                this.cropBtn.disabled = false;
-                this.updateStatus(`Detected ${this.detectedFaces.length} face(s). Click "Crop Selected Faces" to extract them.`, 'success');
-            } else {
-                this.updateStatus('No faces detected in the image.', 'error');
-            }
-
-            this.detectBtn.disabled = false;
-
-        } catch (error) {
-            console.error('Error detecting faces:', error);
-            this.updateStatus(`Error detecting faces: ${error.message}`, 'error');
-            this.detectBtn.disabled = false;
-        }
-    }
-
-    drawFaceBoxes() {
-        this.displayImage(this.currentImage);
-
-        this.ctx.strokeStyle = '#00FF00';
-        this.ctx.lineWidth = 3;
-        this.ctx.font = '16px Arial';
-        this.ctx.fillStyle = '#00FF00';
-
-        this.detectedFaces.forEach((face, index) => {
-            this.ctx.strokeRect(face.x, face.y, face.width, face.height);
-
-            const label = `Face ${index + 1}`;
-            const labelY = face.y > 20 ? face.y - 5 : face.y + face.height + 20;
-            this.ctx.fillText(label, face.x, labelY);
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = URL.createObjectURL(file);
         });
     }
 
-    async cropFaces() {
-        if (!this.currentImage || this.detectedFaces.length === 0) {
-            this.updateStatus('No faces to crop', 'error');
-            return;
-        }
-
-        try {
-            this.updateStatus('Cropping faces...', 'loading');
-            this.cropBtn.disabled = true;
-
-            this.croppedFaces = [];
-            this.croppedContainer.innerHTML = '';
-
-            // Get crop settings
-            const outputWidth = parseInt(this.outputWidth.value);
-            const outputHeight = parseInt(this.outputHeight.value);
-            const faceHeightPct = parseInt(this.faceHeightPct.value) / 100;
-
-            // Create a temporary canvas to draw the displayed image
-            const tempDisplayCanvas = document.createElement('canvas');
-            const tempDisplayCtx = tempDisplayCanvas.getContext('2d');
-            tempDisplayCanvas.width = this.inputCanvas.width;
-            tempDisplayCanvas.height = this.inputCanvas.height;
-
-            // Draw the image exactly as displayed on the canvas
-            tempDisplayCtx.drawImage(this.currentImage, 0, 0, this.inputCanvas.width, this.inputCanvas.height);
-
-            // Create crop canvas with fixed output dimensions
-            const cropCanvas = document.createElement('canvas');
-            const cropCtx = cropCanvas.getContext('2d');
-            cropCanvas.width = outputWidth;
-            cropCanvas.height = outputHeight;
-
-            this.detectedFaces.forEach((face, index) => {
-                // 1. Calculate target face height in output
-                const targetFaceHeight = outputHeight * faceHeightPct;
-
-                // 2. Find scale needed so detected face height becomes target height
-                const scale = targetFaceHeight / face.height;
-
-                // 3. Define crop box dimensions in source with output aspect ratio
-                const cropWidthSrc = outputWidth / scale;
-                const cropHeightSrc = outputHeight / scale;
-
-                // 4. Center crop box on the face, clamped to canvas bounds
-                const faceCenterX = face.x + face.width / 2;
-                const faceCenterY = face.y + face.height / 2;
-
-                const cropX = Math.max(0, Math.min(
-                    this.inputCanvas.width - cropWidthSrc,
-                    faceCenterX - cropWidthSrc / 2
-                ));
-                const cropY = Math.max(0, Math.min(
-                    this.inputCanvas.height - cropHeightSrc,
-                    faceCenterY - cropHeightSrc / 2
-                ));
-
-                // Ensure crop dimensions don't exceed canvas bounds
-                const finalCropWidth = Math.min(cropWidthSrc, this.inputCanvas.width - cropX);
-                const finalCropHeight = Math.min(cropHeightSrc, this.inputCanvas.height - cropY);
-
-                // 5. Crop from source, then resize to output dimensions
-                cropCtx.drawImage(
-                    tempDisplayCanvas,
-                    cropX, cropY, finalCropWidth, finalCropHeight,
-                    0, 0, outputWidth, outputHeight
-                );
-
-                const croppedDataUrl = cropCanvas.toDataURL('image/png');
-                this.croppedFaces.push(croppedDataUrl);
-
-                this.displayCroppedFace(croppedDataUrl, index + 1);
-            });
-
-            this.downloadBtn.disabled = false;
-            this.updateStatus(`Successfully cropped ${this.croppedFaces.length} faces!`, 'success');
-            this.cropBtn.disabled = false;
-
-        } catch (error) {
-            console.error('Error cropping faces:', error);
-            this.updateStatus(`Error cropping faces: ${error.message}`, 'error');
-            this.cropBtn.disabled = false;
-        }
+    generateImageId() {
+        return 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
-    displayCroppedFace(dataUrl, index) {
-        const faceDiv = document.createElement('div');
-        faceDiv.className = 'cropped-face';
+    updateGallery() {
+        this.galleryGrid.innerHTML = '';
+
+        for (const [imageId, imageData] of this.images) {
+            const galleryItem = this.createGalleryItem(imageData);
+            this.galleryGrid.appendChild(galleryItem);
+        }
+
+        this.updateSelectionCounter();
+    }
+
+    createGalleryItem(imageData) {
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.dataset.imageId = imageData.id;
+
+        if (imageData.selected) {
+            item.classList.add('selected');
+        }
+        if (imageData.processed) {
+            item.classList.add('processed');
+        }
+        if (imageData.status === 'processing') {
+            item.classList.add('processing');
+        }
 
         const img = document.createElement('img');
-        img.src = dataUrl;
-        img.alt = `Face ${index}`;
+        img.src = imageData.image.src;
+        img.alt = imageData.file.name;
 
-        const indexLabel = document.createElement('div');
-        indexLabel.className = 'face-index';
-        indexLabel.textContent = index;
+        const info = document.createElement('div');
+        info.className = 'gallery-item-info';
 
-        faceDiv.appendChild(img);
-        faceDiv.appendChild(indexLabel);
-        this.croppedContainer.appendChild(faceDiv);
-    }
+        const name = document.createElement('div');
+        name.className = 'gallery-item-name';
+        name.textContent = imageData.file.name;
 
-    downloadCroppedFaces() {
-        if (this.croppedFaces.length === 0) {
-            this.updateStatus('No cropped faces to download', 'error');
-            return;
+        const status = document.createElement('div');
+        status.className = 'gallery-item-status';
+        if (imageData.processed) {
+            status.textContent = `${imageData.results.length} faces`;
+            status.classList.add('processed');
+        } else if (imageData.status === 'processing') {
+            status.textContent = 'Processing...';
+            status.classList.add('processing');
+        } else {
+            status.textContent = 'Ready';
         }
 
-        this.croppedFaces.forEach((dataUrl, index) => {
-            const link = document.createElement('a');
-            link.download = `cropped_face_${index + 1}.png`;
-            link.href = dataUrl;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
+        info.appendChild(name);
+        info.appendChild(status);
+        item.appendChild(img);
+        item.appendChild(info);
 
-        this.updateStatus(`Downloaded ${this.croppedFaces.length} cropped faces!`, 'success');
+        item.addEventListener('click', () => this.toggleSelection(imageData.id));
+
+        return item;
+    }
+
+    toggleSelection(imageId) {
+        const imageData = this.images.get(imageId);
+        if (imageData) {
+            imageData.selected = !imageData.selected;
+            this.updateGallery();
+            this.updateControls();
+        }
+    }
+
+    selectAll() {
+        for (const imageData of this.images.values()) {
+            imageData.selected = true;
+        }
+        this.updateGallery();
+        this.updateControls();
+    }
+
+    selectNone() {
+        for (const imageData of this.images.values()) {
+            imageData.selected = false;
+        }
+        this.updateGallery();
+        this.updateControls();
+    }
+
+    updateSelectionCounter() {
+        const selected = Array.from(this.images.values()).filter(img => img.selected).length;
+        const total = this.images.size;
+
+        this.selectedCount.textContent = selected;
+        this.totalCount.textContent = total;
+    }
+
+    updateControls() {
+        const hasImages = this.images.size > 0;
+        const hasSelected = Array.from(this.images.values()).some(img => img.selected);
+        const hasResults = Array.from(this.images.values()).some(img => img.results.length > 0);
+
+        this.processAllBtn.disabled = !hasImages || this.isProcessing;
+        this.processSelectedBtn.disabled = !hasSelected || this.isProcessing;
+        this.clearAllBtn.disabled = !hasImages;
+        this.downloadAllBtn.disabled = !hasResults;
+    }
+
+    async processAll() {
+        const allImages = Array.from(this.images.values());
+        await this.processImages(allImages);
+    }
+
+    async processSelected() {
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+        await this.processImages(selectedImages);
+    }
+
+    async processImages(imagesToProcess) {
+        if (this.isProcessing) return;
+
+        this.isProcessing = true;
+        this.processingQueue = imagesToProcess;
+        this.progressSection.style.display = 'block';
+
+        this.updateControls();
+
+        for (let i = 0; i < imagesToProcess.length; i++) {
+            const imageData = imagesToProcess[i];
+            const progress = ((i + 1) / imagesToProcess.length) * 100;
+
+            this.currentProcessingId = imageData.id;
+            imageData.status = 'processing';
+            this.updateGallery();
+
+            this.progressFill.style.width = `${progress}%`;
+            this.progressText.textContent = `Processing image ${i + 1} of ${imagesToProcess.length}: ${imageData.file.name}`;
+
+            try {
+                await this.processImageData(imageData);
+                imageData.processed = true;
+                imageData.status = 'completed';
+            } catch (error) {
+                console.error('Error processing image:', imageData.file.name, error);
+                imageData.status = 'error';
+            }
+
+            this.updateGallery();
+
+            // Small delay to prevent UI blocking
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        this.isProcessing = false;
+        this.currentProcessingId = null;
+        this.progressSection.style.display = 'none';
+
+        this.updateControls();
+
+        const successCount = imagesToProcess.filter(img => img.status === 'completed').length;
+        const totalFaces = imagesToProcess.reduce((sum, img) => sum + img.results.length, 0);
+
+        this.updateStatus(`Processed ${successCount} images and found ${totalFaces} faces total!`, 'success');
+    }
+
+    async processImageData(imageData) {
+        // Detect faces
+        const faces = await this.detector.estimateFaces(imageData.image);
+        imageData.faces = [];
+
+        if (faces.length > 0) {
+            for (const face of faces) {
+                const keypoints = face.keypoints;
+                const xs = keypoints.map(point => point.x);
+                const ys = keypoints.map(point => point.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+
+                imageData.faces.push({
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX,
+                    height: maxY - minY
+                });
+            }
+        }
+
+        // Crop faces
+        imageData.results = await this.cropFacesFromImageData(imageData);
+    }
+
+    async cropFacesFromImageData(imageData) {
+        if (imageData.faces.length === 0) return [];
+
+        const results = [];
+        const outputWidth = parseInt(this.outputWidth.value);
+        const outputHeight = parseInt(this.outputHeight.value);
+        const faceHeightPct = parseInt(this.faceHeightPct.value) / 100;
+
+        // Create temporary canvas for processing
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = imageData.image.width;
+        tempCanvas.height = imageData.image.height;
+        tempCtx.drawImage(imageData.image, 0, 0);
+
+        // Create crop canvas
+        const cropCanvas = document.createElement('canvas');
+        const cropCtx = cropCanvas.getContext('2d');
+        cropCanvas.width = outputWidth;
+        cropCanvas.height = outputHeight;
+
+        for (let i = 0; i < imageData.faces.length; i++) {
+            const face = imageData.faces[i];
+
+            // Calculate target face height and scale
+            const targetFaceHeight = outputHeight * faceHeightPct;
+            const scale = targetFaceHeight / face.height;
+
+            // Calculate crop dimensions
+            const cropWidthSrc = outputWidth / scale;
+            const cropHeightSrc = outputHeight / scale;
+
+            // Center crop on face
+            const faceCenterX = face.x + face.width / 2;
+            const faceCenterY = face.y + face.height / 2;
+
+            const cropX = Math.max(0, Math.min(
+                imageData.image.width - cropWidthSrc,
+                faceCenterX - cropWidthSrc / 2
+            ));
+            const cropY = Math.max(0, Math.min(
+                imageData.image.height - cropHeightSrc,
+                faceCenterY - cropHeightSrc / 2
+            ));
+
+            const finalCropWidth = Math.min(cropWidthSrc, imageData.image.width - cropX);
+            const finalCropHeight = Math.min(cropHeightSrc, imageData.image.height - cropY);
+
+            // Crop and resize
+            cropCtx.drawImage(
+                tempCanvas,
+                cropX, cropY, finalCropWidth, finalCropHeight,
+                0, 0, outputWidth, outputHeight
+            );
+
+            const croppedDataUrl = cropCanvas.toDataURL('image/png');
+            results.push({
+                dataUrl: croppedDataUrl,
+                faceIndex: i + 1,
+                sourceImage: imageData.file.name
+            });
+        }
+
+        return results;
+    }
+
+    downloadAllResults() {
+        let totalDownloads = 0;
+
+        for (const imageData of this.images.values()) {
+            if (imageData.results.length > 0) {
+                imageData.results.forEach((result, index) => {
+                    const link = document.createElement('a');
+                    const filename = `${imageData.file.name.split('.')[0]}_face_${result.faceIndex}.png`;
+                    link.download = filename;
+                    link.href = result.dataUrl;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    totalDownloads++;
+                });
+            }
+        }
+
+        this.updateStatus(`Downloaded ${totalDownloads} cropped faces!`, 'success');
+    }
+
+    clearAll() {
+        // Clean up object URLs
+        for (const imageData of this.images.values()) {
+            if (imageData.image.src.startsWith('blob:')) {
+                URL.revokeObjectURL(imageData.image.src);
+            }
+        }
+
+        this.images.clear();
+        this.processingQueue = [];
+        this.isProcessing = false;
+        this.currentProcessingId = null;
+
+        this.imageGallery.style.display = 'none';
+        this.canvasContainer.style.display = 'none';
+        this.progressSection.style.display = 'none';
+        this.croppedContainer.innerHTML = '';
+
+        this.updateControls();
+        this.updateStatus('Workspace cleared. Ready to load new images.', 'success');
+
+        // Reset file input
+        this.imageInput.value = '';
     }
 }
 

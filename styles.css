@@ -54,12 +54,164 @@ h1 {
     box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
 }
 
-.controls {
+.batch-controls {
     display: flex;
     justify-content: center;
     gap: 15px;
     margin-bottom: 30px;
     flex-wrap: wrap;
+}
+
+.progress-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(45deg, #4CAF50, #45a049);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    text-align: center;
+    color: #555;
+    font-weight: 500;
+}
+
+.image-gallery {
+    margin-bottom: 30px;
+    padding: 25px;
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 15px;
+}
+
+.image-gallery h3 {
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+    text-align: center;
+}
+
+.gallery-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.gallery-controls button {
+    padding: 8px 16px;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: transform 0.3s ease;
+}
+
+.gallery-controls button:hover {
+    transform: translateY(-2px);
+}
+
+.selection-counter {
+    color: #555;
+    font-weight: 500;
+}
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.gallery-item {
+    position: relative;
+    background: white;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.gallery-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+.gallery-item.selected {
+    border: 3px solid #667eea;
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+}
+
+.gallery-item.processed {
+    border: 3px solid #4CAF50;
+}
+
+.gallery-item.processing {
+    border: 3px solid #FF6B35;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.gallery-item img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 5px;
+    margin-bottom: 8px;
+}
+
+.gallery-item-info {
+    text-align: center;
+    font-size: 0.8rem;
+    color: #555;
+}
+
+.gallery-item-name {
+    font-weight: bold;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gallery-item-status {
+    color: #999;
+}
+
+.gallery-item-status.processed {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.gallery-item-status.processing {
+    color: #FF6B35;
+    font-weight: bold;
 }
 
 button {

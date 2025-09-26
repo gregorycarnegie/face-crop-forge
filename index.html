@@ -11,14 +11,22 @@
         <h1>Face Cropping Tool</h1>
 
         <div class="upload-section">
-            <input type="file" id="imageInput" accept="image/*">
-            <label for="imageInput" class="file-label">Choose Image</label>
+            <input type="file" id="imageInput" accept="image/*" multiple>
+            <label for="imageInput" class="file-label">Choose Images</label>
         </div>
 
-        <div class="controls">
-            <button id="detectBtn" disabled>Detect Faces</button>
-            <button id="cropBtn" disabled>Crop Selected Faces</button>
-            <button id="downloadBtn" disabled>Download Cropped Images</button>
+        <div class="batch-controls">
+            <button id="processAllBtn" disabled>Process All</button>
+            <button id="processSelectedBtn" disabled>Process Selected</button>
+            <button id="clearAllBtn" disabled>Clear All</button>
+            <button id="downloadAllBtn" disabled>Download All Results</button>
+        </div>
+
+        <div class="progress-section" id="progressSection" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">Processing...</div>
         </div>
 
         <div class="crop-settings">
@@ -48,13 +56,23 @@
             </div>
         </div>
 
-        <div class="canvas-container">
-            <canvas id="inputCanvas"></canvas>
-            <canvas id="outputCanvas" style="display: none;"></canvas>
+        <div class="image-gallery" id="imageGallery" style="display: none;">
+            <h3>Image Gallery</h3>
+            <div class="gallery-controls">
+                <button id="selectAllBtn">Select All</button>
+                <button id="selectNoneBtn">Select None</button>
+                <span class="selection-counter">Selected: <span id="selectedCount">0</span> of <span id="totalCount">0</span></span>
+            </div>
+            <div class="gallery-grid" id="galleryGrid"></div>
         </div>
 
-        <div id="faceCounter">
-            <span>Detected faces: <span id="faceCount">0</span></span>
+        <div class="canvas-container" id="canvasContainer" style="display: none;">
+            <h3>Current Image Preview</h3>
+            <canvas id="inputCanvas"></canvas>
+            <canvas id="outputCanvas" style="display: none;"></canvas>
+            <div id="faceCounter">
+                <span>Detected faces: <span id="faceCount">0</span></span>
+            </div>
         </div>
 
         <div class="cropped-faces" id="croppedFaces">
