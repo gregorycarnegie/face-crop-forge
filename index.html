@@ -8,23 +8,35 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Face Cropping Tool</h1>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="title-row">
+                <h1>Face Cropping Tool</h1>
+                <div class="header-actions">
+                    <button id="splitViewBtn" class="ghost-btn" title="Enable split view" aria-label="Enable split view" aria-pressed="false">Split View</button>
+                    <button id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
+                </div>
+            </div>
 
-        <div class="upload-section">
-            <input type="file" id="imageInput" accept="image/*" multiple>
-            <label for="imageInput" class="file-label">Choose Images</label>
-        </div>
+            <div class="upload-card">
+                <input type="file" id="imageInput" accept="image/*" multiple>
+                <label for="imageInput" class="file-label">
+                    <span class="upload-title">Drop images or click to upload</span>
+                    <span class="upload-subtitle">You can add multiple images at once</span>
+                </label>
+            </div>
 
-        <div class="batch-controls">
-            <button id="processAllBtn" disabled>Process All</button>
-            <button id="processSelectedBtn" disabled>Process Selected</button>
-            <button id="clearAllBtn" disabled>Clear All</button>
-            <button id="downloadAllBtn" disabled>Download All Results</button>
-            <button id="splitViewBtn" class="split-view-btn">Split View</button>
-            <button id="darkModeBtn" class="dark-mode-btn">🌙 Dark Mode</button>
-        </div>
+            <div class="batch-controls">
+                <button id="processAllBtn" disabled>Process All</button>
+                <button id="processSelectedBtn" disabled>Process Selected</button>
+                <button id="clearAllBtn" disabled>Clear All</button>
+                <button id="downloadAllBtn" disabled>Download All Results</button>
+            </div>
+        </header>
 
+        <div class="app-body">
+            <aside class="control-panel">
+                <div class="control-scroll">
         <div class="workflow-tools">
             <h3 class="collapsible-header">
                 Professional Workflow Tools
@@ -155,13 +167,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="progress-section hidden" id="progressSection">
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <div class="progress-text" id="progressText">Processing...</div>
         </div>
 
         <div class="crop-settings">
@@ -371,55 +376,68 @@
             </div>
             </div>
         </div>
+                </div>
+            </aside>
+            <main class="workspace">
+                <div class="workspace-scroll">
+                    <div class="progress-section hidden workspace-card" id="progressSection">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">Processing...</div>
+                    </div>
 
-        <div class="image-gallery hidden" id="imageGallery">
-            <h3>Image Gallery</h3>
-            <div class="gallery-controls">
-                <button id="selectAllBtn">Select All</button>
-                <button id="selectNoneBtn">Select None</button>
-                <span class="selection-counter">Selected: <span id="selectedCount">0</span> of <span id="totalCount">0</span></span>
-            </div>
-            <div class="gallery-grid" id="galleryGrid"></div>
-        </div>
+                    <div class="image-gallery hidden workspace-card" id="imageGallery">
+                        <h3>Image Gallery</h3>
+                        <div class="gallery-controls">
+                            <button id="selectAllBtn">Select All</button>
+                            <button id="selectNoneBtn">Select None</button>
+                            <span class="selection-counter">Selected: <span id="selectedCount">0</span> of <span id="totalCount">0</span></span>
+                        </div>
+                        <div class="gallery-grid" id="galleryGrid"></div>
+                    </div>
 
-        <div class="canvas-container hidden" id="canvasContainer">
-            <h3 id="canvasTitle">Current Image Preview</h3>
-            <div class="canvas-wrapper" id="canvasWrapper">
-                <div class="canvas-panel" id="originalPanel">
-                    <h4 class="panel-title">Original</h4>
-                    <div class="panel-content">
-                        <canvas id="inputCanvas"></canvas>
-                        <div id="faceOverlays" class="face-overlays"></div>
+                    <div class="canvas-container hidden workspace-card" id="canvasContainer">
+                        <h3 id="canvasTitle">Current Image Preview</h3>
+                        <div class="canvas-wrapper" id="canvasWrapper">
+                            <div class="canvas-panel" id="originalPanel">
+                                <h4 class="panel-title">Original</h4>
+                                <div class="panel-content">
+                                    <canvas id="inputCanvas"></canvas>
+                                    <div id="faceOverlays" class="face-overlays"></div>
+                                </div>
+                            </div>
+                            <div class="canvas-panel hidden" id="processedPanel">
+                                <h4 class="panel-title">Processed</h4>
+                                <div class="panel-content">
+                                    <canvas id="outputCanvas"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="face-controls">
+                            <div id="faceCounter">
+                                <span>Detected faces: <span id="faceCount">0</span></span>
+                                <span class="separator">•</span>
+                                <span>Selected: <span id="selectedFaceCount">0</span></span>
+                            </div>
+                            <div class="face-selection-controls">
+                                <button id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
+                                <button id="selectNoneFacesBtn" class="small-btn">Select None</button>
+                                <button id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cropped-faces workspace-card" id="croppedFaces">
+                        <h3>Cropped Faces:</h3>
+                        <div id="croppedContainer"></div>
+                    </div>
+
+                    <div class="status workspace-card" id="status">
+                        Ready to load image
                     </div>
                 </div>
-                <div class="canvas-panel hidden" id="processedPanel">
-                    <h4 class="panel-title">Processed</h4>
-                    <div class="panel-content">
-                        <canvas id="outputCanvas"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="face-controls">
-                <div id="faceCounter">
-                    <span>Detected faces: <span id="faceCount">0</span></span>
-                    <span class="separator">•</span>
-                    <span>Selected: <span id="selectedFaceCount">0</span></span>
-                </div>
-                <div class="face-selection-controls">
-                    <button id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
-                    <button id="selectNoneFacesBtn" class="small-btn">Select None</button>
-                    <button id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="cropped-faces" id="croppedFaces">
-            <h3>Cropped Faces:</h3>
-            <div id="croppedContainer"></div>
-        </div>
-
-        <div class="status" id="status">
-            Ready to load image
+            </main>
         </div>
     </div>
 

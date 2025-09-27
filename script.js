@@ -576,14 +576,19 @@ class FaceCropper {
         this.splitViewEnabled = !this.splitViewEnabled;
         this.splitViewBtn.classList.toggle('active', this.splitViewEnabled);
         this.canvasWrapper.classList.toggle('split-view', this.splitViewEnabled);
+        this.splitViewBtn.setAttribute('aria-pressed', this.splitViewEnabled.toString());
 
         if (this.splitViewEnabled) {
             this.processedPanel.classList.remove('hidden');
             this.splitViewBtn.textContent = 'Single View';
+            this.splitViewBtn.setAttribute('aria-label', 'Switch to single view');
+            this.splitViewBtn.setAttribute('title', 'Switch to single view');
             this.updateSplitViewContent();
         } else {
             this.processedPanel.classList.add('hidden');
             this.splitViewBtn.textContent = 'Split View';
+            this.splitViewBtn.setAttribute('aria-label', 'Enable split view');
+            this.splitViewBtn.setAttribute('title', 'Enable split view');
         }
     }
 
@@ -591,11 +596,15 @@ class FaceCropper {
         this.isDarkMode = !this.isDarkMode;
         const theme = this.isDarkMode ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', theme);
-        this.darkModeBtn.textContent = this.isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
 
-        // Save preference
+        const icon = this.isDarkMode ? '☀️' : '🌙';
+        const tooltip = this.isDarkMode ? 'Switch to light mode' : 'Switch to dark mode';
+        this.darkModeBtn.textContent = icon;
+        this.darkModeBtn.setAttribute('aria-label', tooltip);
+        this.darkModeBtn.setAttribute('title', tooltip);
+        this.darkModeBtn.setAttribute('aria-pressed', this.isDarkMode.toString());
+
         localStorage.setItem('faceCropperTheme', theme);
-
         this.updateStatus(`Switched to ${theme} mode`, 'success');
     }
 
@@ -604,8 +613,14 @@ class FaceCropper {
         if (savedTheme === 'dark') {
             this.isDarkMode = true;
             document.documentElement.setAttribute('data-theme', 'dark');
-            this.darkModeBtn.textContent = '☀️ Light Mode';
         }
+
+        const icon = this.isDarkMode ? '☀️' : '🌙';
+        const tooltip = this.isDarkMode ? 'Switch to light mode' : 'Switch to dark mode';
+        this.darkModeBtn.textContent = icon;
+        this.darkModeBtn.setAttribute('aria-label', tooltip);
+        this.darkModeBtn.setAttribute('title', tooltip);
+        this.darkModeBtn.setAttribute('aria-pressed', this.isDarkMode.toString());
     }
 
     updateSplitViewContent() {
@@ -632,35 +647,34 @@ class FaceCropper {
     }
 
     setupDragAndDrop() {
-        const uploadSection = document.querySelector('.upload-section');
+        const uploadCard = document.querySelector('.upload-card');
+        if (!uploadCard) {
+            return;
+        }
 
-        // Add drag message
         const dragMessage = document.createElement('div');
         dragMessage.className = 'drag-message';
         dragMessage.textContent = 'Drop your images here!';
-        uploadSection.appendChild(dragMessage);
+        uploadCard.appendChild(dragMessage);
 
-        // Prevent default drag behaviors
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadSection.addEventListener(eventName, this.preventDefaults, false);
+            uploadCard.addEventListener(eventName, this.preventDefaults, false);
             document.body.addEventListener(eventName, this.preventDefaults, false);
         });
 
-        // Highlight drop area when item is dragged over it
         ['dragenter', 'dragover'].forEach(eventName => {
-            uploadSection.addEventListener(eventName, () => {
-                uploadSection.classList.add('drag-over');
+            uploadCard.addEventListener(eventName, () => {
+                uploadCard.classList.add('drag-over');
             }, false);
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
-            uploadSection.addEventListener(eventName, () => {
-                uploadSection.classList.remove('drag-over');
+            uploadCard.addEventListener(eventName, () => {
+                uploadCard.classList.remove('drag-over');
             }, false);
         });
 
-        // Handle dropped files
-        uploadSection.addEventListener('drop', (e) => {
+        uploadCard.addEventListener('drop', (e) => {
             const dt = e.dataTransfer;
             const files = dt.files;
             this.handleDroppedFiles(files);

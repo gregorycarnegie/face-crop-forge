@@ -25,7 +25,8 @@
       "Bash(mkdir:*)",
       "Bash(rm:*)",
       "Bash(cat:*)",
-      "Bash(dir)"
+      "Bash(dir)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []
