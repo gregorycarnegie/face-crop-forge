@@ -72,7 +72,7 @@ a {
 }
 
 .app-shell {
-    max-width: 1280px;
+    max-width: 95vw;
     margin: 0 auto;
     background: var(--container-bg);
     border-radius: 24px;
@@ -207,7 +207,7 @@ button:disabled {
 }
 
 .control-panel {
-    flex: 0 0 340px;
+    flex: 0 0 420px;
 }
 
 .control-scroll {
@@ -549,20 +549,56 @@ button:disabled {
     display: flex;
     align-items: center;
     gap: 8px;
+    width: 100%;
+}
+
+.input-with-lock input[type="number"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.size-controls {
+    grid-column: 1 / -1;
+}
+
+.size-inputs {
+    display: flex;
+    gap: 20px;
+    align-items: flex-end;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.input-group input[type="number"] {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.input-group label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-size: 0.85rem;
 }
 
 .lock-button {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     background: var(--muted-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    flex-shrink: 0;
 }
 
 .lock-button:hover {
@@ -1308,7 +1344,7 @@ button:disabled {
 .collapsible-content {
     overflow: hidden;
     transition: max-height 0.3s ease, opacity 0.3s ease;
-    max-height: 1000px;
+    max-height: 2000px;
     opacity: 1;
 }
 

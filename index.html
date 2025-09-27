@@ -192,22 +192,23 @@
             </div>
 
             <div class="settings-grid">
-                <div class="setting-group">
-                    <label for="outputWidth">Output Width (px)</label>
-                    <div class="input-with-lock">
-                        <label for="outputWidth" class="sr-only">Output width</label>
-                        <input type="number" id="outputWidth" value="256" min="64" max="2048" step="32">
-                        <button type="button" id="aspectRatioLock" class="lock-button" title="Lock aspect ratio">🔓</button>
+                <div class="setting-group size-controls">
+                    <div class="size-inputs">
+                        <div class="input-group">
+                            <label for="outputWidth">Output Width (px)</label>
+                            <div class="input-with-lock">
+                                <input type="number" id="outputWidth" value="256" min="64" max="2048" step="32">
+                                <button type="button" id="aspectRatioLock" class="lock-button" title="Lock aspect ratio">🔓</button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="outputHeight">Output Height (px)</label>
+                            <input type="number" id="outputHeight" value="256" min="64" max="2048" step="32">
+                        </div>
                     </div>
                 </div>
                 <div class="setting-group">
-                    <label for="outputHeight">Output Height (px)</label>
-                    <label for="outputHeight" class="sr-only">Output height</label>
-                    <input type="number" id="outputHeight" value="256" min="64" max="2048" step="32">
-                </div>
-                <div class="setting-group">
                     <label for="faceHeightPct">Face Height %</label>
-                    <label for="faceHeightPct" class="sr-only">Face height percentage</label>
                     <input type="number" id="faceHeightPct" value="70" min="10" max="100" step="5">
                 </div>
                 <div class="setting-group">
