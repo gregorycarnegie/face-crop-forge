@@ -2,6 +2,7 @@ class FaceCropper {
     constructor() {
         this.detector = null;
         this.images = new Map(); // imageId -> { file, image, faces, results, selected, processed }
+        this.imageResults = new Map(); // Store results from streamed processing
         this.processingQueue = [];
         this.isProcessing = false;
         this.currentProcessingId = null;
@@ -2165,6 +2166,133 @@ class FaceCropper {
         }
     }
 
+    async loadAllQueuedImages() {
+        if (this.imageLoadQueue.length === 0) return;
+
+        this.isLoadingImages = true;
+        const totalQueued = this.imageLoadQueue.length;
+
+        while (this.imageLoadQueue.length > 0) {
+            const { files, page } = this.imageLoadQueue.shift();
+            const remainingPages = this.imageLoadQueue.length;
+
+            this.updateStatus(`Loading batch ${totalQueued - remainingPages}/${totalQueued} (${files.length} images)...`, 'loading');
+
+            await this.loadImagePage(files, page);
+
+            // Small delay to prevent UI blocking
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+
+        this.isLoadingImages = false;
+
+        // Remove lazy loading indicator
+        const indicator = this.galleryGrid.querySelector('.gallery-lazy-loading');
+        if (indicator) {
+            indicator.remove();
+        }
+
+        this.updateStatus(`All images loaded. Total: ${this.images.size} images.`, 'success');
+    }
+
+    // Stream processing: handles both loaded images and file references efficiently
+    async processImagesAndFilesProduction(loadedImages, queuedFiles) {
+        if (this.isProcessing) return;
+
+        if (!this.detector && (!this.enableWebWorkers.checked || !this.workerInitialized)) {
+            this.updateStatus('Face detection not available. Please wait or check settings.', 'error');
+            return;
+        }
+
+        this.isProcessing = true;
+        const totalCount = loadedImages.length + queuedFiles.length;
+        this.progressSection.classList.remove('hidden');
+        this.updateControls();
+
+        this.addToProcessingLog(`Starting stream processing of ${totalCount} images (${loadedImages.length} loaded, ${queuedFiles.length} from files)`, 'info');
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        // Process loaded images first
+        for (let i = 0; i < loadedImages.length; i++) {
+            const imageData = loadedImages[i];
+            const progress = ((i + 1) / totalCount) * 100;
+
+            this.progressFill.style.width = `${progress}%`;
+            this.progressText.textContent = `Processing loaded image ${i + 1}/${totalCount}...`;
+
+            try {
+                await this.processImageDataProduction(imageData);
+                successCount++;
+            } catch (error) {
+                errorCount++;
+                this.addToProcessingLog(`Error processing ${imageData.file.name}: ${error.message}`, 'error');
+            }
+        }
+
+        // Stream process queued files (load -> process -> discard)
+        for (let i = 0; i < queuedFiles.length; i++) {
+            const file = queuedFiles[i];
+            const overallIndex = loadedImages.length + i + 1;
+            const progress = (overallIndex / totalCount) * 100;
+
+            this.progressFill.style.width = `${progress}%`;
+            this.progressText.textContent = `Streaming file ${overallIndex}/${totalCount}: ${file.name}`;
+
+            try {
+                // Create temporary image data for processing
+                const image = await this.loadImageFromFileWithErrorHandling(file);
+                const tempImageData = {
+                    id: `temp_${Date.now()}_${i}`,
+                    file: file,
+                    image: image,
+                    faces: [],
+                    results: [],
+                    selected: true,
+                    processed: false,
+                    status: 'loaded'
+                };
+
+                // Process without storing in main images collection
+                await this.processImageDataProduction(tempImageData);
+
+                // Add results to permanent storage if any faces found
+                if (tempImageData.results.length > 0) {
+                    // Store only results, not the image data
+                    this.imageResults.set(tempImageData.id, {
+                        filename: file.name,
+                        results: tempImageData.results,
+                        processedAt: new Date().toISOString()
+                    });
+                }
+
+                // Clean up temporary image from memory
+                if (image.src && image.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(image.src);
+                }
+
+                successCount++;
+            } catch (error) {
+                errorCount++;
+                this.addToProcessingLog(`Error processing ${file.name}: ${error.message}`, 'error');
+            }
+        }
+
+        this.isProcessing = false;
+        this.updateControls();
+        this.progressFill.style.width = '100%';
+        this.progressText.textContent = 'Processing complete!';
+
+        const message = `Stream processing complete! Processed: ${successCount}, Errors: ${errorCount}`;
+        this.updateStatus(message, errorCount > 0 ? 'warning' : 'success');
+        this.addToProcessingLog(message, 'info');
+
+        setTimeout(() => {
+            this.progressSection.classList.add('hidden');
+        }, 3000);
+    }
+
     // Enhanced processImages with production optimizations
     async processImagesProduction(imagesToProcess) {
         if (this.isProcessing) return;
@@ -2676,30 +2804,55 @@ class FaceCropper {
 
     updateSelectionCounter() {
         const selected = Array.from(this.images.values()).filter(img => img.selected).length;
-        const total = this.images.size;
+        const loaded = this.images.size;
+        const queued = this.imageLoadQueue.length * this.galleryPageSize;
+        const total = loaded + queued;
 
         this.selectedCount.textContent = selected;
-        this.totalCount.textContent = total;
+
+        if (queued > 0) {
+            this.totalCount.textContent = `${loaded} (+${queued} queued)`;
+        } else {
+            this.totalCount.textContent = total;
+        }
     }
 
     updateControls() {
         const hasImages = this.images.size > 0;
+        const hasQueuedFiles = this.imageLoadQueue.length > 0;
         const hasSelected = Array.from(this.images.values()).some(img => img.selected);
-        const hasResults = Array.from(this.images.values()).some(img => img.results.length > 0);
+        const hasLoadedResults = Array.from(this.images.values()).some(img => img.results.length > 0);
+        const hasStreamedResults = this.imageResults.size > 0;
+        const hasResults = hasLoadedResults || hasStreamedResults;
 
-        this.processAllBtn.disabled = !hasImages || this.isProcessing;
+        this.processAllBtn.disabled = (!hasImages && !hasQueuedFiles) || this.isProcessing;
         this.processSelectedBtn.disabled = !hasSelected || this.isProcessing;
-        this.clearAllBtn.disabled = !hasImages;
+        this.clearAllBtn.disabled = !hasImages && !hasQueuedFiles;
         this.downloadAllBtn.disabled = !hasResults;
     }
 
     async processAll() {
-        const allImages = Array.from(this.images.values());
-        await this.processImagesProduction(allImages);
+        // Process both loaded images and queued file references
+        const loadedImages = Array.from(this.images.values());
+        const queuedFiles = this.imageLoadQueue.flatMap(batch => batch.files);
+
+        if (queuedFiles.length > 0) {
+            this.updateStatus(`Processing ${loadedImages.length} loaded images + ${queuedFiles.length} queued files...`, 'loading');
+            await this.processImagesAndFilesProduction(loadedImages, queuedFiles);
+        } else {
+            await this.processImagesProduction(loadedImages);
+        }
     }
 
     async processSelected() {
         const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+
+        // If no images are selected but there are queued images, inform the user
+        if (selectedImages.length === 0 && this.imageLoadQueue.length > 0) {
+            this.updateStatus('No images selected. Use "Process All" to process all images including queued ones.', 'warning');
+            return;
+        }
+
         await this.processImagesProduction(selectedImages);
     }
 
@@ -3170,10 +3323,17 @@ class FaceCropper {
     async downloadAllResults() {
         const allResults = [];
 
-        // Collect all results
+        // Collect results from loaded images
         for (const imageData of this.images.values()) {
             if (imageData.results.length > 0) {
                 allResults.push(...imageData.results);
+            }
+        }
+
+        // Collect results from streamed processing
+        for (const streamedResult of this.imageResults.values()) {
+            if (streamedResult.results.length > 0) {
+                allResults.push(...streamedResult.results);
             }
         }
 
@@ -3325,12 +3485,14 @@ class FaceCropper {
     clearAll() {
         // Clean up object URLs
         for (const imageData of this.images.values()) {
-            if (imageData.image.src.startsWith('blob:')) {
+            if (imageData.image && imageData.image.src && imageData.image.src.startsWith('blob:')) {
                 URL.revokeObjectURL(imageData.image.src);
             }
         }
 
         this.images.clear();
+        this.imageResults.clear();
+        this.imageLoadQueue = [];
         this.processingQueue = [];
         this.isProcessing = false;
         this.currentProcessingId = null;

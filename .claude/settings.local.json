@@ -26,7 +26,8 @@
       "Bash(rm:*)",
       "Bash(cat:*)",
       "Bash(dir)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": [],
     "ask": []
