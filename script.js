@@ -1679,6 +1679,51 @@ class FaceCropper {
         }
     }
 
+    convertBoundingBoxToPixels(bbox, imageWidth, imageHeight) {
+        if (!bbox) {
+            return null;
+        }
+
+        const originX = Number.isFinite(bbox.originX) ? bbox.originX : 0;
+        const originY = Number.isFinite(bbox.originY) ? bbox.originY : 0;
+        const boxWidth = Number.isFinite(bbox.width) ? bbox.width : 0;
+        const boxHeight = Number.isFinite(bbox.height) ? bbox.height : 0;
+
+        const isNormalized = originX >= 0 && originX <= 1 &&
+            originY >= 0 && originY <= 1 &&
+            boxWidth > 0 && boxWidth <= 1 &&
+            boxHeight > 0 && boxHeight <= 1;
+
+        const rawX = isNormalized ? originX * imageWidth : originX;
+        const rawY = isNormalized ? originY * imageHeight : originY;
+        const rawWidth = isNormalized ? boxWidth * imageWidth : boxWidth;
+        const rawHeight = isNormalized ? boxHeight * imageHeight : boxHeight;
+
+        if (!Number.isFinite(rawX) || !Number.isFinite(rawY) ||
+            !Number.isFinite(rawWidth) || !Number.isFinite(rawHeight)) {
+            return null;
+        }
+
+        const clampedX = Math.min(Math.max(rawX, 0), imageWidth);
+        const clampedY = Math.min(Math.max(rawY, 0), imageHeight);
+        const maxWidth = imageWidth - clampedX;
+        const maxHeight = imageHeight - clampedY;
+
+        const width = Math.min(Math.max(rawWidth, 1), maxWidth);
+        const height = Math.min(Math.max(rawHeight, 1), maxHeight);
+
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+
+        return {
+            x: clampedX,
+            y: clampedY,
+            width,
+            height
+        };
+    }
+
     async detectFacesWithQualityProduction(image, imageId) {
         // Enhanced version with error handling and retry logic
         const maxRetries = parseInt(this.retryAttempts.value) || 0;
@@ -2579,41 +2624,62 @@ class FaceCropper {
         return { cropX, cropY };
     }
 
+    async waitForMediaPipe() {
+        // Wait for MediaPipe Tasks Vision library to be available
+        const maxWaitTime = 10000; // 10 seconds
+        const checkInterval = 100; // 100ms
+        let elapsed = 0;
+
+        while (elapsed < maxWaitTime) {
+            if (typeof window.vision !== 'undefined' &&
+                window.vision.FilesetResolver &&
+                window.vision.FaceDetector) {
+                return; // Library is loaded
+            }
+            await new Promise(resolve => setTimeout(resolve, checkInterval));
+            elapsed += checkInterval;
+        }
+
+        throw new Error('MediaPipe Tasks Vision library failed to load within timeout');
+    }
+
     async loadModel() {
         try {
             this.updateStatus('Loading MediaPipe face detection model...', 'loading');
 
-            // Wait for TensorFlow to be ready
-            await tf.ready();
-            console.log('TensorFlow.js ready');
+            // Wait for MediaPipe Tasks Vision library to load
+            await this.waitForMediaPipe();
 
-            // Check if faceLandmarksDetection is available
-            if (typeof faceLandmarksDetection === 'undefined') {
-                throw new Error('MediaPipe face landmarks detection library not loaded');
+            // Check if MediaPipe Tasks Vision is available
+            if (!window.vision || !window.vision.FilesetResolver || !window.vision.FaceDetector) {
+                throw new Error('MediaPipe Tasks Vision library not loaded');
             }
 
-            const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
-            const detectorConfig = {
-                runtime: 'tfjs',
-                refineLandmarks: false,
-                maxFaces: 20,
-                solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh'
-            };
+            console.log('Initializing MediaPipe Tasks Vision...');
 
-            console.log('Creating detector with config:', detectorConfig);
-            this.detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
-            console.log('Detector created successfully');
+            // Initialize the MediaPipe Vision tasks
+            const visionFileset = await window.vision.FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+            );
 
+            // Create face detector with WebAssembly runtime
+            this.detector = await window.vision.FaceDetector.createFromOptions(visionFileset, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
+                    delegate: "GPU"
+                },
+                runningMode: "IMAGE"
+            });
+
+            console.log('MediaPipe face detector created successfully');
             this.updateStatus('MediaPipe model loaded successfully. Ready to process images!', 'success');
         } catch (error) {
             console.error('Error loading MediaPipe model:', error);
             this.updateStatus(`Error loading model: ${error.message}. Please refresh the page.`, 'error');
 
             // Try to provide helpful error information
-            if (typeof tf === 'undefined') {
-                this.updateStatus('TensorFlow.js not loaded. Please refresh the page.', 'error');
-            } else if (typeof faceLandmarksDetection === 'undefined') {
-                this.updateStatus('MediaPipe face detection library not loaded. Please refresh the page.', 'error');
+            if (!window.vision || !window.vision.FilesetResolver || !window.vision.FaceDetector) {
+                this.updateStatus('MediaPipe Tasks Vision library not loaded. Please refresh the page.', 'error');
             }
         }
     }
@@ -2885,32 +2951,39 @@ class FaceCropper {
             throw new Error('Face detection model not loaded. Please wait for model to load.');
         }
 
-        const faces = await this.detector.estimateFaces(image);
+        const detectionResult = await this.detector.detect(image);
         const detectedFaces = [];
 
-        if (faces.length > 0) {
-            for (let i = 0; i < faces.length; i++) {
-                const face = faces[i];
-                const keypoints = face.keypoints;
-                const xs = keypoints.map(point => point.x);
-                const ys = keypoints.map(point => point.y);
-                const minX = Math.min(...xs);
-                const maxX = Math.max(...xs);
-                const minY = Math.min(...ys);
-                const maxY = Math.max(...ys);
+        if (detectionResult.detections && detectionResult.detections.length > 0) {
+            for (let i = 0; i < detectionResult.detections.length; i++) {
+                const detection = detectionResult.detections[i];
+                const bbox = detection.boundingBox;
+                const box = this.convertBoundingBoxToPixels(bbox, image.width, image.height);
+                if (!box) {
+                    continue;
+                }
+                const { x, y, width, height } = box;
 
-                // Calculate confidence score from keypoint stability
-                const confidence = this.calculateConfidenceScore(keypoints);
+                // Use detection confidence from MediaPipe
+                const confidence = detection.categories && detection.categories.length > 0
+                    ? detection.categories[0].score
+                    : 0.8; // Default confidence
 
                 // Calculate face quality using blur detection
-                const quality = await this.calculateFaceQuality(image, minX, minY, maxX - minX, maxY - minY);
+                const quality = await this.calculateFaceQuality(image, x, y, width, height);
 
                 detectedFaces.push({
                     id: `face_${i}`,
-                    x: minX,
-                    y: minY,
-                    width: maxX - minX,
-                    height: maxY - minY,
+                    x: x,
+                    y: y,
+                    width: width,
+                    height: height,
+                    box: {
+                        xMin: x,
+                        yMin: y,
+                        width: width,
+                        height: height
+                    },
                     confidence: confidence,
                     quality: quality,
                     selected: true, // Default to selected
@@ -2922,37 +2995,47 @@ class FaceCropper {
         return detectedFaces;
     }
 
-    calculateConfidenceScore(keypoints) {
-        // Calculate confidence based on keypoint distribution and stability
-        if (keypoints.length === 0) return 0;
-
-        // Simple confidence score based on keypoint spread
-        const xs = keypoints.map(p => p.x);
-        const ys = keypoints.map(p => p.y);
-        const width = Math.max(...xs) - Math.min(...xs);
-        const height = Math.max(...ys) - Math.min(...ys);
-
-        // Higher confidence for larger, well-distributed faces
-        const score = Math.min(0.95, (width * height) / 50000 + 0.3);
-        return Math.max(0.1, score);
-    }
 
     async calculateFaceQuality(image, x, y, width, height) {
-        // Create canvas to extract face region
+        const safeX = Math.max(0, Math.min(image.width, Math.floor(x)));
+        const safeY = Math.max(0, Math.min(image.height, Math.floor(y)));
+        const maxWidth = image.width - safeX;
+        const maxHeight = image.height - safeY;
+        const safeWidth = Math.max(1, Math.min(Math.floor(width), maxWidth));
+        const safeHeight = Math.max(1, Math.min(Math.floor(height), maxHeight));
+
+        if (safeWidth <= 0 || safeHeight <= 0) {
+            return { score: 0, level: 'unknown' };
+        }
+
+        const maxDimension = 1024;
+        const downscale = Math.min(1, maxDimension / Math.max(safeWidth, safeHeight));
+        const targetWidth = Math.max(1, Math.floor(safeWidth * downscale));
+        const targetHeight = Math.max(1, Math.floor(safeHeight * downscale));
+
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = width;
-        canvas.height = height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
 
-        // Draw face region
-        ctx.drawImage(image, x, y, width, height, 0, 0, width, height);
+        ctx.drawImage(
+            image,
+            safeX, safeY, safeWidth, safeHeight,
+            0, 0, targetWidth, targetHeight
+        );
 
-        // Get image data for blur analysis
-        const imageData = ctx.getImageData(0, 0, width, height);
+        let imageData;
+        try {
+            imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+        } catch (error) {
+            console.warn('Face quality analysis skipped due to canvas limits', error);
+            return { score: 0, level: 'unknown' };
+        }
+
         const data = imageData.data;
 
         // Calculate Laplacian variance for blur detection
-        const laplacianVariance = this.calculateLaplacianVariance(data, width, height);
+        const laplacianVariance = this.calculateLaplacianVariance(data, targetWidth, targetHeight);
 
         // Classify quality based on variance
         if (laplacianVariance > 1000) return { score: laplacianVariance, level: 'high' };

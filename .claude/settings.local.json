@@ -27,7 +27,11 @@
       "Bash(cat:*)",
       "Bash(dir)",
       "Bash(tasklist:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:codepen.io)",
+      "WebFetch(domain:developers.google.com)",
+      "WebFetch(domain:cdn.jsdelivr.net)"
     ],
     "deny": [],
     "ask": []

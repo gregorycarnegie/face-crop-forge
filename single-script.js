@@ -147,18 +147,96 @@ class SingleImageFaceCropper {
         });
     }
 
+    convertBoundingBoxToPixels(bbox, imageWidth, imageHeight) {
+        if (!bbox) {
+            return null;
+        }
+
+        const originX = Number.isFinite(bbox.originX) ? bbox.originX : 0;
+        const originY = Number.isFinite(bbox.originY) ? bbox.originY : 0;
+        const boxWidth = Number.isFinite(bbox.width) ? bbox.width : 0;
+        const boxHeight = Number.isFinite(bbox.height) ? bbox.height : 0;
+
+        const isNormalized = originX >= 0 && originX <= 1 &&
+            originY >= 0 && originY <= 1 &&
+            boxWidth > 0 && boxWidth <= 1 &&
+            boxHeight > 0 && boxHeight <= 1;
+
+        const rawX = isNormalized ? originX * imageWidth : originX;
+        const rawY = isNormalized ? originY * imageHeight : originY;
+        const rawWidth = isNormalized ? boxWidth * imageWidth : boxWidth;
+        const rawHeight = isNormalized ? boxHeight * imageHeight : boxHeight;
+
+        if (!Number.isFinite(rawX) || !Number.isFinite(rawY) ||
+            !Number.isFinite(rawWidth) || !Number.isFinite(rawHeight)) {
+            return null;
+        }
+
+        const clampedX = Math.min(Math.max(rawX, 0), imageWidth);
+        const clampedY = Math.min(Math.max(rawY, 0), imageHeight);
+        const maxWidth = imageWidth - clampedX;
+        const maxHeight = imageHeight - clampedY;
+
+        const width = Math.min(Math.max(rawWidth, 1), maxWidth);
+        const height = Math.min(Math.max(rawHeight, 1), maxHeight);
+
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+
+        return {
+            x: clampedX,
+            y: clampedY,
+            width,
+            height
+        };
+    }
+
+    async waitForMediaPipe() {
+        // Wait for MediaPipe Tasks Vision library to be available
+        const maxWaitTime = 10000; // 10 seconds
+        const checkInterval = 100; // 100ms
+        let elapsed = 0;
+
+        while (elapsed < maxWaitTime) {
+            if (typeof window.vision !== 'undefined' &&
+                window.vision.FilesetResolver &&
+                window.vision.FaceDetector) {
+                return; // Library is loaded
+            }
+            await new Promise(resolve => setTimeout(resolve, checkInterval));
+            elapsed += checkInterval;
+        }
+
+        throw new Error('MediaPipe Tasks Vision library failed to load within timeout');
+    }
+
     async loadModel() {
         try {
             this.updateStatus('Loading face detection model...');
-            await tf.ready();
-            this.detector = await faceLandmarksDetection.createDetector(
-                faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
-                {
-                    runtime: 'tfjs',
-                    refineLandmarks: true,
-                    maxFaces: 10
-                }
+
+            // Wait for MediaPipe Tasks Vision library to load
+            await this.waitForMediaPipe();
+
+            // Check if MediaPipe Tasks Vision is available
+            if (!window.vision || !window.vision.FilesetResolver || !window.vision.FaceDetector) {
+                throw new Error('MediaPipe Tasks Vision library not loaded');
+            }
+
+            // Initialize the MediaPipe Vision tasks
+            const visionFileset = await window.vision.FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
             );
+
+            // Create face detector with WebAssembly runtime
+            this.detector = await window.vision.FaceDetector.createFromOptions(visionFileset, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
+                    delegate: "GPU"
+                },
+                runningMode: "IMAGE"
+            });
+
             this.updateStatus('Model loaded successfully. Ready to process images.');
             this.addToLog('Face detection model loaded successfully');
         } catch (error) {
@@ -233,12 +311,36 @@ class SingleImageFaceCropper {
         this.processingStartTime = Date.now();
 
         try {
-            const faces = await this.detector.estimateFaces(this.currentImage);
-            this.faces = faces.map((face, index) => ({
-                ...face,
-                id: index,
-                selected: true
-            }));
+            const detectionResult = await this.detector.detect(this.currentImage);
+
+            this.faces = [];
+            if (detectionResult.detections && detectionResult.detections.length > 0) {
+                this.faces = detectionResult.detections
+                    .map((detection, index) => {
+                        const bbox = detection.boundingBox;
+                        const box = this.convertBoundingBoxToPixels(bbox, this.currentImage.width, this.currentImage.height);
+                        if (!box) {
+                            return null;
+                        }
+
+                        const { x, y, width, height } = box;
+
+                        return {
+                            id: index,
+                            box: {
+                                xMin: x,
+                                yMin: y,
+                                width: width,
+                                height: height
+                            },
+                            confidence: detection.categories && detection.categories.length > 0
+                                ? detection.categories[0].score
+                                : 0.8,
+                            selected: true
+                        };
+                    })
+                    .filter(Boolean);
+            }
 
             this.selectedFaces = new Set(this.faces.map(f => f.id));
             this.updateFaceOverlays();
