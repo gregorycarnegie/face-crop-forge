@@ -4,26 +4,32 @@
 let detector = null;
 let isInitialized = false;
 
-// Import TensorFlow.js and MediaPipe dependencies
-self.importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core');
-self.importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter');
-self.importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl');
-self.importScripts('https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection');
+// Import MediaPipe Tasks Vision
+self.importScripts('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs');
 
 async function initializeDetector() {
     try {
-        // Wait for TensorFlow to be ready
-        await tf.ready();
+        // Wait for MediaPipe Tasks Vision to be available
+        while (!self.vision) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
 
-        const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
-        const detectorConfig = {
-            runtime: 'tfjs',
-            refineLandmarks: false,
-            maxFaces: 20,
-            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh'
-        };
+        console.log('Initializing MediaPipe Tasks Vision in worker...');
 
-        detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
+        // Initialize the MediaPipe Vision tasks
+        const visionFileset = await self.vision.FilesetResolver.forVisionTasks(
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
+
+        // Create face detector with WebAssembly runtime
+        detector = await self.vision.FaceDetector.createFromOptions(visionFileset, {
+            baseOptions: {
+                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
+                delegate: "GPU"
+            },
+            runningMode: "IMAGE"
+        });
+
         isInitialized = true;
 
         self.postMessage({
@@ -47,43 +53,34 @@ async function detectFaces(imageData, options = {}) {
     try {
         // Create canvas from image data
         const canvas = new OffscreenCanvas(imageData.width, imageData.height);
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         // Create ImageData and put it on canvas
         const imgData = new ImageData(imageData.data, imageData.width, imageData.height);
         ctx.putImageData(imgData, 0, 0);
 
-        // Detect faces
-        const faces = await detector.estimateFaces(canvas);
+        // Detect faces using MediaPipe Tasks Vision
+        const detectionResult = await detector.detect(canvas);
         const detectedFaces = [];
 
-        if (faces.length > 0) {
-            for (let i = 0; i < faces.length; i++) {
-                const face = faces[i];
-                const keypoints = face.keypoints;
-                const xs = keypoints.map(point => point.x);
-                const ys = keypoints.map(point => point.y);
-                const minX = Math.min(...xs);
-                const maxX = Math.max(...xs);
-                const minY = Math.min(...ys);
-                const maxY = Math.max(...ys);
-
-                // Calculate confidence score
-                const confidence = calculateConfidenceScore(keypoints);
+        if (detectionResult.detections && detectionResult.detections.length > 0) {
+            for (let i = 0; i < detectionResult.detections.length; i++) {
+                const detection = detectionResult.detections[i];
+                const boundingBox = detection.boundingBox;
 
                 // Calculate face quality if requested
                 let quality = null;
                 if (options.includeQuality) {
-                    quality = await calculateFaceQuality(canvas, minX, minY, maxX - minX, maxY - minY);
+                    quality = await calculateFaceQuality(canvas, boundingBox.originX, boundingBox.originY, boundingBox.width, boundingBox.height);
                 }
 
                 detectedFaces.push({
                     id: `face_${i}`,
-                    x: minX,
-                    y: minY,
-                    width: maxX - minX,
-                    height: maxY - minY,
-                    confidence: confidence,
+                    x: boundingBox.originX,
+                    y: boundingBox.originY,
+                    width: boundingBox.width,
+                    height: boundingBox.height,
+                    confidence: detection.categories[0]?.score || 0.5,
                     quality: quality,
                     selected: true,
                     index: i + 1
@@ -97,21 +94,9 @@ async function detectFaces(imageData, options = {}) {
     }
 }
 
-function calculateConfidenceScore(keypoints) {
-    if (keypoints.length === 0) return 0;
-
-    const xs = keypoints.map(p => p.x);
-    const ys = keypoints.map(p => p.y);
-    const width = Math.max(...xs) - Math.min(...xs);
-    const height = Math.max(...ys) - Math.min(...ys);
-
-    const score = Math.min(0.95, (width * height) / 50000 + 0.3);
-    return Math.max(0.1, score);
-}
-
 async function calculateFaceQuality(canvas, x, y, width, height) {
     try {
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const imageData = ctx.getImageData(x, y, width, height);
         const data = imageData.data;
 
