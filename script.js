@@ -209,6 +209,13 @@ class FaceCropper {
             });
         }
 
+        const csvBatchModeBtn = document.getElementById('csvBatchModeBtn');
+        if (csvBatchModeBtn) {
+            csvBatchModeBtn.addEventListener('click', () => {
+                window.location.href = 'csv-batch.html';
+            });
+        }
+
         // Preprocessing listeners
         this.autoColorCorrection.addEventListener('change', () => this.updateEnhancementSummary());
         this.exposureAdjustment.addEventListener('input', () => this.updateSliderValue('exposure'));

@@ -98,6 +98,13 @@ class SingleImageFaceCropper {
             });
         }
 
+        const csvBatchModeBtn = document.getElementById('csvBatchModeBtn');
+        if (csvBatchModeBtn) {
+            csvBatchModeBtn.addEventListener('click', () => {
+                window.location.href = 'csv-batch.html';
+            });
+        }
+
         // Dark mode listener
         const darkModeBtn = document.getElementById('darkModeBtn');
         if (darkModeBtn) {
