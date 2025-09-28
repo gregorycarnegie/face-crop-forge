@@ -201,6 +201,14 @@ class FaceCropper {
         this.splitViewBtn.addEventListener('click', () => this.toggleSplitView());
         this.darkModeBtn.addEventListener('click', () => this.toggleDarkMode());
 
+        // Navigation listeners
+        const singleImageModeBtn = document.getElementById('singleImageModeBtn');
+        if (singleImageModeBtn) {
+            singleImageModeBtn.addEventListener('click', () => {
+                window.location.href = 'single.html';
+            });
+        }
+
         // Preprocessing listeners
         this.autoColorCorrection.addEventListener('change', () => this.updateEnhancementSummary());
         this.exposureAdjustment.addEventListener('input', () => this.updateSliderValue('exposure'));
