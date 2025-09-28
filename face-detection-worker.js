@@ -4,25 +4,25 @@
 let detector = null;
 let isInitialized = false;
 
-// Import MediaPipe Tasks Vision
-self.importScripts('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs');
+// Import MediaPipe Tasks Vision using dynamic import
+let vision = null;
 
 async function initializeDetector() {
     try {
-        // Wait for MediaPipe Tasks Vision to be available
-        while (!self.vision) {
-            await new Promise(resolve => setTimeout(resolve, 100));
+        // Dynamic import of MediaPipe Tasks Vision
+        if (!vision) {
+            vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs');
         }
 
         console.log('Initializing MediaPipe Tasks Vision in worker...');
 
         // Initialize the MediaPipe Vision tasks
-        const visionFileset = await self.vision.FilesetResolver.forVisionTasks(
+        const visionFileset = await vision.FilesetResolver.forVisionTasks(
             "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
         );
 
         // Create face detector with WebAssembly runtime
-        detector = await self.vision.FaceDetector.createFromOptions(visionFileset, {
+        detector = await vision.FaceDetector.createFromOptions(visionFileset, {
             baseOptions: {
                 modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
                 delegate: "GPU"
@@ -71,7 +71,7 @@ async function detectFaces(imageData, options = {}) {
                 // Calculate face quality if requested
                 let quality = null;
                 if (options.includeQuality) {
-                    quality = await calculateFaceQuality(canvas, boundingBox.originX, boundingBox.originY, boundingBox.width, boundingBox.height);
+                    quality = await calculateFaceQuality(ctx, boundingBox.originX, boundingBox.originY, boundingBox.width, boundingBox.height);
                 }
 
                 detectedFaces.push({
@@ -94,14 +94,35 @@ async function detectFaces(imageData, options = {}) {
     }
 }
 
-async function calculateFaceQuality(canvas, x, y, width, height) {
+async function calculateFaceQuality(ctx, x, y, width, height) {
     try {
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const imageData = ctx.getImageData(x, y, width, height);
+        const sourceCanvas = ctx.canvas;
+
+        const safeX = Math.max(0, Math.floor(x));
+        const safeY = Math.max(0, Math.floor(y));
+        const safeWidth = Math.max(1, Math.floor(Math.min(width, sourceCanvas.width - safeX)));
+        const safeHeight = Math.max(1, Math.floor(Math.min(height, sourceCanvas.height - safeY)));
+
+        const qualityCanvas = new OffscreenCanvas(safeWidth, safeHeight);
+        const qualityCtx = qualityCanvas.getContext('2d', { willReadFrequently: true });
+
+        qualityCtx.drawImage(
+            sourceCanvas,
+            safeX,
+            safeY,
+            safeWidth,
+            safeHeight,
+            0,
+            0,
+            safeWidth,
+            safeHeight
+        );
+
+        const imageData = qualityCtx.getImageData(0, 0, safeWidth, safeHeight);
         const data = imageData.data;
 
         // Calculate Laplacian variance for blur detection
-        const laplacianVariance = calculateLaplacianVariance(data, width, height);
+        const laplacianVariance = calculateLaplacianVariance(data, safeWidth, safeHeight);
 
         if (laplacianVariance > 1000) return { score: laplacianVariance, level: 'high' };
         if (laplacianVariance > 300) return { score: laplacianVariance, level: 'medium' };

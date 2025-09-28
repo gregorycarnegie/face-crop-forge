@@ -944,7 +944,7 @@ class FaceCropper {
     async applyImageEnhancements(image) {
         // Create canvas for processing
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         canvas.width = image.width;
         canvas.height = image.height;
         ctx.drawImage(image, 0, 0);
@@ -1785,7 +1785,7 @@ class FaceCropper {
 
             // Create canvas to get image data
             const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             canvas.width = image.width;
             canvas.height = image.height;
             ctx.drawImage(image, 0, 0);

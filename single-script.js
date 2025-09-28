@@ -495,7 +495,7 @@ class SingleImageFaceCropper {
         const canvas = document.createElement('canvas');
         canvas.width = settings.outputWidth;
         canvas.height = settings.outputHeight;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         // Draw cropped image
         ctx.drawImage(
