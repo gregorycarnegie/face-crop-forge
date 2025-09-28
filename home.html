@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Cropping Tool - Select Mode</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 2rem;
+        }
+
+        .home-container {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .hero-section {
+            margin-bottom: 4rem;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+
+        .modes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .mode-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 2.5rem;
+            text-decoration: none;
+            color: #2d3748;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mode-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .mode-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .mode-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 48px rgba(0,0,0,0.15);
+            background: rgba(255, 255, 255, 1);
+        }
+
+        .mode-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            display: block;
+            stroke: #667eea;
+            fill: none;
+            stroke-width: 1.5;
+            transition: all 0.3s ease;
+        }
+
+        .mode-card:hover .mode-icon {
+            stroke: #764ba2;
+            transform: scale(1.1);
+        }
+
+        .mode-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #2d3748;
+        }
+
+        .mode-description {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: #4a5568;
+            margin-bottom: 1.5rem;
+        }
+
+        .mode-features {
+            list-style: none;
+            text-align: left;
+            margin-bottom: 1.5rem;
+        }
+
+        .mode-features li {
+            font-size: 0.9rem;
+            color: #718096;
+            margin-bottom: 0.5rem;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .mode-features li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #48bb78;
+            font-weight: bold;
+        }
+
+        .mode-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .mode-action:hover {
+            background: linear-gradient(135deg, #5a67d8, #6b46c1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        .footer {
+            text-align: center;
+            opacity: 0.8;
+            font-size: 0.9rem;
+            margin-top: 2rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.8;
+            transition: opacity 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+
+            .modes-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .mode-card {
+                padding: 2rem;
+            }
+
+            .footer-links {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 1rem;
+            }
+
+            .hero-title {
+                font-size: 2rem;
+            }
+
+            .mode-card {
+                padding: 1.5rem;
+            }
+
+            .mode-icon {
+                width: 60px;
+                height: 60px;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="home-container">
+        <header class="hero-section">
+            <h1 class="hero-title">Face Cropping Tool</h1>
+            <p class="hero-subtitle">
+                Intelligent face detection and cropping with advanced settings and batch processing capabilities.
+                Choose the mode that best fits your workflow.
+            </p>
+        </header>
+
+        <main class="modes-grid">
+            <!-- Multiple Images Mode -->
+            <a href="index.html" class="mode-card">
+                <svg class="mode-icon" viewBox="0 0 24 24">
+                    <!-- Multiple images icon -->
+                    <rect x="3" y="3" width="7" height="5" rx="1" />
+                    <rect x="14" y="3" width="7" height="5" rx="1" />
+                    <rect x="3" y="12" width="7" height="5" rx="1" />
+                    <rect x="14" y="12" width="7" height="5" rx="1" />
+                    <path d="M8 19h8" />
+                    <path d="M8 21h8" />
+                </svg>
+                <h2 class="mode-title">Multiple Images</h2>
+                <p class="mode-description">
+                    Upload and process multiple images simultaneously with batch operations and gallery management.
+                </p>
+                <ul class="mode-features">
+                    <li>Drag & drop multiple images</li>
+                    <li>Gallery view with selection</li>
+                    <li>Batch processing with progress</li>
+                    <li>Lazy loading for performance</li>
+                    <li>ZIP download of all results</li>
+                </ul>
+                <span class="mode-action">
+                    Start Batch Processing →
+                </span>
+            </a>
+
+            <!-- Single Image Mode -->
+            <a href="single.html" class="mode-card">
+                <svg class="mode-icon" viewBox="0 0 24 24">
+                    <!-- Single image icon -->
+                    <rect x="3" y="3" width="18" height="12" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                    <path d="M17 19h4" />
+                    <path d="M19 17v4" />
+                </svg>
+                <h2 class="mode-title">Single Image</h2>
+                <p class="mode-description">
+                    Focus on one image at a time with real-time preview and individual face selection controls.
+                </p>
+                <ul class="mode-features">
+                    <li>Single image upload</li>
+                    <li>Real-time face detection</li>
+                    <li>Individual face selection</li>
+                    <li>Live preview and adjustments</li>
+                    <li>Instant download options</li>
+                </ul>
+                <span class="mode-action">
+                    Process Single Image →
+                </span>
+            </a>
+
+            <!-- CSV Batch Mode -->
+            <a href="csv-batch.html" class="mode-card">
+                <svg class="mode-icon" viewBox="0 0 24 24">
+                    <!-- CSV/spreadsheet icon -->
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14,2 14,8 20,8" />
+                    <line x1="8" y1="13" x2="16" y2="13" />
+                    <line x1="8" y1="17" x2="16" y2="17" />
+                    <polyline points="10,9 9,9 8,9" />
+                    <circle cx="12" cy="5" r="1" />
+                    <circle cx="15" cy="5" r="1" />
+                    <circle cx="18" cy="5" r="1" />
+                </svg>
+                <h2 class="mode-title">CSV Batch</h2>
+                <p class="mode-description">
+                    Process images based on CSV data with custom output naming and automated file matching.
+                </p>
+                <ul class="mode-features">
+                    <li>CSV-driven processing</li>
+                    <li>Custom output naming</li>
+                    <li>Automatic file matching</li>
+                    <li>Smart filename filtering</li>
+                    <li>Bulk operations with mapping</li>
+                </ul>
+                <span class="mode-action">
+                    Upload CSV & Process →
+                </span>
+            </a>
+        </main>
+
+        <footer class="footer">
+            <p>Built with TensorFlow.js and MediaPipe for client-side face detection</p>
+            <div class="footer-links">
+                <a href="https://github.com/tensorflow/tfjs" target="_blank">TensorFlow.js</a>
+                <a href="https://mediapipe.dev/" target="_blank">MediaPipe</a>
+                <a href="https://github.com" target="_blank">View Source</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Add subtle animations on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.mode-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, 200 * index);
+            });
+        });
+
+        // Add click analytics (placeholder)
+        document.querySelectorAll('.mode-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const mode = card.querySelector('.mode-title').textContent;
+                console.log(`User selected: ${mode} mode`);
+            });
+        });
+    </script>
+</body>
+</html>

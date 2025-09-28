@@ -15,7 +15,6 @@ class FaceCropper {
         this.undoStack = [];
         this.redoStack = [];
         this.isDarkMode = false;
-        this.splitViewEnabled = false;
 
         // Workflow statistics
         this.statistics = {
@@ -107,7 +106,6 @@ class FaceCropper {
         this.individualDownload = document.getElementById('individualDownload');
 
         // UI enhancement elements
-        this.splitViewBtn = document.getElementById('splitViewBtn');
         this.darkModeBtn = document.getElementById('darkModeBtn');
         this.canvasWrapper = document.getElementById('canvasWrapper');
         this.originalPanel = document.getElementById('originalPanel');
@@ -198,7 +196,6 @@ class FaceCropper {
         this.resetSettingsBtn.addEventListener('click', () => this.resetToDefaults());
 
         // UI enhancement listeners
-        this.splitViewBtn.addEventListener('click', () => this.toggleSplitView());
         this.darkModeBtn.addEventListener('click', () => this.toggleDarkMode());
 
         // Navigation listeners
@@ -587,26 +584,6 @@ class FaceCropper {
         }
     }
 
-    // UI Enhancement Methods
-    toggleSplitView() {
-        this.splitViewEnabled = !this.splitViewEnabled;
-        this.splitViewBtn.classList.toggle('active', this.splitViewEnabled);
-        this.canvasWrapper.classList.toggle('split-view', this.splitViewEnabled);
-        this.splitViewBtn.setAttribute('aria-pressed', this.splitViewEnabled.toString());
-
-        if (this.splitViewEnabled) {
-            this.processedPanel.classList.remove('hidden');
-            this.splitViewBtn.textContent = 'Single View';
-            this.splitViewBtn.setAttribute('aria-label', 'Switch to single view');
-            this.splitViewBtn.setAttribute('title', 'Switch to single view');
-            this.updateSplitViewContent();
-        } else {
-            this.processedPanel.classList.add('hidden');
-            this.splitViewBtn.textContent = 'Split View';
-            this.splitViewBtn.setAttribute('aria-label', 'Enable split view');
-            this.splitViewBtn.setAttribute('title', 'Enable split view');
-        }
-    }
 
     toggleDarkMode() {
         this.isDarkMode = !this.isDarkMode;
@@ -639,28 +616,6 @@ class FaceCropper {
         this.darkModeBtn.setAttribute('aria-pressed', this.isDarkMode.toString());
     }
 
-    updateSplitViewContent() {
-        if (!this.splitViewEnabled) return;
-
-        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
-        if (selectedImages.length === 0 || !selectedImages[0].results || selectedImages[0].results.length === 0) {
-            return;
-        }
-
-        const currentImage = selectedImages[0];
-        const outputCanvas = document.getElementById('outputCanvas');
-        const outputCtx = outputCanvas.getContext('2d');
-
-        // Display first processed result
-        const result = currentImage.results[0];
-        const img = new Image();
-        img.onload = () => {
-            outputCanvas.width = img.width;
-            outputCanvas.height = img.height;
-            outputCtx.drawImage(img, 0, 0);
-        };
-        img.src = result.dataUrl;
-    }
 
     setupDragAndDrop() {
         const uploadCard = document.querySelector('.upload-card');
@@ -744,7 +699,6 @@ class FaceCropper {
             'processSelectedBtn': 'Process only selected images',
             'clearAllBtn': 'Clear all images from the workspace',
             'downloadAllBtn': 'Download all processed faces',
-            'splitViewBtn': 'Toggle split view to compare original vs processed',
             'darkModeBtn': 'Switch between light and dark themes',
             'outputWidth': 'Set the width of cropped face images',
             'outputHeight': 'Set the height of cropped face images',
@@ -1264,18 +1218,8 @@ class FaceCropper {
     }
 
     displayEnhancedPreview(enhancedImage, originalImageData) {
-        // If split view is enabled, show enhanced version in processed panel
-        if (this.splitViewEnabled) {
-            const outputCanvas = document.getElementById('outputCanvas');
-            const outputCtx = outputCanvas.getContext('2d');
-
-            outputCanvas.width = enhancedImage.width;
-            outputCanvas.height = enhancedImage.height;
-            outputCtx.drawImage(enhancedImage, 0, 0);
-        } else {
-            // Otherwise, temporarily replace the main canvas
-            this.displayImageWithFaceOverlays(originalImageData, enhancedImage);
-        }
+        // Temporarily replace the main canvas with enhanced preview
+        this.displayImageWithFaceOverlays(originalImageData, enhancedImage);
     }
 
     // Workflow Tools Methods
@@ -2394,10 +2338,6 @@ class FaceCropper {
         // Crop faces (only selected ones)
         imageData.results = await this.cropFacesFromImageData(imageData);
 
-        // Update split view if enabled
-        if (this.splitViewEnabled) {
-            this.updateSplitViewContent();
-        }
     }
 
     updateStatus(message, type = '') {
@@ -2938,10 +2878,6 @@ class FaceCropper {
         // Crop faces (only selected ones)
         imageData.results = await this.cropFacesFromImageData(imageData);
 
-        // Update split view if enabled
-        if (this.splitViewEnabled) {
-            this.updateSplitViewContent();
-        }
     }
 
     async detectFacesWithQuality(image) {
