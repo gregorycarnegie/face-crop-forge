@@ -81,6 +81,38 @@
             border: 1px solid #ddd;
             border-radius: 4px;
         }
+
+        .gallery-lazy-loading {
+            grid-column: 1 / -1;
+            padding: 2rem;
+            text-align: center;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            margin: 1rem 0;
+            background-color: #f8f9fa;
+        }
+
+        .lazy-loading-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .lazy-loading-content span {
+            font-size: 1.1rem;
+            color: #6c757d;
+        }
+
+        .lazy-loading-stats {
+            font-size: 0.9rem;
+            color: #adb5bd;
+        }
+
+        .gallery-lazy-loading:hover {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
     </style>
 </head>
 <body>

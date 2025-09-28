@@ -32,6 +32,12 @@ class CSVBatchFaceCropper {
         this.loadingLog = [];
         this.errorLog = [];
 
+        // Lazy loading state
+        this.galleryPage = 0;
+        this.galleryPageSize = 20;
+        this.imageLoadQueue = [];
+        this.isLoadingImages = false;
+
         this.initializeElements();
         this.setupEventListeners();
         this.loadModel();
@@ -388,9 +394,8 @@ class CSVBatchFaceCropper {
         this.updateStatus('Filtering images against CSV entries...');
         this.addToLoadingLog(`Processing ${files.length} uploaded files...`);
 
-        let matchedCount = 0;
-        let imageId = 0;
-
+        // First, filter files to only those matching CSV entries
+        const matchedFiles = [];
         for (const file of files) {
             if (!file.type.startsWith('image/')) continue;
 
@@ -415,36 +420,152 @@ class CSVBatchFaceCropper {
             }
 
             if (outputName) {
-                try {
-                    const image = await this.loadImageFile(file);
-                    this.images.set(`img_${imageId}`, {
-                        file: file,
-                        image: image,
-                        faces: [],
-                        results: [],
-                        selected: true,
-                        processed: false,
-                        csvOutputName: outputName
-                    });
-                    matchedCount++;
-                    imageId++;
-                    this.addToLoadingLog(`✓ Matched: ${file.name} → ${outputName}`);
-                } catch (error) {
-                    this.addToErrorLog(`Failed to load image ${file.name}: ${error.message}`);
-                }
+                matchedFiles.push({ file, outputName });
+                this.addToLoadingLog(`✓ Matched: ${file.name} → ${outputName}`);
             } else {
                 this.addToLoadingLog(`⚠ Skipped: ${file.name} (not found in CSV)`);
             }
         }
 
-        this.updateStatus(`Loaded ${matchedCount} images matching CSV entries`);
-        this.addToLoadingLog(`Image filtering completed: ${matchedCount} matched images loaded`);
+        if (matchedFiles.length === 0) {
+            this.updateStatus('No uploaded images matched CSV entries');
+            return;
+        }
+
+        // Use lazy loading for large batches
+        if (matchedFiles.length > this.galleryPageSize) {
+            await this.handleLargeImageBatch(matchedFiles);
+        } else {
+            await this.handleStandardImageBatch(matchedFiles);
+        }
+
         this.updateFileStats();
         this.displayImageGallery();
 
-        if (matchedCount > 0) {
+        if (this.images.size > 0) {
             this.processAllBtn.disabled = false;
             this.processSelectedBtn.disabled = false;
+        }
+    }
+
+    async handleLargeImageBatch(matchedFiles) {
+        this.addToLoadingLog(`Loading large batch: ${matchedFiles.length} images`);
+
+        // Load first page immediately
+        const firstPage = matchedFiles.slice(0, this.galleryPageSize);
+        await this.loadImagePage(firstPage, 0);
+
+        // Queue remaining files
+        for (let i = this.galleryPageSize; i < matchedFiles.length; i += this.galleryPageSize) {
+            const page = matchedFiles.slice(i, i + this.galleryPageSize);
+            this.imageLoadQueue.push({ files: page, page: Math.floor(i / this.galleryPageSize) });
+        }
+
+        this.setupLazyLoading();
+        this.updateStatus(`Loaded first ${firstPage.length} images. ${matchedFiles.length - firstPage.length} queued for lazy loading.`);
+    }
+
+    async handleStandardImageBatch(matchedFiles) {
+        await this.loadImagePage(matchedFiles, 0);
+        this.updateStatus(`Loaded ${matchedFiles.length} images.`);
+    }
+
+    async loadImagePage(matchedFiles, pageIndex) {
+        let imageId = this.images.size; // Continue from current count
+
+        for (const { file, outputName } of matchedFiles) {
+            try {
+                const image = await this.loadImageFile(file);
+                this.images.set(`img_${imageId}`, {
+                    file: file,
+                    image: image,
+                    faces: [],
+                    results: [],
+                    selected: true,
+                    processed: false,
+                    csvOutputName: outputName
+                });
+                imageId++;
+            } catch (error) {
+                this.addToErrorLog(`Failed to load image ${file.name}: ${error.message}`);
+            }
+        }
+    }
+
+    setupLazyLoading() {
+        // Add lazy loading indicator to gallery
+        const indicator = document.createElement('div');
+        indicator.className = 'gallery-lazy-loading';
+        indicator.innerHTML = `
+            <div class="lazy-loading-content">
+                <span>Scroll to load more images...</span>
+                <div class="lazy-loading-stats">
+                    ${this.imageLoadQueue.length} pages remaining
+                </div>
+            </div>
+        `;
+        this.galleryGrid.appendChild(indicator);
+
+        // Setup intersection observer for lazy loading
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !this.isLoadingImages && this.imageLoadQueue.length > 0) {
+                    this.loadNextImagePage();
+                }
+            });
+        }, {
+            rootMargin: '100px' // Start loading 100px before the indicator is visible
+        });
+
+        observer.observe(indicator);
+        this.lazyLoadingObserver = observer;
+        this.lazyLoadingIndicator = indicator;
+    }
+
+    async loadNextImagePage() {
+        if (this.isLoadingImages || this.imageLoadQueue.length === 0) return;
+
+        this.isLoadingImages = true;
+        const nextPage = this.imageLoadQueue.shift();
+
+        // Update indicator
+        if (this.lazyLoadingIndicator) {
+            this.lazyLoadingIndicator.innerHTML = `
+                <div class="lazy-loading-content">
+                    <span>Loading more images...</span>
+                    <div class="lazy-loading-stats">
+                        ${this.imageLoadQueue.length} pages remaining
+                    </div>
+                </div>
+            `;
+        }
+
+        try {
+            await this.loadImagePage(nextPage.files, nextPage.page);
+            this.displayImageGallery(); // Refresh gallery to show new images
+            this.addToLoadingLog(`Loaded page ${nextPage.page + 1} (${nextPage.files.length} images)`);
+        } catch (error) {
+            this.addToErrorLog(`Failed to load image page: ${error.message}`);
+        }
+
+        this.isLoadingImages = false;
+
+        // Update or remove indicator
+        if (this.imageLoadQueue.length === 0) {
+            if (this.lazyLoadingIndicator) {
+                this.lazyLoadingIndicator.remove();
+                this.lazyLoadingObserver?.disconnect();
+            }
+            this.updateStatus(`All ${this.images.size} matched images loaded successfully`);
+        } else if (this.lazyLoadingIndicator) {
+            this.lazyLoadingIndicator.innerHTML = `
+                <div class="lazy-loading-content">
+                    <span>Scroll to load more images...</span>
+                    <div class="lazy-loading-stats">
+                        ${this.imageLoadQueue.length} pages remaining
+                    </div>
+                </div>
+            `;
         }
     }
 
@@ -580,37 +701,157 @@ class CSVBatchFaceCropper {
 
     updateSelectionCount() {
         const selected = Array.from(this.images.values()).filter(img => img.selected).length;
+        const loaded = this.images.size;
+        const queued = this.imageLoadQueue.length * this.galleryPageSize;
+        const total = loaded + queued;
+
         this.selectedCount.textContent = selected;
-        this.totalCount.textContent = this.images.size;
+
+        if (queued > 0) {
+            this.totalCount.textContent = `${loaded} (${total} total)`;
+        } else {
+            this.totalCount.textContent = loaded;
+        }
     }
 
     async processAll() {
-        const selectedImages = Array.from(this.images.entries()).filter(([id, data]) => data.selected);
-        if (selectedImages.length === 0) {
-            this.updateStatus('No images selected for processing.');
+        // Process both loaded images and queued file references (like index.html)
+        const loadedImages = Array.from(this.images.values());
+        const queuedFiles = this.imageLoadQueue.flatMap(batch => batch.files);
+
+        if (queuedFiles.length > 0) {
+            this.updateStatus(`Processing ${loadedImages.length} loaded images + ${queuedFiles.length} queued files...`);
+            await this.processImagesAndFiles(loadedImages, queuedFiles);
+        } else {
+            await this.processImages(loadedImages);
+        }
+    }
+
+    async processSelected() {
+        const selectedImages = Array.from(this.images.values()).filter(img => img.selected);
+
+        // If no images are selected but there are queued images, inform the user
+        if (selectedImages.length === 0 && this.imageLoadQueue.length > 0) {
+            this.updateStatus('No images selected. Use "Process All" to process all images including queued ones.');
             return;
         }
 
         await this.processImages(selectedImages);
     }
 
-    async processSelected() {
-        await this.processAll(); // Same as processAll since we're filtering by selected
+    async processImagesAndFiles(loadedImages, queuedFiles) {
+        if (!this.detector) {
+            this.updateStatus('Face detection model not loaded. Please wait and try again.');
+            return;
+        }
+
+        this.isProcessing = true;
+        const totalItems = loadedImages.length + queuedFiles.length;
+        this.showProgress();
+        this.addToProcessingLog(`Starting batch processing of ${totalItems} images (${loadedImages.length} loaded + ${queuedFiles.length} queued)`);
+
+        let successCount = 0;
+        let errorCount = 0;
+        let processedCount = 0;
+
+        try {
+            // Process loaded images first
+            for (const imageData of loadedImages) {
+                if (imageData.selected) {
+                    processedCount++;
+                    this.updateProgress((processedCount / totalItems) * 100,
+                        `Processing loaded image ${processedCount}/${totalItems}: ${imageData.csvOutputName}`);
+
+                    try {
+                        const success = await this.processImage(imageData.id || `img_${processedCount}`, imageData);
+                        if (success) successCount++;
+                        else errorCount++;
+                    } catch (error) {
+                        errorCount++;
+                        this.addToErrorLog(`Error processing ${imageData.csvOutputName}: ${error.message}`);
+                    }
+                }
+            }
+
+            // Process queued files
+            for (const { file, outputName } of queuedFiles) {
+                processedCount++;
+                this.updateProgress((processedCount / totalItems) * 100,
+                    `Processing queued file ${processedCount}/${totalItems}: ${outputName}`);
+
+                try {
+                    // Load and process the queued file
+                    const image = await this.loadImageFile(file);
+                    const tempImageData = {
+                        file: file,
+                        image: image,
+                        faces: [],
+                        results: [],
+                        selected: true,
+                        processed: false,
+                        csvOutputName: outputName,
+                        id: `queued_${processedCount}`
+                    };
+
+                    const success = await this.processImage(tempImageData.id, tempImageData);
+
+                    // Store results from streamed processing (like index.html)
+                    if (tempImageData.results.length > 0) {
+                        this.imageResults.set(tempImageData.id, {
+                            filename: file.name,
+                            csvOutputName: outputName,
+                            results: tempImageData.results,
+                            processedAt: new Date().toISOString()
+                        });
+                    }
+
+                    if (success) successCount++;
+                    else errorCount++;
+                } catch (error) {
+                    errorCount++;
+                    this.addToErrorLog(`Error processing queued file ${outputName}: ${error.message}`);
+                }
+            }
+
+        } catch (error) {
+            this.addToErrorLog(`Fatal error during batch processing: ${error.message}`);
+        }
+
+        this.isProcessing = false;
+        this.hideProgress();
+
+        // Update statistics
+        this.statistics.imagesProcessed += successCount;
+        this.statistics.successfulProcessing += successCount;
+        this.updateStatistics();
+
+        this.updateStatus(`Processing complete: ${successCount} successful, ${errorCount} failed`);
+        this.addToProcessingLog(`Batch processing completed: ${successCount}/${totalItems} successful`);
+
+        if (successCount > 0) {
+            this.downloadAllBtn.disabled = false;
+        }
     }
 
-    async processImages(imageEntries) {
+    async processImages(imageDataArray) {
+        if (!this.detector) {
+            this.updateStatus('Face detection model not loaded. Please wait and try again.');
+            return;
+        }
+
         this.isProcessing = true;
         this.updateStatus('Processing images...');
-        this.addToProcessingLog(`Starting batch processing of ${imageEntries.length} images...`);
+        this.addToProcessingLog(`Starting batch processing of ${imageDataArray.length} images...`);
         this.showProgress();
 
         let successCount = 0;
         const processingTimes = [];
 
-        for (let i = 0; i < imageEntries.length; i++) {
-            const [imageId, imageData] = imageEntries[i];
+        for (let i = 0; i < imageDataArray.length; i++) {
+            const imageData = imageDataArray[i];
+            const imageId = `processed_${i}`;
 
-            this.updateProgress((i / imageEntries.length) * 100, `Processing ${i + 1}/${imageEntries.length}: ${imageData.csvFileName}`);
+            this.updateProgress((i / imageDataArray.length) * 100, `Processing ${i + 1}/${imageDataArray.length}: ${imageData.csvOutputName}`);
 
             try {
                 const startTime = Date.now();
@@ -620,12 +861,12 @@ class CSVBatchFaceCropper {
                 if (success) {
                     successCount++;
                     processingTimes.push(processingTime);
-                    this.addToProcessingLog(`✓ Processed ${imageData.csvFileName} in ${processingTime}ms`);
+                    this.addToProcessingLog(`✓ Processed ${imageData.csvOutputName} in ${processingTime}ms`);
                 } else {
-                    this.addToErrorLog(`✗ Failed to process ${imageData.csvFileName}`);
+                    this.addToErrorLog(`✗ Failed to process ${imageData.csvOutputName}`);
                 }
             } catch (error) {
-                this.addToErrorLog(`✗ Error processing ${imageData.csvFileName}: ${error.message}`);
+                this.addToErrorLog(`✗ Error processing ${imageData.csvOutputName}: ${error.message}`);
             }
         }
 
@@ -640,8 +881,8 @@ class CSVBatchFaceCropper {
         const avgTime = processingTimes.length > 0 ?
             Math.round(processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length) : 0;
 
-        this.updateStatus(`Processing complete: ${successCount}/${imageEntries.length} images processed successfully`);
-        this.addToProcessingLog(`Batch processing completed: ${successCount}/${imageEntries.length} successful, avg time: ${avgTime}ms`);
+        this.updateStatus(`Processing complete: ${successCount}/${imageDataArray.length} images processed successfully`);
+        this.addToProcessingLog(`Batch processing completed: ${successCount}/${imageDataArray.length} successful, avg time: ${avgTime}ms`);
 
         this.updateStatistics();
         this.isProcessing = false;
@@ -734,9 +975,39 @@ class CSVBatchFaceCropper {
     }
 
     async downloadAllResults() {
-        const processedImages = Array.from(this.images.values()).filter(img => img.processed && img.results.length > 0);
+        // Collect results from both loaded images and streamed processing (like index.html)
+        const allResults = [];
 
-        if (processedImages.length === 0) {
+        // Collect results from loaded images
+        for (const imageData of this.images.values()) {
+            if (imageData.results && imageData.results.length > 0) {
+                for (let i = 0; i < imageData.results.length; i++) {
+                    allResults.push({
+                        result: imageData.results[i],
+                        imageData: imageData,
+                        faceIndex: i
+                    });
+                }
+            }
+        }
+
+        // Collect results from streamed processing
+        for (const streamedResult of this.imageResults.values()) {
+            if (streamedResult.results && streamedResult.results.length > 0) {
+                for (let i = 0; i < streamedResult.results.length; i++) {
+                    allResults.push({
+                        result: streamedResult.results[i],
+                        imageData: {
+                            csvOutputName: streamedResult.csvOutputName,
+                            file: { name: streamedResult.filename }
+                        },
+                        faceIndex: i
+                    });
+                }
+            }
+        }
+
+        if (allResults.length === 0) {
             this.updateStatus('No processed results to download.');
             return;
         }
@@ -744,17 +1015,14 @@ class CSVBatchFaceCropper {
         const zip = new JSZip();
         const settings = this.getSettings();
 
-        for (const imageData of processedImages) {
-            for (let i = 0; i < imageData.results.length; i++) {
-                const result = imageData.results[i];
-                const filename = this.generateFilename(imageData, i);
+        for (const { result, imageData, faceIndex } of allResults) {
+            const filename = this.generateFilename(imageData, faceIndex);
 
-                const blob = await new Promise(resolve => {
-                    result.image.toBlob(resolve, `image/${settings.format}`, settings.quality);
-                });
+            const blob = await new Promise(resolve => {
+                result.image.toBlob(resolve, `image/${settings.format}`, settings.quality);
+            });
 
-                zip.file(filename, blob);
-            }
+            zip.file(filename, blob);
         }
 
         const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -765,7 +1033,7 @@ class CSVBatchFaceCropper {
         a.click();
         URL.revokeObjectURL(url);
 
-        this.addToProcessingLog(`Downloaded ${processedImages.length} processed images as ZIP`);
+        this.addToProcessingLog(`Downloaded ${allResults.length} processed face crops as ZIP`);
     }
 
     generateFilename(imageData, faceIndex) {
@@ -798,11 +1066,29 @@ class CSVBatchFaceCropper {
 
     clearAll() {
         this.images.clear();
+        this.imageResults.clear(); // Clear streamed processing results
         this.csvData = [];
         this.csvHeaders = [];
+        this.csvMapping.clear();
         this.filePathColumn = null;
         this.fileNameColumn = null;
         this.csvInput.value = '';
+        this.imageInput.value = '';
+
+        // Clear lazy loading state
+        this.imageLoadQueue = [];
+        this.isLoadingImages = false;
+        this.galleryPage = 0;
+
+        if (this.lazyLoadingObserver) {
+            this.lazyLoadingObserver.disconnect();
+            this.lazyLoadingObserver = null;
+        }
+
+        if (this.lazyLoadingIndicator) {
+            this.lazyLoadingIndicator.remove();
+            this.lazyLoadingIndicator = null;
+        }
 
         this.csvMappingDiv.classList.add('hidden');
         this.imageUploadCard.classList.add('hidden');
