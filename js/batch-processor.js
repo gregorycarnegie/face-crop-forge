@@ -1,29 +1,17 @@
-class FaceCropper {
+class FaceCropper extends BaseFaceCropper {
     constructor() {
-        this.detector = null;
+        super();
         this.images = new Map(); // imageId -> { file, image, faces, results, selected, processed }
         this.imageResults = new Map(); // Store results from streamed processing
         this.processingQueue = [];
         this.isProcessing = false;
         this.currentProcessingId = null;
-        this.aspectRatioLocked = false;
-        this.currentAspectRatio = 1;
 
         // UI state
         this.currentImageIndex = 0;
         this.currentFaceIndex = 0;
         this.undoStack = [];
         this.redoStack = [];
-        this.isDarkMode = false;
-
-        // Workflow statistics
-        this.statistics = {
-            totalFacesDetected: 0,
-            imagesProcessed: 0,
-            successfulProcessing: 0,
-            processingTimes: [],
-            startTime: null
-        };
 
         this.processingLog = [];
         this.savedSettings = new Map();
@@ -585,21 +573,6 @@ class FaceCropper {
     }
 
 
-    toggleDarkMode() {
-        this.isDarkMode = !this.isDarkMode;
-        const theme = this.isDarkMode ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', theme);
-
-        const icon = this.isDarkMode ? '☀️' : '🌙';
-        const tooltip = this.isDarkMode ? 'Switch to light mode' : 'Switch to dark mode';
-        this.darkModeBtn.textContent = icon;
-        this.darkModeBtn.setAttribute('aria-label', tooltip);
-        this.darkModeBtn.setAttribute('title', tooltip);
-        this.darkModeBtn.setAttribute('aria-pressed', this.isDarkMode.toString());
-
-        localStorage.setItem('faceCropperTheme', theme);
-        this.updateStatus(`Switched to ${theme} mode`, 'success');
-    }
 
     loadThemePreference() {
         const savedTheme = localStorage.getItem('faceCropperTheme');
@@ -1679,50 +1652,6 @@ class FaceCropper {
         }
     }
 
-    convertBoundingBoxToPixels(bbox, imageWidth, imageHeight) {
-        if (!bbox) {
-            return null;
-        }
-
-        const originX = Number.isFinite(bbox.originX) ? bbox.originX : 0;
-        const originY = Number.isFinite(bbox.originY) ? bbox.originY : 0;
-        const boxWidth = Number.isFinite(bbox.width) ? bbox.width : 0;
-        const boxHeight = Number.isFinite(bbox.height) ? bbox.height : 0;
-
-        const isNormalized = originX >= 0 && originX <= 1 &&
-            originY >= 0 && originY <= 1 &&
-            boxWidth > 0 && boxWidth <= 1 &&
-            boxHeight > 0 && boxHeight <= 1;
-
-        const rawX = isNormalized ? originX * imageWidth : originX;
-        const rawY = isNormalized ? originY * imageHeight : originY;
-        const rawWidth = isNormalized ? boxWidth * imageWidth : boxWidth;
-        const rawHeight = isNormalized ? boxHeight * imageHeight : boxHeight;
-
-        if (!Number.isFinite(rawX) || !Number.isFinite(rawY) ||
-            !Number.isFinite(rawWidth) || !Number.isFinite(rawHeight)) {
-            return null;
-        }
-
-        const clampedX = Math.min(Math.max(rawX, 0), imageWidth);
-        const clampedY = Math.min(Math.max(rawY, 0), imageHeight);
-        const maxWidth = imageWidth - clampedX;
-        const maxHeight = imageHeight - clampedY;
-
-        const width = Math.min(Math.max(rawWidth, 1), maxWidth);
-        const height = Math.min(Math.max(rawHeight, 1), maxHeight);
-
-        if (width <= 0 || height <= 0) {
-            return null;
-        }
-
-        return {
-            x: clampedX,
-            y: clampedY,
-            width,
-            height
-        };
-    }
 
     async detectFacesWithQualityProduction(image, imageId) {
         // Enhanced version with error handling and retry logic
@@ -2390,16 +2319,6 @@ class FaceCropper {
         this.status.className = `status ${type}`;
     }
 
-    updatePreview() {
-        const width = parseInt(this.outputWidth.value);
-        const height = parseInt(this.outputHeight.value);
-        const faceHeight = parseInt(this.faceHeightPct.value);
-        const format = this.outputFormat.value.toUpperCase();
-        const positionMode = this.positioningMode.value;
-
-        this.previewText.textContent = `${width}×${height}px, face at ${faceHeight}% height, ${format} format, ${positionMode} positioning`;
-        this.updateAspectRatioDisplay();
-    }
 
     updateAspectRatioDisplay() {
         const width = parseInt(this.outputWidth.value);
@@ -2458,20 +2377,6 @@ class FaceCropper {
         }
     }
 
-    toggleAspectRatioLock() {
-        this.aspectRatioLocked = !this.aspectRatioLocked;
-
-        if (this.aspectRatioLocked) {
-            this.aspectRatioLock.classList.add('locked');
-            this.aspectRatioLock.textContent = '🔒';
-            this.aspectRatioLock.title = 'Unlock aspect ratio';
-            this.currentAspectRatio = parseInt(this.outputWidth.value) / parseInt(this.outputHeight.value);
-        } else {
-            this.aspectRatioLock.classList.remove('locked');
-            this.aspectRatioLock.textContent = '🔓';
-            this.aspectRatioLock.title = 'Lock aspect ratio';
-        }
-    }
 
     handleDimensionChange(changedDimension) {
         if (this.aspectRatioLocked) {

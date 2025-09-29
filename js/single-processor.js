@@ -1,14 +1,10 @@
-class SingleImageFaceCropper {
+class SingleImageFaceCropper extends BaseFaceCropper {
     constructor() {
-        this.detector = null;
+        super();
         this.currentImage = null;
         this.currentFile = null;
         this.faces = [];
         this.selectedFaces = new Set();
-        this.aspectRatioLocked = false;
-        this.currentAspectRatio = 1;
-        this.isDarkMode = false;
-        this.processingStartTime = null;
 
         this.initializeElements();
         this.setupEventListeners();
@@ -145,105 +141,6 @@ class SingleImageFaceCropper {
                 this.handleFile(imageFile);
             }
         });
-    }
-
-    convertBoundingBoxToPixels(bbox, imageWidth, imageHeight) {
-        if (!bbox) {
-            return null;
-        }
-
-        const originX = Number.isFinite(bbox.originX) ? bbox.originX : 0;
-        const originY = Number.isFinite(bbox.originY) ? bbox.originY : 0;
-        const boxWidth = Number.isFinite(bbox.width) ? bbox.width : 0;
-        const boxHeight = Number.isFinite(bbox.height) ? bbox.height : 0;
-
-        const isNormalized = originX >= 0 && originX <= 1 &&
-            originY >= 0 && originY <= 1 &&
-            boxWidth > 0 && boxWidth <= 1 &&
-            boxHeight > 0 && boxHeight <= 1;
-
-        const rawX = isNormalized ? originX * imageWidth : originX;
-        const rawY = isNormalized ? originY * imageHeight : originY;
-        const rawWidth = isNormalized ? boxWidth * imageWidth : boxWidth;
-        const rawHeight = isNormalized ? boxHeight * imageHeight : boxHeight;
-
-        if (!Number.isFinite(rawX) || !Number.isFinite(rawY) ||
-            !Number.isFinite(rawWidth) || !Number.isFinite(rawHeight)) {
-            return null;
-        }
-
-        const clampedX = Math.min(Math.max(rawX, 0), imageWidth);
-        const clampedY = Math.min(Math.max(rawY, 0), imageHeight);
-        const maxWidth = imageWidth - clampedX;
-        const maxHeight = imageHeight - clampedY;
-
-        const width = Math.min(Math.max(rawWidth, 1), maxWidth);
-        const height = Math.min(Math.max(rawHeight, 1), maxHeight);
-
-        if (width <= 0 || height <= 0) {
-            return null;
-        }
-
-        return {
-            x: clampedX,
-            y: clampedY,
-            width,
-            height
-        };
-    }
-
-    async waitForMediaPipe() {
-        // Wait for MediaPipe Tasks Vision library to be available
-        const maxWaitTime = 10000; // 10 seconds
-        const checkInterval = 100; // 100ms
-        let elapsed = 0;
-
-        while (elapsed < maxWaitTime) {
-            if (typeof window.vision !== 'undefined' &&
-                window.vision.FilesetResolver &&
-                window.vision.FaceDetector) {
-                return; // Library is loaded
-            }
-            await new Promise(resolve => setTimeout(resolve, checkInterval));
-            elapsed += checkInterval;
-        }
-
-        throw new Error('MediaPipe Tasks Vision library failed to load within timeout');
-    }
-
-    async loadModel() {
-        try {
-            this.updateStatus('Loading face detection model...');
-
-            // Wait for MediaPipe Tasks Vision library to load
-            await this.waitForMediaPipe();
-
-            // Check if MediaPipe Tasks Vision is available
-            if (!window.vision || !window.vision.FilesetResolver || !window.vision.FaceDetector) {
-                throw new Error('MediaPipe Tasks Vision library not loaded');
-            }
-
-            // Initialize the MediaPipe Vision tasks
-            const visionFileset = await window.vision.FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-            );
-
-            // Create face detector with WebAssembly runtime
-            this.detector = await window.vision.FaceDetector.createFromOptions(visionFileset, {
-                baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
-                    delegate: "GPU"
-                },
-                runningMode: "IMAGE"
-            });
-
-            this.updateStatus('Model loaded successfully. Ready to process images.');
-            this.addToLog('Face detection model loaded successfully');
-        } catch (error) {
-            console.error('Error loading model:', error);
-            this.updateStatus('Error loading model. Please refresh the page.');
-            this.addToLog('Error loading face detection model: ' + error.message, 'error');
-        }
     }
 
     handleImageUpload(event) {
@@ -460,64 +357,7 @@ class SingleImageFaceCropper {
     }
 
     async cropFace(face) {
-        const settings = this.getSettings();
-        const box = face.box;
-
-        // Calculate crop dimensions
-        const faceHeight = settings.outputHeight * (settings.faceHeightPct / 100);
-        const scale = faceHeight / box.height;
-
-        // Calculate crop area
-        let cropWidth = settings.outputWidth / scale;
-        let cropHeight = settings.outputHeight / scale;
-
-        // Calculate center position
-        let centerX = box.xMin + (box.width / 2);
-        let centerY = box.yMin + (box.height / 2);
-
-        // Apply positioning mode offsets
-        if (settings.positioningMode === 'rule-of-thirds') {
-            centerY = box.yMin + (box.height * 0.33);
-        } else if (settings.positioningMode === 'custom') {
-            centerX += (settings.horizontalOffset / 100) * cropWidth;
-            centerY += (settings.verticalOffset / 100) * cropHeight;
-        }
-
-        // Calculate crop bounds
-        let cropX = centerX - (cropWidth / 2);
-        let cropY = centerY - (cropHeight / 2);
-
-        // Ensure crop area is within image bounds
-        cropX = Math.max(0, Math.min(cropX, this.currentImage.width - cropWidth));
-        cropY = Math.max(0, Math.min(cropY, this.currentImage.height - cropHeight));
-
-        // Create canvas for cropping
-        const canvas = document.createElement('canvas');
-        canvas.width = settings.outputWidth;
-        canvas.height = settings.outputHeight;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-        // Draw cropped image
-        ctx.drawImage(
-            this.currentImage,
-            cropX, cropY, cropWidth, cropHeight,
-            0, 0, settings.outputWidth, settings.outputHeight
-        );
-
-        // Apply enhancements if enabled
-        await this.applyEnhancements(ctx, canvas);
-
-        return canvas;
-    }
-
-    async applyEnhancements(ctx, canvas) {
-        // This is a simplified version - you can implement full enhancement features here
-        if (this.autoColorCorrection?.checked) {
-            // Apply basic auto color correction
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            // Basic enhancement logic would go here
-            ctx.putImageData(imageData, 0, 0);
-        }
+        return super.cropFace(this.currentImage, face);
     }
 
     displayResults(results) {
@@ -568,33 +408,8 @@ class SingleImageFaceCropper {
         if (canvases.length === 1) {
             this.downloadSingle(canvases[0], 0);
         } else {
-            // Download as ZIP
             this.downloadAsZip(Array.from(canvases));
         }
-    }
-
-    async downloadAsZip(canvases) {
-        const zip = new JSZip();
-        const settings = this.getSettings();
-
-        for (let i = 0; i < canvases.length; i++) {
-            const canvas = canvases[i];
-            const filename = this.generateFilename(i);
-
-            const blob = await new Promise(resolve => {
-                canvas.toBlob(resolve, `image/${settings.format}`, settings.quality);
-            });
-
-            zip.file(filename, blob);
-        }
-
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const url = URL.createObjectURL(zipBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'cropped_faces.zip';
-        a.click();
-        URL.revokeObjectURL(url);
     }
 
     generateFilename(index) {
@@ -609,19 +424,6 @@ class SingleImageFaceCropper {
             .replace('{timestamp}', Date.now())
             .replace('{width}', settings.outputWidth)
             .replace('{height}', settings.outputHeight) + '.' + extension;
-    }
-
-    getSettings() {
-        return {
-            outputWidth: parseInt(this.outputWidth.value),
-            outputHeight: parseInt(this.outputHeight.value),
-            faceHeightPct: parseInt(this.faceHeightPct.value),
-            positioningMode: this.positioningMode.value,
-            verticalOffset: parseInt(this.verticalOffset.value),
-            horizontalOffset: parseInt(this.horizontalOffset.value),
-            format: this.outputFormat.value,
-            quality: this.outputFormat.value === 'jpeg' ? (parseInt(this.jpegQuality.value) / 100) : 1
-        };
     }
 
     clearImage() {
@@ -665,155 +467,6 @@ class SingleImageFaceCropper {
         if (this.processingStartTime) {
             const time = Date.now() - this.processingStartTime;
             this.processingTime.textContent = time + 'ms';
-        }
-    }
-
-    updateStatus(message) {
-        this.status.textContent = message;
-        this.processingStatus.textContent = message.split('.')[0];
-    }
-
-    addToLog(message, type = 'info') {
-        const logEntry = document.createElement('div');
-        logEntry.className = `log-entry ${type}`;
-        logEntry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
-        this.processingLog.appendChild(logEntry);
-        this.processingLog.scrollTop = this.processingLog.scrollHeight;
-    }
-
-    showProgress() {
-        this.progressSection.classList.remove('hidden');
-    }
-
-    hideProgress() {
-        setTimeout(() => {
-            this.progressSection.classList.add('hidden');
-        }, 1000);
-    }
-
-    updateProgress(percent, text) {
-        this.progressFill.style.width = percent + '%';
-        this.progressText.textContent = text;
-    }
-
-    // Settings methods
-    updatePreview() {
-        const width = this.outputWidth.value;
-        const height = this.outputHeight.value;
-        const faceHeight = this.faceHeightPct.value;
-        const format = this.outputFormat.value.toUpperCase();
-
-        document.getElementById('previewText').textContent =
-            `${width}×${height}px, face at ${faceHeight}% height, ${format} format`;
-
-        const ratio = width / height;
-        document.getElementById('aspectRatioText').textContent =
-            `${ratio.toFixed(2)}:1 ratio`;
-
-        if (this.aspectRatioLocked) {
-            this.maintainAspectRatio();
-        }
-    }
-
-    updateAdvancedPositioning() {
-        const mode = this.positioningMode.value;
-        const advancedPositioning = document.getElementById('advancedPositioning');
-
-        if (mode === 'custom') {
-            advancedPositioning.style.display = 'block';
-        } else {
-            advancedPositioning.style.display = 'none';
-        }
-    }
-
-    updateOffsetDisplay(type) {
-        const value = type === 'vertical' ? this.verticalOffset.value : this.horizontalOffset.value;
-        const displayElement = document.getElementById(`${type}OffsetValue`);
-        if (displayElement) {
-            displayElement.textContent = value + '%';
-        }
-    }
-
-    toggleAspectRatioLock() {
-        this.aspectRatioLocked = !this.aspectRatioLocked;
-        this.aspectRatioLock.textContent = this.aspectRatioLocked ? '🔒' : '🔓';
-
-        if (this.aspectRatioLocked) {
-            this.currentAspectRatio = this.outputWidth.value / this.outputHeight.value;
-        }
-    }
-
-    maintainAspectRatio() {
-        if (!this.aspectRatioLocked) return;
-
-        const currentRatio = this.outputWidth.value / this.outputHeight.value;
-        if (Math.abs(currentRatio - this.currentAspectRatio) > 0.01) {
-            this.outputHeight.value = Math.round(this.outputWidth.value / this.currentAspectRatio);
-        }
-    }
-
-    applySizePreset() {
-        const preset = this.sizePreset.value;
-        const presets = {
-            linkedin: { width: 400, height: 400 },
-            passport: { width: 413, height: 531 },
-            instagram: { width: 1080, height: 1080 },
-            idcard: { width: 332, height: 498 },
-            avatar: { width: 512, height: 512 },
-            headshot: { width: 600, height: 800 }
-        };
-
-        if (presets[preset]) {
-            this.outputWidth.value = presets[preset].width;
-            this.outputHeight.value = presets[preset].height;
-            this.updatePreview();
-        }
-    }
-
-    updateFormatSettings() {
-        const format = this.outputFormat.value;
-        const jpegQualityGroup = document.getElementById('jpegQualityGroup');
-
-        if (format === 'jpeg') {
-            jpegQualityGroup.classList.remove('hidden');
-        } else {
-            jpegQualityGroup.classList.add('hidden');
-        }
-
-        this.updatePreview();
-    }
-
-    updateSliderValue(type) {
-        const sliderMap = {
-            exposure: { element: this.exposureAdjustment, display: 'exposureValue' },
-            contrast: { element: this.contrastAdjustment, display: 'contrastValue' },
-            sharpness: { element: this.sharpnessControl, display: 'sharpnessValue' },
-            skinSmoothing: { element: this.skinSmoothing, display: 'skinSmoothingValue' },
-            backgroundBlur: { element: this.backgroundBlur, display: 'backgroundBlurValue' }
-        };
-
-        const config = sliderMap[type];
-        if (config && config.element) {
-            const value = config.element.value;
-            const displayElement = document.getElementById(config.display);
-            if (displayElement) {
-                if (type === 'backgroundBlur') {
-                    displayElement.textContent = value + 'px';
-                } else {
-                    displayElement.textContent = value;
-                }
-            }
-        }
-    }
-
-    toggleDarkMode() {
-        this.isDarkMode = !this.isDarkMode;
-        document.body.classList.toggle('dark-mode', this.isDarkMode);
-
-        const darkModeBtn = document.getElementById('darkModeBtn');
-        if (darkModeBtn) {
-            darkModeBtn.textContent = this.isDarkMode ? '☀️' : '🌙';
-            darkModeBtn.setAttribute('aria-pressed', this.isDarkMode.toString());
         }
     }
 }
