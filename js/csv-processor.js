@@ -157,13 +157,13 @@ class CSVBatchFaceCropper {
 
         if (multipleImageModeBtn) {
             multipleImageModeBtn.addEventListener('click', () => {
-                window.location.href = 'index.html';
+                window.location.href = 'batch-processing.html';
             });
         }
 
         if (singleImageModeBtn) {
             singleImageModeBtn.addEventListener('click', () => {
-                window.location.href = 'single.html';
+                window.location.href = 'single-processing.html';
             });
         }
 
@@ -793,7 +793,7 @@ class CSVBatchFaceCropper {
     }
 
     async processAll() {
-        // Process both loaded images and queued file references (like index.html)
+        // Process both loaded images and queued file references (like batch-processing.html)
         const loadedImages = Array.from(this.images.values());
         const queuedFiles = this.imageLoadQueue.flatMap(batch => batch.files);
 
@@ -873,7 +873,7 @@ class CSVBatchFaceCropper {
 
                     const success = await this.processImage(tempImageData.id, tempImageData);
 
-                    // Store results from streamed processing (like index.html)
+                    // Store results from streamed processing (like batch-processing.html)
                     if (tempImageData.results.length > 0) {
                         this.imageResults.set(tempImageData.id, {
                             filename: file.name,
@@ -1077,7 +1077,7 @@ class CSVBatchFaceCropper {
     }
 
     async downloadAllResults() {
-        // Collect results from both loaded images and streamed processing (like index.html)
+        // Collect results from both loaded images and streamed processing (like batch-processing.html)
         const allResults = [];
 
         // Collect results from loaded images

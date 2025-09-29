@@ -94,14 +94,14 @@ class SingleImageFaceCropper {
         const backToMultipleBtn = document.getElementById('backToMultipleBtn');
         if (backToMultipleBtn) {
             backToMultipleBtn.addEventListener('click', () => {
-                window.location.href = 'index.html';
+                window.location.href = 'batch-processing.html';
             });
         }
 
         const csvBatchModeBtn = document.getElementById('csvBatchModeBtn');
         if (csvBatchModeBtn) {
             csvBatchModeBtn.addEventListener('click', () => {
-                window.location.href = 'csv-batch.html';
+                window.location.href = 'csv-processing.html';
             });
         }
 

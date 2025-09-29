@@ -3,170 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Batch Face Cropping</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="styles.css">
-    <style>
-        .file-selection-area {
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 1rem 0;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .file-selection-area.drag-over {
-            border-color: #007bff;
-            background-color: #f8f9fa;
-        }
-
-        .file-label.secondary {
-            background-color: #6c757d;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        .file-label.secondary:hover {
-            background-color: #5a6268;
-        }
-
-        .file-matching-info {
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-            color: #6c757d;
-        }
-
-        .csv-preview-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .csv-preview-table th,
-        .csv-preview-table td {
-            border: 1px solid #ddd;
-            padding: 0.5rem;
-            text-align: left;
-        }
-
-        .csv-preview-table th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-
-        .mapping-controls {
-            display: flex;
-            gap: 1rem;
-            align-items: end;
-            flex-wrap: wrap;
-            margin: 1rem 0;
-        }
-
-        .mapping-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            min-width: 200px;
-        }
-
-        .mapping-group label {
-            font-weight: bold;
-            font-size: 0.9rem;
-        }
-
-        .mapping-group select {
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .gallery-lazy-loading {
-            grid-column: 1 / -1;
-            padding: 2rem;
-            text-align: center;
-            border: 2px dashed #ddd;
-            border-radius: 8px;
-            margin: 1rem 0;
-            background-color: #f8f9fa;
-        }
-
-        .lazy-loading-content {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            align-items: center;
-        }
-
-        .lazy-loading-content span {
-            font-size: 1.1rem;
-            color: #6c757d;
-        }
-
-        .lazy-loading-stats {
-            font-size: 0.9rem;
-            color: #adb5bd;
-        }
-
-        .gallery-lazy-loading:hover {
-            border-color: #007bff;
-            background-color: #e3f2fd;
-        }
-    </style>
+    <title>Face Cropping Tool</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div class="app-shell">
         <header class="app-header">
             <div class="title-row">
-                <h1>CSV Batch Face Cropping</h1>
+                <h1>Face Cropping Tool</h1>
                 <div class="header-actions">
-                    <button id="multipleImageModeBtn" class="ghost-btn" title="Switch to multiple image mode">
-                        <span>Multiple Images</span>
-                    </button>
                     <button id="singleImageModeBtn" class="ghost-btn" title="Switch to single image mode">
                         <span>Single Image</span>
+                    </button>
+                    <button id="csvBatchModeBtn" class="ghost-btn" title="Switch to CSV batch mode">
+                        <span>CSV Batch</span>
                     </button>
                     <button id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
                 </div>
             </div>
 
             <div class="upload-card">
-                <input type="file" id="csvInput" accept=".csv">
-                <label for="csvInput" class="file-label">
-                    <span class="upload-title">Drop CSV file or click to upload</span>
-                    <span class="upload-subtitle">CSV should contain file paths and output names</span>
-                </label>
-            </div>
-
-            <div class="csv-mapping hidden" id="csvMapping">
-                <h3>Column Mapping</h3>
-                <div class="mapping-controls">
-                    <div class="mapping-group">
-                        <label for="filePathColumn">File Path Column:</label>
-                        <select id="filePathColumn">
-                            <option value="">Select column...</option>
-                        </select>
-                    </div>
-                    <div class="mapping-group">
-                        <label for="fileNameColumn">Output Name Column:</label>
-                        <select id="fileNameColumn">
-                            <option value="">Select column...</option>
-                        </select>
-                    </div>
-                    <button id="confirmMappingBtn" class="primary-btn" disabled>Confirm Mapping</button>
-                </div>
-                <div class="csv-preview">
-                    <h4>CSV Preview (First 5 rows):</h4>
-                    <div id="csvPreviewTable"></div>
-                </div>
-            </div>
-
-            <div class="upload-card hidden" id="imageUploadCard">
                 <input type="file" id="imageInput" accept="image/*" multiple>
                 <label for="imageInput" class="file-label">
                     <span class="upload-title">Drop images or click to upload</span>
-                    <span class="upload-subtitle">Only images matching CSV filenames will be kept</span>
+                    <span class="upload-subtitle">You can add multiple images at once</span>
                 </label>
             </div>
 
@@ -183,32 +44,10 @@
                 <div class="control-scroll">
         <div class="workflow-tools">
             <h3 class="collapsible-header">
-                CSV Processing Status
+                Professional Workflow Tools
                 <span class="collapse-icon">▼</span>
             </h3>
             <div class="collapsible-content">
-
-                <div class="workflow-section">
-                    <h4>CSV Statistics</h4>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Rows</span>
-                            <span class="stat-value" id="totalRows">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Images Uploaded</span>
-                            <span class="stat-value" id="imagesUploaded">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Images Matched</span>
-                            <span class="stat-value" id="imagesMatched">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Processing Status</span>
-                            <span class="stat-value" id="processingStatus">Ready</span>
-                        </div>
-                    </div>
-                </div>
 
                 <div class="workflow-section">
                     <h4>Processing Statistics</h4>
@@ -233,9 +72,80 @@
                 </div>
 
                 <div class="workflow-section">
-                    <h4>File Loading Log</h4>
-                    <div class="processing-log" id="loadingLog">
-                        <div class="log-entry">Ready to process CSV...</div>
+                    <h4>Settings Management</h4>
+                    <div class="settings-management">
+                        <div class="recent-settings">
+                            <label for="recentSettingsDropdown">Recent Settings</label>
+                            <select id="recentSettingsDropdown">
+                                <option value="">Select a saved configuration...</option>
+                            </select>
+                            <button type="button" id="loadRecentBtn" class="small-btn">Load</button>
+                        </div>
+
+                        <div class="settings-actions">
+                            <label for="settingsName" class="sr-only">Configuration name</label>
+                            <input type="text" id="settingsName" placeholder="Configuration name..." maxlength="50">
+                            <button type="button" id="saveSettingsBtn" class="save-btn">Save Settings</button>
+                            <button type="button" id="exportSettingsBtn" class="export-btn">Export JSON</button>
+                            <button type="button" id="importSettingsBtn" class="import-btn">Import JSON</button>
+                            <label for="importSettingsFile" class="sr-only">Import settings file</label>
+                            <input type="file" id="importSettingsFile" accept=".json" class="hidden">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="workflow-section">
+                    <h4>Export & Reporting</h4>
+                    <div class="export-tools">
+                        <button type="button" id="exportLogBtn" class="export-btn">Export Processing Log</button>
+                        <button type="button" id="exportCsvBtn" class="export-btn">Export CSV Report</button>
+                        <button type="button" id="clearStatsBtn" class="reset-button">Clear Statistics</button>
+                    </div>
+                </div>
+
+                <div class="workflow-section">
+                    <h4>Performance Settings</h4>
+                    <div class="performance-settings">
+                        <div class="setting-group">
+                            <label>
+                                <input type="checkbox" id="continueOnError" checked>
+                                Continue on Error
+                            </label>
+                            <div class="setting-help">Continue processing other images when one fails</div>
+                        </div>
+
+                        <div class="setting-group">
+                            <label>
+                                <input type="checkbox" id="reducedResolution">
+                                Fast Detection Mode
+                            </label>
+                            <div class="setting-help">Process at 50% resolution for faster detection</div>
+                        </div>
+
+                        <div class="setting-group">
+                            <label>
+                                <input type="checkbox" id="enableWebWorkers" checked>
+                                Use Web Workers
+                            </label>
+                            <div class="setting-help">Prevent UI blocking during processing</div>
+                        </div>
+
+                        <div class="setting-group">
+                            <label for="memoryManagement">Memory Management</label>
+                            <select id="memoryManagement">
+                                <option value="auto">Auto Cleanup</option>
+                                <option value="aggressive">Aggressive Cleanup</option>
+                                <option value="manual">Manual Only</option>
+                            </select>
+                            <div class="setting-help">How aggressively to free memory</div>
+                        </div>
+
+                        <div class="setting-group">
+                            <label for="retryAttempts">Retry Attempts</label>
+                            <label for="retryAttempts" class="sr-only">Retry attempts</label>
+                            <input type="number" id="retryAttempts" min="0" max="5" value="2">
+                            <div class="setting-help">Number of retry attempts for failed detections</div>
+                        </div>
                     </div>
                 </div>
 
@@ -454,9 +364,9 @@
                 </div>
                 <div class="setting-group full-width">
                     <label for="namingTemplate">Filename Template</label>
-                    <input type="text" id="namingTemplate" value="{csv_name}" placeholder="{csv_name}">
+                    <input type="text" id="namingTemplate" value="face_{original}_{index}" placeholder="face_{original}_{index}">
                     <div class="template-help">
-                        Available variables: {csv_name}, {original}, {index}, {timestamp}, {width}, {height}
+                        Available variables: {original}, {index}, {timestamp}, {width}, {height}
                     </div>
                 </div>
             </div>
@@ -530,7 +440,7 @@
                     </div>
 
                     <div class="status workspace-card" id="status">
-                        Ready to load CSV file
+                        Ready to load image
                     </div>
                 </div>
             </main>
@@ -544,6 +454,6 @@
     </script>
     <!-- JSZip for batch downloads -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="csv-batch-script.js"></script>
+    <script src="js/batch-processor.js"></script>
 </body>
 </html>

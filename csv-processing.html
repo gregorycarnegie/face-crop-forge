@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Batch Face Cropping</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .file-selection-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .file-selection-area.drag-over {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+
+        .file-label.secondary {
+            background-color: #6c757d;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .file-label.secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .file-matching-info {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .csv-preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .csv-preview-table th,
+        .csv-preview-table td {
+            border: 1px solid #ddd;
+            padding: 0.5rem;
+            text-align: left;
+        }
+
+        .csv-preview-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .mapping-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: end;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+
+        .mapping-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            min-width: 200px;
+        }
+
+        .mapping-group label {
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .mapping-group select {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .gallery-lazy-loading {
+            grid-column: 1 / -1;
+            padding: 2rem;
+            text-align: center;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            margin: 1rem 0;
+            background-color: #f8f9fa;
+        }
+
+        .lazy-loading-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .lazy-loading-content span {
+            font-size: 1.1rem;
+            color: #6c757d;
+        }
+
+        .lazy-loading-stats {
+            font-size: 0.9rem;
+            color: #adb5bd;
+        }
+
+        .gallery-lazy-loading:hover {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="title-row">
+                <h1>CSV Batch Face Cropping</h1>
+                <div class="header-actions">
+                    <button id="multipleImageModeBtn" class="ghost-btn" title="Switch to multiple image mode">
+                        <span>Multiple Images</span>
+                    </button>
+                    <button id="singleImageModeBtn" class="ghost-btn" title="Switch to single image mode">
+                        <span>Single Image</span>
+                    </button>
+                    <button id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
+                </div>
+            </div>
+
+            <div class="upload-card">
+                <input type="file" id="csvInput" accept=".csv">
+                <label for="csvInput" class="file-label">
+                    <span class="upload-title">Drop CSV file or click to upload</span>
+                    <span class="upload-subtitle">CSV should contain file paths and output names</span>
+                </label>
+            </div>
+
+            <div class="csv-mapping hidden" id="csvMapping">
+                <h3>Column Mapping</h3>
+                <div class="mapping-controls">
+                    <div class="mapping-group">
+                        <label for="filePathColumn">File Path Column:</label>
+                        <select id="filePathColumn">
+                            <option value="">Select column...</option>
+                        </select>
+                    </div>
+                    <div class="mapping-group">
+                        <label for="fileNameColumn">Output Name Column:</label>
+                        <select id="fileNameColumn">
+                            <option value="">Select column...</option>
+                        </select>
+                    </div>
+                    <button id="confirmMappingBtn" class="primary-btn" disabled>Confirm Mapping</button>
+                </div>
+                <div class="csv-preview">
+                    <h4>CSV Preview (First 5 rows):</h4>
+                    <div id="csvPreviewTable"></div>
+                </div>
+            </div>
+
+            <div class="upload-card hidden" id="imageUploadCard">
+                <input type="file" id="imageInput" accept="image/*" multiple>
+                <label for="imageInput" class="file-label">
+                    <span class="upload-title">Drop images or click to upload</span>
+                    <span class="upload-subtitle">Only images matching CSV filenames will be kept</span>
+                </label>
+            </div>
+
+            <div class="batch-controls">
+                <button id="processAllBtn" disabled>Process All</button>
+                <button id="processSelectedBtn" disabled>Process Selected</button>
+                <button id="clearAllBtn" disabled>Clear All</button>
+                <button id="downloadAllBtn" disabled>Download All Results</button>
+            </div>
+        </header>
+
+        <div class="app-body">
+            <aside class="control-panel">
+                <div class="control-scroll">
+        <div class="workflow-tools">
+            <h3 class="collapsible-header">
+                CSV Processing Status
+                <span class="collapse-icon">▼</span>
+            </h3>
+            <div class="collapsible-content">
+
+                <div class="workflow-section">
+                    <h4>CSV Statistics</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Rows</span>
+                            <span class="stat-value" id="totalRows">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Images Uploaded</span>
+                            <span class="stat-value" id="imagesUploaded">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Images Matched</span>
+                            <span class="stat-value" id="imagesMatched">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Processing Status</span>
+                            <span class="stat-value" id="processingStatus">Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="workflow-section">
+                    <h4>Processing Statistics</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Faces Detected</span>
+                            <span class="stat-value" id="totalFacesDetected">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Success Rate</span>
+                            <span class="stat-value" id="successRate">0%</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Avg. Processing Time</span>
+                            <span class="stat-value" id="avgProcessingTime">0ms</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Images Processed</span>
+                            <span class="stat-value" id="imagesProcessed">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="workflow-section">
+                    <h4>File Loading Log</h4>
+                    <div class="processing-log" id="loadingLog">
+                        <div class="log-entry">Ready to process CSV...</div>
+                    </div>
+                </div>
+
+                <div class="workflow-section">
+                    <h4>Processing Log</h4>
+                    <div class="processing-log" id="processingLog">
+                        <div class="log-entry">Ready to process images...</div>
+                    </div>
+                </div>
+
+                <div class="workflow-section">
+                    <h4 class="collapsible-header error-log-header">
+                        Error Details
+                        <span class="collapse-icon">▼</span>
+                    </h4>
+                    <div class="collapsible-content error-log-panel">
+                        <div class="error-log" id="errorLog">
+                            <div class="log-entry">No errors detected</div>
+                        </div>
+                        <div class="error-actions">
+                            <button type="button" id="clearErrorsBtn" class="reset-button">Clear Errors</button>
+                            <button type="button" id="exportErrorsBtn" class="export-btn">Export Error Log</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="crop-settings">
+            <h3 class="collapsible-header">
+                Smart Cropping Settings
+                <span class="collapse-icon">▼</span>
+            </h3>
+            <div class="collapsible-content">
+
+            <div class="preset-controls">
+                <div class="setting-group full-width">
+                    <label for="sizePreset">Size Presets</label>
+                    <select id="sizePreset">
+                        <option value="custom">Custom</option>
+                        <option value="linkedin">LinkedIn Profile (400×400)</option>
+                        <option value="passport">Passport Photo (413×531)</option>
+                        <option value="instagram">Instagram Square (1080×1080)</option>
+                        <option value="idcard">ID Card (332×498)</option>
+                        <option value="avatar">Avatar (512×512)</option>
+                        <option value="headshot">Professional Headshot (600×800)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="settings-grid">
+                <div class="setting-group size-controls">
+                    <div class="size-inputs">
+                        <div class="input-group">
+                            <label for="outputWidth">Output Width (px)</label>
+                            <div class="input-with-lock">
+                                <input type="number" id="outputWidth" value="256" min="64" max="2048" step="32">
+                                <button type="button" id="aspectRatioLock" class="lock-button" title="Lock aspect ratio">🔓</button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="outputHeight">Output Height (px)</label>
+                            <input type="number" id="outputHeight" value="256" min="64" max="2048" step="32">
+                        </div>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label for="faceHeightPct">Face Height %</label>
+                    <input type="number" id="faceHeightPct" value="70" min="10" max="100" step="5">
+                </div>
+                <div class="setting-group">
+                    <label for="positioningMode">Positioning Mode</label>
+                    <select id="positioningMode">
+                        <option value="center">Center Face</option>
+                        <option value="rule-of-thirds">Rule of Thirds</option>
+                        <option value="custom">Custom Position</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="advanced-positioning" id="advancedPositioning">
+                <div class="setting-group">
+                    <label for="verticalOffset">Vertical Offset</label>
+                    <div class="offset-slider-container">
+                        <input type="range" id="verticalOffset" min="-50" max="50" value="0">
+                        <span class="offset-value" id="verticalOffsetValue">0%</span>
+                    </div>
+                    <div class="offset-help">Negative: up, Positive: down</div>
+                </div>
+                <div class="setting-group">
+                    <label for="horizontalOffset">Horizontal Offset</label>
+                    <div class="offset-slider-container">
+                        <input type="range" id="horizontalOffset" min="-50" max="50" value="0">
+                        <span class="offset-value" id="horizontalOffsetValue">0%</span>
+                    </div>
+                    <div class="offset-help">Negative: left, Positive: right</div>
+                </div>
+            </div>
+
+            <div class="preset-actions">
+                <button type="button" id="applyToAllBtn" class="apply-button">Apply Settings to All Images</button>
+                <button type="button" id="resetSettingsBtn" class="reset-button">Reset to Defaults</button>
+            </div>
+
+            <div class="setting-preview">
+                <span>Preview: <span id="previewText">256×256px, face at 70% height, PNG format</span></span>
+                <span class="aspect-ratio" id="aspectRatioText">1:1 ratio</span>
+            </div>
+            </div>
+        </div>
+
+        <div class="preprocessing-settings">
+            <h3 class="collapsible-header">
+                Image Preprocessing
+                <span class="collapse-icon">▼</span>
+            </h3>
+            <div class="collapsible-content">
+
+                <div class="preprocessing-controls">
+                    <div class="setting-group">
+                        <label>
+                            <input type="checkbox" id="autoColorCorrection" checked>
+                            Auto Color Correction
+                        </label>
+                        <div class="setting-help">Automatic brightness/contrast normalization</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="exposureAdjustment">Exposure</label>
+                        <div class="slider-container">
+                            <input type="range" id="exposureAdjustment" min="-2" max="2" step="0.1" value="0">
+                            <span class="slider-value" id="exposureValue">0</span>
+                        </div>
+                        <div class="setting-help">Adjust image brightness (-2 to +2)</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="contrastAdjustment">Contrast</label>
+                        <div class="slider-container">
+                            <input type="range" id="contrastAdjustment" min="0.5" max="2" step="0.1" value="1">
+                            <span class="slider-value" id="contrastValue">1.0</span>
+                        </div>
+                        <div class="setting-help">Adjust image contrast (0.5 to 2.0)</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="sharpnessControl">Sharpness</label>
+                        <div class="slider-container">
+                            <input type="range" id="sharpnessControl" min="0" max="2" step="0.1" value="0">
+                            <span class="slider-value" id="sharpnessValue">0</span>
+                        </div>
+                        <div class="setting-help">Apply unsharp mask filter (0 to 2)</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="skinSmoothing">Skin Smoothing</label>
+                        <div class="slider-container">
+                            <input type="range" id="skinSmoothing" min="0" max="5" step="0.5" value="0">
+                            <span class="slider-value" id="skinSmoothingValue">0</span>
+                        </div>
+                        <div class="setting-help">Smooth skin tones (0 to 5)</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label>
+                            <input type="checkbox" id="redEyeRemoval">
+                            Red-eye Removal
+                        </label>
+                        <div class="setting-help">Detect and correct red-eye effect</div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="backgroundBlur">Background Blur</label>
+                        <div class="slider-container">
+                            <input type="range" id="backgroundBlur" min="0" max="10" step="0.5" value="0">
+                            <span class="slider-value" id="backgroundBlurValue">0px</span>
+                        </div>
+                        <div class="setting-help">Blur background around faces (0-10px)</div>
+                    </div>
+                </div>
+
+                <div class="preprocessing-actions">
+                    <button type="button" id="previewEnhancementsBtn" class="preview-button">Preview Enhancements</button>
+                    <button type="button" id="resetEnhancementsBtn" class="reset-button">Reset All</button>
+                    <button type="button" id="applyToAllImagesBtn" class="apply-button">Apply to All Images</button>
+                </div>
+
+                <div class="enhancement-preview">
+                    <span>Preview: </span>
+                    <span id="enhancementSummary">No enhancements applied</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="output-settings">
+            <h3 class="collapsible-header">
+                Output Settings
+                <span class="collapse-icon">▼</span>
+            </h3>
+            <div class="collapsible-content">
+            <div class="settings-grid">
+                <div class="setting-group">
+                    <label for="outputFormat">Output Format</label>
+                    <select id="outputFormat">
+                        <option value="png">PNG (Lossless)</option>
+                        <option value="jpeg">JPEG (Compressed)</option>
+                        <option value="webp">WebP (Modern)</option>
+                    </select>
+                </div>
+                <div class="setting-group hidden" id="jpegQualityGroup">
+                    <label for="jpegQuality">JPEG Quality</label>
+                    <div class="quality-slider-container">
+                        <input type="range" id="jpegQuality" min="1" max="100" value="85">
+                        <span class="quality-value" id="qualityValue">85%</span>
+                    </div>
+                </div>
+                <div class="setting-group full-width">
+                    <label for="namingTemplate">Filename Template</label>
+                    <input type="text" id="namingTemplate" value="{csv_name}" placeholder="{csv_name}">
+                    <div class="template-help">
+                        Available variables: {csv_name}, {original}, {index}, {timestamp}, {width}, {height}
+                    </div>
+                </div>
+            </div>
+            <div class="download-options">
+                <div class="download-option">
+                    <input type="checkbox" id="zipDownload" checked>
+                    <label for="zipDownload">Download as ZIP archive</label>
+                </div>
+                <div class="download-option">
+                    <input type="checkbox" id="individualDownload">
+                    <label for="individualDownload">Show individual download buttons</label>
+                </div>
+            </div>
+            </div>
+        </div>
+                </div>
+            </aside>
+            <main class="workspace">
+                <div class="workspace-scroll">
+                    <div class="progress-section hidden workspace-card" id="progressSection">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">Processing...</div>
+                    </div>
+
+                    <div class="image-gallery hidden workspace-card" id="imageGallery">
+                        <h3>Image Gallery</h3>
+                        <div class="gallery-controls">
+                            <button id="selectAllBtn">Select All</button>
+                            <button id="selectNoneBtn">Select None</button>
+                            <span class="selection-counter">Selected: <span id="selectedCount">0</span> of <span id="totalCount">0</span></span>
+                        </div>
+                        <div class="gallery-grid" id="galleryGrid"></div>
+                    </div>
+
+                    <div class="canvas-container hidden workspace-card" id="canvasContainer">
+                        <h3 id="canvasTitle">Current Image Preview</h3>
+                        <div class="canvas-wrapper" id="canvasWrapper">
+                            <div class="canvas-panel" id="originalPanel">
+                                <h4 class="panel-title">Original</h4>
+                                <div class="panel-content">
+                                    <canvas id="inputCanvas"></canvas>
+                                    <div id="faceOverlays" class="face-overlays"></div>
+                                </div>
+                            </div>
+                            <div class="canvas-panel hidden" id="processedPanel">
+                                <h4 class="panel-title">Processed</h4>
+                                <div class="panel-content">
+                                    <canvas id="outputCanvas"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="face-controls">
+                            <div id="faceCounter">
+                                <span>Detected faces: <span id="faceCount">0</span></span>
+                                <span class="separator">•</span>
+                                <span>Selected: <span id="selectedFaceCount">0</span></span>
+                            </div>
+                            <div class="face-selection-controls">
+                                <button id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
+                                <button id="selectNoneFacesBtn" class="small-btn">Select None</button>
+                                <button id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cropped-faces workspace-card" id="croppedFaces">
+                        <h3>Cropped Faces:</h3>
+                        <div id="croppedContainer"></div>
+                    </div>
+
+                    <div class="status workspace-card" id="status">
+                        Ready to load CSV file
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- MediaPipe Tasks Vision -->
+    <script type="module">
+        import * as vision from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs';
+        window.vision = vision;
+    </script>
+    <!-- JSZip for batch downloads -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="js/csv-processor.js"></script>
+</body>
+</html>

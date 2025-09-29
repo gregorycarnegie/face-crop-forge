@@ -202,14 +202,14 @@ class FaceCropper {
         const singleImageModeBtn = document.getElementById('singleImageModeBtn');
         if (singleImageModeBtn) {
             singleImageModeBtn.addEventListener('click', () => {
-                window.location.href = 'single.html';
+                window.location.href = 'single-processing.html';
             });
         }
 
         const csvBatchModeBtn = document.getElementById('csvBatchModeBtn');
         if (csvBatchModeBtn) {
             csvBatchModeBtn.addEventListener('click', () => {
-                window.location.href = 'csv-batch.html';
+                window.location.href = 'csv-processing.html';
             });
         }
 
@@ -1625,7 +1625,7 @@ class FaceCropper {
         if (!this.enableWebWorkers.checked) return;
 
         try {
-            this.faceDetectionWorker = new Worker('face-detection-worker.js');
+            this.faceDetectionWorker = new Worker('js/face-detection-worker.js');
 
             this.faceDetectionWorker.onmessage = (e) => {
                 const { type, data, id, success, faces, error } = e.data;

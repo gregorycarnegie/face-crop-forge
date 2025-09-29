@@ -31,7 +31,8 @@
       "WebFetch(domain:ai.google.dev)",
       "WebFetch(domain:codepen.io)",
       "WebFetch(domain:developers.google.com)",
-      "WebFetch(domain:cdn.jsdelivr.net)"
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

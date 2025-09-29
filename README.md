@@ -35,7 +35,7 @@ A powerful, client-side face detection and cropping application built with Media
 ### Option 1: Direct File Access
 
 1. Download or clone this repository
-2. Open `home.html` in any modern web browser
+2. Open `index.html` in any modern web browser
 3. Choose your processing mode and start uploading images
 
 ### Option 2: Local Server (Recommended)
@@ -55,21 +55,21 @@ Then navigate to `http://localhost:8000`
 
 ## 📖 Usage Guide
 
-### Single Image Mode (`single.html`)
+### Single Image Mode (`single-processing.html`)
 
 1. **Upload**: Drag & drop or click to select an image
 2. **Detect**: Click "Detect Faces" to analyze the image
 3. **Adjust**: Use quality filters and color correction as needed
 4. **Download**: Get individual crops or a complete ZIP package
 
-### Multiple Images Mode (`index.html`)
+### Multiple Images Mode (`batch-processing.html`)
 
 1. **Batch Upload**: Add multiple images to the gallery
 2. **Process**: Run face detection across all images
 3. **Review**: Use the gallery to navigate and review results
 4. **Export**: Download crops individually or as a batch ZIP
 
-### CSV Batch Mode (`csv-batch.html`)
+### CSV Batch Mode (`csv-processing.html`)
 
 1. **Upload CSV**: Provide a CSV file with image URLs or file references
 2. **Configure**: Set processing parameters and output options
@@ -107,14 +107,14 @@ Then navigate to `http://localhost:8000`
 
 ### Key Components
 
-- `home.html` - Mode selection landing page
-- `single.html` - Single image processing interface
-- `index.html` - Multiple image batch processing
-- `csv-batch.html` - CSV-driven batch operations
-- `face-detection-worker.js` - Web Worker for face detection
-- `script.js` - Main application logic for multiple images
-- `single-script.js` - Single image processing logic
-- `csv-batch-script.js` - CSV batch processing logic
+- `index.html` - Mode selection landing page
+- `single-processing.html` - Single image processing interface
+- `batch-processing.html` - Multiple images batch processing
+- `csv-processing.html` - CSV-driven batch operations
+- `js/face-detection-worker.js` - Web Worker for face detection
+- `js/batch-processor.js` - Main application logic for multiple images
+- `js/single-processor.js` - Single image processing logic
+- `js/csv-processor.js` - CSV batch processing logic
 
 ### Performance Features
 
@@ -144,16 +144,22 @@ Then navigate to `http://localhost:8000`
 ### Project Structure
 
 ```text
-├── home.html              # Mode selection page
-├── index.html             # Multiple images interface
-├── single.html            # Single image interface
-├── csv-batch.html         # CSV batch interface
-├── script.js              # Main application logic
-├── single-script.js       # Single image logic
-├── csv-batch-script.js    # CSV batch logic
-├── face-detection-worker.js # Web Worker for face detection
-├── styles.css             # Global styles
-└── server.js              # Optional local server
+├── index.html                   # Mode selection landing page
+├── single-processing.html       # Single image processing interface
+├── batch-processing.html        # Multiple images batch processing
+├── csv-processing.html          # CSV-driven batch operations
+├── server.js                    # Optional local development server
+├── README.md                    # Project documentation
+├── assets/
+│   └── favicon.svg              # Application favicon
+├── css/
+│   └── styles.css               # Global styles and responsive design
+├── js/
+│   ├── single-processor.js      # Single image processing logic
+│   ├── batch-processor.js       # Multiple images batch logic
+│   ├── csv-processor.js         # CSV batch processing logic
+│   └── face-detection-worker.js # Web Worker for face detection
+└── docs/                        # Additional documentation (if needed)
 ```
 
 ### Key Files
