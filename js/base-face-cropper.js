@@ -445,7 +445,8 @@ class BaseFaceCropper {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
-                URL.revokeObjectURL(img.src);
+                // Don't revoke the URL - we need it for gallery display
+                // The URL will be automatically cleaned up when the page unloads
                 resolve(img);
             };
             img.onerror = () => {
@@ -523,6 +524,66 @@ class BaseFaceCropper {
         logEntry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
         logElement.appendChild(logEntry);
         logElement.scrollTop = logElement.scrollHeight;
+    }
+
+    createGalleryItem(imageData) {
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.dataset.imageId = imageData.id;
+
+        if (imageData.selected) {
+            item.classList.add('selected');
+        }
+        if (imageData.processed) {
+            item.classList.add('processed');
+        }
+        if (imageData.status === 'processing') {
+            item.classList.add('processing');
+        }
+
+        const img = document.createElement('img');
+        try {
+            if (imageData.image instanceof HTMLImageElement && imageData.image.src) {
+                // Use the existing image source
+                img.src = imageData.image.src;
+            } else if (imageData.file) {
+                // Create blob URL from file
+                img.src = URL.createObjectURL(imageData.file);
+            } else {
+                // Fallback: show placeholder
+                img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM5OTkiPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
+            }
+        } catch (error) {
+            // Fallback: show placeholder
+            img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM5OTkiPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
+        }
+        img.alt = imageData.file ? imageData.file.name : 'Image';
+
+        const info = document.createElement('div');
+        info.className = 'gallery-item-info';
+
+        const name = document.createElement('div');
+        name.className = 'gallery-item-name';
+        name.textContent = imageData.csvOutputName || imageData.file.name;
+
+        const status = document.createElement('div');
+        status.className = 'gallery-item-status';
+        if (imageData.processed) {
+            status.textContent = `${imageData.results.length} faces`;
+            status.classList.add('processed');
+        } else if (imageData.status === 'processing') {
+            status.textContent = 'Processing...';
+            status.classList.add('processing');
+        } else {
+            status.textContent = 'Ready';
+        }
+
+        info.appendChild(name);
+        info.appendChild(status);
+        item.appendChild(img);
+        item.appendChild(info);
+
+        return item;
     }
 
     // Common selection methods for images

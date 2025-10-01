@@ -28,6 +28,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
 
         this.initializeElements();
         this.setupEventListeners();
+        this.setupDragAndDrop();
         this.loadModel();
     }
 
@@ -172,34 +173,91 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
             }
         });
 
-        // Drag and drop for image files
-        document.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+    }
+
+    setupDragAndDrop() {
+        // Setup drag and drop for CSV upload card
+        const csvUploadCard = this.csvInput.closest('.upload-card');
+        if (csvUploadCard) {
+            this.setupDropZone(csvUploadCard, (files) => this.handleCSVDrop(files));
+        }
+
+        // Setup drag and drop for image upload card
+        if (this.imageUploadCard) {
+            this.setupDropZone(this.imageUploadCard, (files) => this.handleImageDrop(files));
+        }
+    }
+
+    setupDropZone(element, dropHandler) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            element.addEventListener(eventName, this.preventDefaults, false);
         });
 
-        document.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            if (!this.csvMapping.size) {
-                this.updateStatus('Please upload and configure CSV first.');
-                return;
-            }
-
-            const files = Array.from(e.dataTransfer.files);
-            const imageFiles = files.filter(file => file.type.startsWith('image/'));
-
-            if (imageFiles.length > 0) {
-                // Simulate file input change
-                const dt = new DataTransfer();
-                imageFiles.forEach(file => dt.items.add(file));
-                this.imageInput.files = dt.files;
-
-                // Trigger the upload handler
-                this.handleMultipleImageUpload({ target: { files: imageFiles } });
-            }
+        ['dragenter', 'dragover'].forEach(eventName => {
+            element.addEventListener(eventName, () => {
+                element.classList.add('drag-over');
+            }, false);
         });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            element.addEventListener(eventName, () => {
+                element.classList.remove('drag-over');
+            }, false);
+        });
+
+        element.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            dropHandler(files);
+        }, false);
+    }
+
+    preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    handleCSVDrop(files) {
+        const csvFiles = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.csv'));
+
+        if (csvFiles.length === 0) {
+            this.updateStatus('Please drop a CSV file');
+            return;
+        }
+
+        if (csvFiles.length > 1) {
+            this.updateStatus('Please drop only one CSV file at a time');
+            return;
+        }
+
+        // Simulate file input
+        const dt = new DataTransfer();
+        dt.items.add(csvFiles[0]);
+        this.csvInput.files = dt.files;
+
+        // Trigger the upload handler
+        this.handleCSVUpload({ target: { files: csvFiles } });
+    }
+
+    handleImageDrop(files) {
+        if (!this.csvMapping.size) {
+            this.updateStatus('Please upload and configure CSV first.');
+            return;
+        }
+
+        const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+
+        if (imageFiles.length === 0) {
+            this.updateStatus('Please drop image files');
+            return;
+        }
+
+        // Simulate file input
+        const dt = new DataTransfer();
+        imageFiles.forEach(file => dt.items.add(file));
+        this.imageInput.files = dt.files;
+
+        // Trigger the upload handler
+        this.handleMultipleImageUpload({ target: { files: imageFiles } });
     }
 
 
@@ -440,7 +498,9 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         for (const { file, outputName } of matchedFiles) {
             try {
                 const image = await this.loadImageFile(file);
-                this.images.set(`img_${imageId}`, {
+                const id = `img_${imageId}`;
+                this.images.set(id, {
+                    id: id,
                     file: file,
                     image: image,
                     faces: [],
@@ -545,55 +605,27 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         }
 
         this.images.forEach((imageData, imageId) => {
-            const galleryItem = document.createElement('div');
-            galleryItem.className = 'gallery-item';
-            if (imageData.selected) galleryItem.classList.add('selected');
-
-            const canvas = document.createElement('canvas');
-            canvas.width = 150;
-            canvas.height = 150;
-            const ctx = canvas.getContext('2d');
-
-            // Draw thumbnail
-            const scale = Math.min(150 / imageData.image.width, 150 / imageData.image.height);
-            const width = imageData.image.width * scale;
-            const height = imageData.image.height * scale;
-            const x = (150 - width) / 2;
-            const y = (150 - height) / 2;
-
-            ctx.fillStyle = '#f0f0f0';
-            ctx.fillRect(0, 0, 150, 150);
-            ctx.drawImage(imageData.image, x, y, width, height);
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = imageData.selected;
-            checkbox.addEventListener('change', () => this.toggleImageSelection(imageId));
-
-            const label = document.createElement('div');
-            label.className = 'gallery-label';
-            label.textContent = imageData.csvOutputName || imageData.file.name;
-
-            const status = document.createElement('div');
-            status.className = 'gallery-status';
-            status.textContent = imageData.processed ? 'Processed' : 'Pending';
-
-            galleryItem.appendChild(canvas);
-            galleryItem.appendChild(checkbox);
-            galleryItem.appendChild(label);
-            galleryItem.appendChild(status);
-
-            galleryItem.addEventListener('click', (e) => {
-                if (e.target !== checkbox) {
-                    this.selectImage(imageId);
-                }
-            });
-
+            const galleryItem = this.createGalleryItem(imageData);
             this.galleryGrid.appendChild(galleryItem);
         });
 
         this.imageGallery.classList.remove('hidden');
         this.updateSelectionCount();
+    }
+
+    createGalleryItem(imageData) {
+        const item = super.createGalleryItem(imageData);
+        item.addEventListener('click', () => this.toggleSelection(imageData.id));
+        return item;
+    }
+
+    toggleSelection(imageId) {
+        const imageData = this.images.get(imageId);
+        if (imageData) {
+            imageData.selected = !imageData.selected;
+            this.displayImageGallery();
+            this.updateSelectionCount();
+        }
     }
 
     selectImage(imageId) {
@@ -621,14 +653,6 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
 
         // Display faces if already detected
         this.updateFaceOverlays(imageData);
-    }
-
-    toggleImageSelection(imageId) {
-        const imageData = this.images.get(imageId);
-        if (imageData) {
-            imageData.selected = !imageData.selected;
-            this.displayImageGallery(); // Refresh display
-        }
     }
 
     selectAll() {
