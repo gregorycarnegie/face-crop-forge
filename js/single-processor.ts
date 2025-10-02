@@ -1,0 +1,562 @@
+import { BaseFaceCropper } from './base-face-cropper.js';
+import { CropSettings } from './types';
+
+// Face interface specific to SingleImageFaceCropper
+interface FaceBox {
+    xMin: number;
+    yMin: number;
+    width: number;
+    height: number;
+}
+
+interface Face {
+    id: number;
+    box: FaceBox;
+    confidence: number;
+    selected: boolean;
+}
+
+interface CroppedResult {
+    face: Face;
+    image: HTMLCanvasElement;
+    index: number;
+}
+
+class SingleImageFaceCropper extends BaseFaceCropper {
+    private currentImage: HTMLImageElement | null;
+    private currentFile: File | null;
+    private faces: Face[];
+    private selectedFaces: Set<number>;
+
+    // UI Elements
+    private imageInput!: HTMLInputElement;
+    private processImageBtn!: HTMLButtonElement;
+    private clearImageBtn!: HTMLButtonElement;
+    private downloadResultsBtn!: HTMLButtonElement;
+    protected progressSection!: HTMLElement;
+    protected progressFill!: HTMLElement;
+    protected progressText!: HTMLElement;
+    private canvasContainer!: HTMLElement;
+    private inputCanvas!: HTMLCanvasElement;
+    private outputCanvas!: HTMLCanvasElement;
+    private croppedFaces!: HTMLElement;
+    private croppedContainer!: HTMLElement;
+    protected status!: HTMLElement;
+    private faceOverlays!: HTMLElement;
+    private faceCount!: HTMLElement;
+    private selectedFaceCount!: HTMLElement;
+    private selectAllFacesBtn!: HTMLButtonElement;
+    private selectNoneFacesBtn!: HTMLButtonElement;
+    private detectFacesBtn!: HTMLButtonElement;
+
+    // Settings elements
+    protected outputWidth!: HTMLInputElement;
+    protected outputHeight!: HTMLInputElement;
+    protected faceHeightPct!: HTMLInputElement;
+    protected positioningMode!: HTMLSelectElement;
+    protected verticalOffset!: HTMLInputElement;
+    protected horizontalOffset!: HTMLInputElement;
+    protected aspectRatioLock!: HTMLButtonElement;
+    protected sizePreset!: HTMLSelectElement;
+    protected outputFormat!: HTMLSelectElement;
+    protected jpegQuality!: HTMLInputElement;
+    protected namingTemplate!: HTMLInputElement;
+
+    // Stats elements
+    private facesDetected!: HTMLElement;
+    private processingTime!: HTMLElement;
+    private imageSize!: HTMLElement;
+    protected processingStatus!: HTMLElement;
+    protected processingLogElement!: HTMLElement;
+
+    // Enhancement elements
+    protected autoColorCorrection!: HTMLInputElement;
+    protected exposureAdjustment!: HTMLInputElement;
+    protected contrastAdjustment!: HTMLInputElement;
+    protected sharpnessControl!: HTMLInputElement;
+    protected skinSmoothing!: HTMLInputElement;
+    private redEyeRemoval!: HTMLInputElement;
+    protected backgroundBlur!: HTMLInputElement;
+
+    constructor() {
+        super();
+        this.currentImage = null;
+        this.currentFile = null;
+        this.faces = [];
+        this.selectedFaces = new Set();
+
+        this.initializeElements();
+        this.setupEventListeners();
+        this.loadModel();
+    }
+
+    private initializeElements(): void {
+        this.imageInput = document.getElementById('imageInput') as HTMLInputElement;
+        this.processImageBtn = document.getElementById('processImageBtn') as HTMLButtonElement;
+        this.clearImageBtn = document.getElementById('clearImageBtn') as HTMLButtonElement;
+        this.downloadResultsBtn = document.getElementById('downloadResultsBtn') as HTMLButtonElement;
+        this.progressSection = document.getElementById('progressSection') as HTMLElement;
+        this.progressFill = document.getElementById('progressFill') as HTMLElement;
+        this.progressText = document.getElementById('progressText') as HTMLElement;
+        this.canvasContainer = document.getElementById('canvasContainer') as HTMLElement;
+        this.inputCanvas = document.getElementById('inputCanvas') as HTMLCanvasElement;
+        this.outputCanvas = document.getElementById('outputCanvas') as HTMLCanvasElement;
+        this.croppedFaces = document.getElementById('croppedFaces') as HTMLElement;
+        this.croppedContainer = document.getElementById('croppedContainer') as HTMLElement;
+        this.status = document.getElementById('status') as HTMLElement;
+        this.faceOverlays = document.getElementById('faceOverlays') as HTMLElement;
+        this.faceCount = document.getElementById('faceCount') as HTMLElement;
+        this.selectedFaceCount = document.getElementById('selectedFaceCount') as HTMLElement;
+        this.selectAllFacesBtn = document.getElementById('selectAllFacesBtn') as HTMLButtonElement;
+        this.selectNoneFacesBtn = document.getElementById('selectNoneFacesBtn') as HTMLButtonElement;
+        this.detectFacesBtn = document.getElementById('detectFacesBtn') as HTMLButtonElement;
+
+        // Settings elements
+        this.outputWidth = document.getElementById('outputWidth') as HTMLInputElement;
+        this.outputHeight = document.getElementById('outputHeight') as HTMLInputElement;
+        this.faceHeightPct = document.getElementById('faceHeightPct') as HTMLInputElement;
+        this.positioningMode = document.getElementById('positioningMode') as HTMLSelectElement;
+        this.verticalOffset = document.getElementById('verticalOffset') as HTMLInputElement;
+        this.horizontalOffset = document.getElementById('horizontalOffset') as HTMLInputElement;
+        this.aspectRatioLock = document.getElementById('aspectRatioLock') as HTMLButtonElement;
+        this.sizePreset = document.getElementById('sizePreset') as HTMLSelectElement;
+        this.outputFormat = document.getElementById('outputFormat') as HTMLSelectElement;
+        this.jpegQuality = document.getElementById('jpegQuality') as HTMLInputElement;
+        this.namingTemplate = document.getElementById('namingTemplate') as HTMLInputElement;
+
+        // Stats elements
+        this.facesDetected = document.getElementById('facesDetected') as HTMLElement;
+        this.processingTime = document.getElementById('processingTime') as HTMLElement;
+        this.imageSize = document.getElementById('imageSize') as HTMLElement;
+        this.processingStatus = document.getElementById('processingStatus') as HTMLElement;
+        this.processingLogElement = document.getElementById('processingLog') as HTMLElement;
+
+        // Enhancement elements
+        this.autoColorCorrection = document.getElementById('autoColorCorrection') as HTMLInputElement;
+        this.exposureAdjustment = document.getElementById('exposureAdjustment') as HTMLInputElement;
+        this.contrastAdjustment = document.getElementById('contrastAdjustment') as HTMLInputElement;
+        this.sharpnessControl = document.getElementById('sharpnessControl') as HTMLInputElement;
+        this.skinSmoothing = document.getElementById('skinSmoothing') as HTMLInputElement;
+        this.redEyeRemoval = document.getElementById('redEyeRemoval') as HTMLInputElement;
+        this.backgroundBlur = document.getElementById('backgroundBlur') as HTMLInputElement;
+
+        this.updateUI();
+    }
+
+    private setupEventListeners(): void {
+        this.imageInput.addEventListener('change', (e: Event) => this.handleImageUpload(e));
+        this.processImageBtn.addEventListener('click', () => this.processImage());
+        this.clearImageBtn.addEventListener('click', () => this.clearImage());
+        this.downloadResultsBtn.addEventListener('click', () => this.downloadResults());
+
+        // Face selection listeners
+        this.selectAllFacesBtn.addEventListener('click', () => this.selectAllFaces());
+        this.selectNoneFacesBtn.addEventListener('click', () => this.selectNoneFaces());
+        this.detectFacesBtn.addEventListener('click', () => this.detectFaces());
+
+        // Settings listeners
+        this.outputWidth.addEventListener('input', () => this.updatePreview());
+        this.outputHeight.addEventListener('input', () => this.updatePreview());
+        this.faceHeightPct.addEventListener('input', () => this.updatePreview());
+        this.positioningMode.addEventListener('change', () => this.updateAdvancedPositioning());
+        this.verticalOffset.addEventListener('input', () => this.updateOffsetDisplay('vertical'));
+        this.horizontalOffset.addEventListener('input', () => this.updateOffsetDisplay('horizontal'));
+        this.aspectRatioLock.addEventListener('click', () => this.toggleAspectRatioLock());
+        this.sizePreset.addEventListener('change', () => this.applySizePreset());
+        this.outputFormat.addEventListener('change', () => this.updateFormatSettings());
+
+        // Navigation listeners
+        const backToMultipleBtn = document.getElementById('backToMultipleBtn');
+        if (backToMultipleBtn) {
+            backToMultipleBtn.addEventListener('click', () => {
+                window.location.href = 'batch-processing.html';
+            });
+        }
+
+        const csvBatchModeBtn = document.getElementById('csvBatchModeBtn');
+        if (csvBatchModeBtn) {
+            csvBatchModeBtn.addEventListener('click', () => {
+                window.location.href = 'csv-processing.html';
+            });
+        }
+
+        // Dark mode listener
+        const darkModeBtn = document.getElementById('darkModeBtn');
+        if (darkModeBtn) {
+            darkModeBtn.addEventListener('click', () => this.toggleDarkMode());
+        }
+
+        // Enhancement listeners
+        if (this.exposureAdjustment) {
+            this.exposureAdjustment.addEventListener('input', () => this.updateSliderValue('exposure'));
+        }
+        if (this.contrastAdjustment) {
+            this.contrastAdjustment.addEventListener('input', () => this.updateSliderValue('contrast'));
+        }
+        if (this.sharpnessControl) {
+            this.sharpnessControl.addEventListener('input', () => this.updateSliderValue('sharpness'));
+        }
+        if (this.skinSmoothing) {
+            this.skinSmoothing.addEventListener('input', () => this.updateSliderValue('skinSmoothing'));
+        }
+        if (this.backgroundBlur) {
+            this.backgroundBlur.addEventListener('input', () => this.updateSliderValue('backgroundBlur'));
+        }
+
+        // Drag and drop
+        document.addEventListener('dragover', (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        document.addEventListener('drop', (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (!e.dataTransfer) return;
+
+            const files = Array.from(e.dataTransfer.files);
+            const imageFile = files.find(file => file.type.startsWith('image/'));
+
+            if (imageFile) {
+                this.handleFile(imageFile);
+            }
+        });
+    }
+
+    private handleImageUpload(event: Event): void {
+        const target = event.target as HTMLInputElement;
+        const file = target.files?.[0];
+        if (file) {
+            this.handleFile(file);
+        }
+    }
+
+    private async handleFile(file: File): Promise<void> {
+        if (!file.type.startsWith('image/')) {
+            this.updateStatus('Please select a valid image file.');
+            return;
+        }
+
+        this.currentFile = file;
+
+        try {
+            const image = new Image();
+            image.onload = () => {
+                this.currentImage = image;
+                this.displayImage();
+                this.updateStats();
+                this.enableControls();
+                this.updateStatus(`Image loaded: ${file.name}`);
+                this.addToLog(`Image loaded: ${file.name} (${image.width}×${image.height})`);
+            };
+            image.src = URL.createObjectURL(file);
+        } catch (error) {
+            console.error('Error loading image:', error);
+            this.updateStatus('Error loading image.');
+            this.addToLog('Error loading image: ' + (error as Error).message, 'error');
+        }
+    }
+
+    private displayImage(): void {
+        if (!this.currentImage) return;
+
+        const canvas = this.inputCanvas;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Set canvas size
+        const maxWidth = 600;
+        const maxHeight = 400;
+        const scale = Math.min(maxWidth / this.currentImage.width, maxHeight / this.currentImage.height);
+
+        canvas.width = this.currentImage.width * scale;
+        canvas.height = this.currentImage.height * scale;
+
+        // Draw image
+        ctx.drawImage(this.currentImage, 0, 0, canvas.width, canvas.height);
+
+        this.canvasContainer.classList.remove('hidden');
+        this.clearFaceOverlays();
+    }
+
+    private async detectFaces(): Promise<void> {
+        if (!this.detector || !this.currentImage) {
+            this.updateStatus('Model not loaded or no image selected.');
+            return;
+        }
+
+        this.updateStatus('Detecting faces...');
+        this.addToLog('Starting face detection...');
+        this.processingStartTime = Date.now();
+
+        try {
+            const detectionResult = await this.detector.detect(this.currentImage);
+
+            this.faces = [];
+            if (detectionResult.detections && detectionResult.detections.length > 0) {
+                this.faces = detectionResult.detections
+                    .map((detection, index) => {
+                        const bbox = detection.boundingBox;
+                        const box = this.convertBoundingBoxToPixels(bbox, this.currentImage!.width, this.currentImage!.height);
+                        if (!box) {
+                            return null;
+                        }
+
+                        const { x, y, width, height } = box;
+
+                        return {
+                            id: index,
+                            box: {
+                                xMin: x,
+                                yMin: y,
+                                width: width,
+                                height: height
+                            },
+                            confidence: detection.categories && detection.categories.length > 0
+                                ? detection.categories[0].score
+                                : 0.8,
+                            selected: true
+                        };
+                    })
+                    .filter((face): face is Face => face !== null);
+            }
+
+            this.selectedFaces = new Set(this.faces.map(f => f.id));
+            this.updateFaceOverlays();
+            this.updateFaceCount();
+
+            const processingTime = Date.now() - this.processingStartTime;
+            this.updateStatus(`Detected ${this.faces.length} face(s) in ${processingTime}ms`);
+            this.addToLog(`Face detection completed: ${this.faces.length} faces found in ${processingTime}ms`);
+
+            this.updateStats();
+
+            if (this.faces.length > 0) {
+                this.processImageBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error detecting faces:', error);
+            this.updateStatus('Error detecting faces.');
+            this.addToLog('Error during face detection: ' + (error as Error).message, 'error');
+        }
+    }
+
+    private updateFaceOverlays(): void {
+        this.clearFaceOverlays();
+
+        if (!this.faces.length || !this.currentImage) return;
+
+        const canvas = this.inputCanvas;
+        const scaleX = canvas.width / this.currentImage.width;
+        const scaleY = canvas.height / this.currentImage.height;
+
+        this.faces.forEach((face) => {
+            const box = face.box;
+            const overlay = document.createElement('div');
+            overlay.className = `face-overlay ${this.selectedFaces.has(face.id) ? 'selected' : ''}`;
+            overlay.style.left = (box.xMin * scaleX) + 'px';
+            overlay.style.top = (box.yMin * scaleY) + 'px';
+            overlay.style.width = (box.width * scaleX) + 'px';
+            overlay.style.height = (box.height * scaleY) + 'px';
+
+            overlay.addEventListener('click', () => this.toggleFaceSelection(face.id));
+
+            this.faceOverlays.appendChild(overlay);
+        });
+    }
+
+    private clearFaceOverlays(): void {
+        this.faceOverlays.innerHTML = '';
+    }
+
+    private toggleFaceSelection(faceId: number): void {
+        if (this.selectedFaces.has(faceId)) {
+            this.selectedFaces.delete(faceId);
+        } else {
+            this.selectedFaces.add(faceId);
+        }
+        this.updateFaceOverlays();
+        this.updateFaceCount();
+    }
+
+    selectAllFaces(): void {
+        this.selectedFaces = new Set(this.faces.map(f => f.id));
+        this.updateFaceOverlays();
+        this.updateFaceCount();
+    }
+
+    selectNoneFaces(): void {
+        this.selectedFaces.clear();
+        this.updateFaceOverlays();
+        this.updateFaceCount();
+    }
+
+    private updateFaceCount(): void {
+        this.faceCount.textContent = this.faces.length.toString();
+        this.selectedFaceCount.textContent = this.selectedFaces.size.toString();
+    }
+
+    private async processImage(): Promise<void> {
+        if (!this.detector || !this.currentImage || !this.selectedFaces.size) {
+            this.updateStatus('No faces selected for processing.');
+            return;
+        }
+
+        this.updateStatus('Processing selected faces...');
+        this.addToLog(`Processing ${this.selectedFaces.size} selected faces...`);
+        this.showProgress();
+
+        const selectedFaceData = this.faces.filter(face => this.selectedFaces.has(face.id));
+        const croppedResults: CroppedResult[] = [];
+
+        try {
+            for (let i = 0; i < selectedFaceData.length; i++) {
+                const face = selectedFaceData[i];
+                this.updateProgress((i / selectedFaceData.length) * 100, `Processing face ${i + 1}/${selectedFaceData.length}`);
+
+                const croppedImage = await this.cropCurrentFace(face);
+                croppedResults.push({
+                    face,
+                    image: croppedImage,
+                    index: i
+                });
+            }
+
+            this.displayResults(croppedResults);
+            this.updateProgress(100, 'Processing complete!');
+            this.hideProgress();
+            this.updateStatus(`Successfully processed ${croppedResults.length} face(s)`);
+            this.addToLog(`Processing completed: ${croppedResults.length} faces cropped successfully`);
+
+            this.downloadResultsBtn.disabled = false;
+        } catch (error) {
+            console.error('Error processing faces:', error);
+            this.updateStatus('Error processing faces.');
+            this.addToLog('Error during face processing: ' + (error as Error).message, 'error');
+            this.hideProgress();
+        }
+    }
+
+    private async cropCurrentFace(face: Face): Promise<HTMLCanvasElement> {
+        return super.cropFace(this.currentImage!, face);
+    }
+
+    private displayResults(results: CroppedResult[]): void {
+        this.croppedContainer.innerHTML = '';
+
+        results.forEach((result, index) => {
+            const container = document.createElement('div');
+            container.className = 'cropped-face-item';
+
+            const canvas = result.image;
+            canvas.className = 'cropped-face';
+
+            const controls = document.createElement('div');
+            controls.className = 'cropped-face-controls';
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = 'Download';
+            downloadBtn.className = 'small-btn';
+            downloadBtn.onclick = () => this.downloadSingle(canvas, index);
+
+            controls.appendChild(downloadBtn);
+            container.appendChild(canvas);
+            container.appendChild(controls);
+            this.croppedContainer.appendChild(container);
+        });
+
+        this.croppedFaces.classList.remove('hidden');
+    }
+
+    private downloadSingle(canvas: HTMLCanvasElement, index: number): void {
+        const settings = this.getSettings();
+        const filename = this.generateFaceFilename(index);
+
+        canvas.toBlob((blob) => {
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }, `image/${settings.format}`, settings.quality);
+    }
+
+    private downloadResults(): void {
+        const canvases = this.croppedContainer.querySelectorAll('canvas');
+        if (canvases.length === 0) return;
+
+        if (canvases.length === 1) {
+            this.downloadSingle(canvases[0] as HTMLCanvasElement, 0);
+        } else {
+            this.downloadAsZip(Array.from(canvases) as HTMLCanvasElement[]);
+        }
+    }
+
+    private generateFaceFilename(index: number): string {
+        const settings = this.getSettings();
+        const template = this.namingTemplate.value || 'face_{original}_{index}';
+        const originalName = this.currentFile ? this.currentFile.name.replace(/\.[^/.]+$/, '') : 'image';
+        const extension = settings.format === 'jpeg' ? 'jpg' : settings.format;
+
+        return template
+            .replace('{original}', originalName)
+            .replace('{index}', (index + 1).toString())
+            .replace('{timestamp}', Date.now().toString())
+            .replace('{width}', settings.outputWidth.toString())
+            .replace('{height}', settings.outputHeight.toString()) + '.' + extension;
+    }
+
+    private clearImage(): void {
+        this.currentImage = null;
+        this.currentFile = null;
+        this.faces = [];
+        this.selectedFaces.clear();
+        this.imageInput.value = '';
+
+        this.canvasContainer.classList.add('hidden');
+        this.croppedFaces.classList.add('hidden');
+        this.clearFaceOverlays();
+        this.croppedContainer.innerHTML = '';
+
+        this.updateUI();
+        this.updateStatus('Ready to load image');
+        this.addToLog('Image cleared');
+    }
+
+    updateUI(): void {
+        const hasImage = !!this.currentImage;
+        const hasFaces = this.faces.length > 0;
+        const hasSelectedFaces = this.selectedFaces.size > 0;
+
+        this.processImageBtn.disabled = !hasFaces || !hasSelectedFaces;
+        this.clearImageBtn.disabled = !hasImage;
+        this.detectFacesBtn.disabled = !hasImage;
+        this.downloadResultsBtn.disabled = true;
+    }
+
+    private enableControls(): void {
+        this.updateUI();
+    }
+
+    private updateStats(): void {
+        if (this.currentImage) {
+            this.imageSize.textContent = `${this.currentImage.width}×${this.currentImage.height}`;
+        }
+        this.facesDetected.textContent = this.faces.length.toString();
+
+        if (this.processingStartTime) {
+            const time = Date.now() - this.processingStartTime;
+            this.processingTime.textContent = time + 'ms';
+        }
+    }
+}
+
+// Initialize the application when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    new SingleImageFaceCropper();
+});
+
+export default SingleImageFaceCropper;

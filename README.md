@@ -32,26 +32,73 @@ A powerful, client-side face detection and cropping application built with Media
 
 ## 🚀 Quick Start
 
-### Option 1: Direct File Access
+### Prerequisites
 
-1. Download or clone this repository
-2. Open `index.html` in any modern web browser
-3. Choose your processing mode and start uploading images
+- **Node.js 16+** (for development and running the server)
+- **npm** (comes with Node.js)
 
-### Option 2: Local Server (Recommended)
+### Installation & Setup
+
+1. **Clone the repository**
+
+   ```bash
+   git clone <repository-url>
+   cd opencv-face-crop
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+3. **Build the project**
+
+   ```bash
+   npm run build
+   ```
+
+   This compiles TypeScript files to JavaScript.
+
+4. **Start the server**
+
+   **Option A: Node.js Server (Recommended)**
+
+   ```bash
+   npm start
+   ```
+
+   Navigate to `http://localhost:3000`
+
+   **Option B: Python HTTP Server**
+
+   ```bash
+   # Python 3
+   python -m http.server 3000
+
+   # Python 2
+   python -m SimpleHTTPServer 3000
+   ```
+
+   Navigate to `http://localhost:3000`
+
+   **Option C: PHP Built-in Server**
+
+   ```bash
+   php -S localhost:3000
+   ```
+
+   Navigate to `http://localhost:3000`
+
+### Development Mode
+
+For active development with automatic recompilation:
 
 ```bash
-# Using Node.js (if server.js is present)
-node server.js
-
-# Using Python
-python -m http.server 8000
-
-# Using PHP
-php -S localhost:8000
+npm run dev
 ```
 
-Then navigate to `http://localhost:8000`
+This runs TypeScript in watch mode alongside the Node.js server, automatically recompiling on file changes.
 
 ## 📖 Usage Guide
 
@@ -100,10 +147,11 @@ Then navigate to `http://localhost:8000`
 
 ### Core Technologies
 
+- **TypeScript**: Type-safe development with strict null checking
 - **MediaPipe Tasks Vision**: Google's state-of-the-art face detection
 - **Web Workers**: Background processing for smooth UI performance
 - **Canvas API**: High-performance image manipulation
-- **Modern ES6+**: Clean, maintainable JavaScript
+- **Modern ES6+ Modules**: Clean, maintainable code architecture
 
 ### Key Components
 
@@ -144,30 +192,73 @@ Then navigate to `http://localhost:8000`
 ### Project Structure
 
 ```text
-├── index.html                   # Mode selection landing page
-├── single-processing.html       # Single image processing interface
-├── batch-processing.html        # Multiple images batch processing
-├── csv-processing.html          # CSV-driven batch operations
-├── server.js                    # Optional local development server
-├── README.md                    # Project documentation
+├── index.html                      # Mode selection landing page
+├── single-processing.html          # Single image processing interface
+├── batch-processing.html           # Multiple images batch processing
+├── csv-processing.html             # CSV-driven batch operations
+├── package.json                    # NPM dependencies and scripts
+├── tsconfig.json                   # TypeScript configuration
+├── server.ts                       # Development server (TypeScript)
+├── README.md                       # Project documentation
 ├── assets/
-│   └── favicon.svg              # Application favicon
+│   └── favicon.svg                 # Application favicon
 ├── css/
-│   └── styles.css               # Global styles and responsive design
-├── js/
-│   ├── single-processor.js      # Single image processing logic
-│   ├── batch-processor.js       # Multiple images batch logic
-│   ├── csv-processor.js         # CSV batch processing logic
-│   └── face-detection-worker.js # Web Worker for face detection
-└── docs/                        # Additional documentation (if needed)
+│   └── styles.css                  # Global styles and responsive design
+└── js/
+    ├── types.ts                    # TypeScript type definitions
+    ├── base-face-cropper.ts        # Base class for face processing
+    ├── single-processor.ts         # Single image processing (TypeScript)
+    ├── batch-processor.ts          # Batch processing (TypeScript)
+    ├── csv-processor.ts            # CSV batch processing (TypeScript)
+    ├── face-detection-worker.ts    # Web Worker (TypeScript)
+    └── *.js                        # Compiled JavaScript (git-ignored)
 ```
 
 ### Key Files
 
+- **TypeScript Source** (`*.ts`): Type-safe source code
+- **Compiled JavaScript** (`*.js`): Generated from TypeScript (not tracked in git)
 - **HTML Pages**: User interfaces for different processing modes
-- **JavaScript Modules**: Core application logic and face detection
 - **Web Worker**: Background face detection processing
 - **Styles**: Responsive CSS with dark mode support
+
+### Build System
+
+- **TypeScript Compiler**: Compiles `.ts` files to `.js` with source maps
+- **Strict Type Checking**: Full null safety and type inference
+- **ES2020 Target**: Modern JavaScript output for better performance
+- **Source Maps**: For debugging TypeScript in the browser
+
+### Available NPM Scripts
+
+```bash
+# Build TypeScript to JavaScript
+npm run build
+
+# Watch mode - auto-rebuild on file changes
+npm run build:watch
+
+# Development mode - watch + server
+npm run dev
+
+# Start the server (requires built files)
+npm start
+
+# Clean build artifacts
+npm run clean
+```
+
+### TypeScript Configuration
+
+The project uses strict TypeScript settings for maximum type safety:
+
+- Strict null checks
+- No implicit any
+- Strict function types
+- No unused locals/parameters warnings
+- Full type inference
+
+Configuration in `tsconfig.json` can be adjusted for your needs.
 
 ## 🎨 Customization
 
@@ -186,9 +277,9 @@ The application uses CSS custom properties for easy theming:
 
 ### Face Detection Parameters
 
-Modify detection settings in the JavaScript files:
+Modify detection settings in the TypeScript files (e.g., `js/base-face-cropper.ts`):
 
-```javascript
+```typescript
 const detectionConfig = {
     baseOptions: {
         modelAssetPath: 'path/to/model',
@@ -198,6 +289,12 @@ const detectionConfig = {
 };
 ```
 
+After making changes, rebuild the project:
+
+```bash
+npm run build
+```
+
 ## 📄 License
 
 This project is open source. See the repository for license details.
@@ -205,6 +302,26 @@ This project is open source. See the repository for license details.
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
+
+### Development Guidelines
+
+1. **Use TypeScript**: All new code should be written in TypeScript (`.ts` files)
+2. **Type Safety**: Maintain strict type checking - no `any` types without good reason
+3. **Build Before Commit**: Always run `npm run build` before committing
+4. **Test Thoroughly**: Test all three processing modes after changes
+5. **Source Control**: Only commit `.ts` files - `.js` files are auto-generated and git-ignored
+
+### Making Changes
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes in the TypeScript files
+4. Build and test (`npm run build && npm start`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+**Note**: Compiled JavaScript files (`.js`, `.js.map`, `.d.ts`) are automatically ignored by git and should not be committed.
 
 ## 🔗 Links
 

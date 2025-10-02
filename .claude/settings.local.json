@@ -32,7 +32,13 @@
       "WebFetch(domain:codepen.io)",
       "WebFetch(domain:developers.google.com)",
       "WebFetch(domain:cdn.jsdelivr.net)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(dir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm install)",
+      "Bash(npm run build:*)",
+      "Bash(npm start)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
