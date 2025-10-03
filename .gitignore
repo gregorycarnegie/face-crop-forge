@@ -8,10 +8,6 @@ dist/
 *.d.ts
 *.d.ts.map
 
-# Compiled JavaScript from TypeScript
-js/**/*.js
-server.js
-
 # TypeScript cache
 *.tsbuildinfo
 
