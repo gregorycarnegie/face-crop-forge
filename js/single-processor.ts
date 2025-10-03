@@ -37,14 +37,14 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     protected progressFill!: HTMLElement;
     protected progressText!: HTMLElement;
     private canvasContainer!: HTMLElement;
-    private inputCanvas!: HTMLCanvasElement;
+    protected inputCanvas!: HTMLCanvasElement;
     private outputCanvas!: HTMLCanvasElement;
     private croppedFaces!: HTMLElement;
     private croppedContainer!: HTMLElement;
     protected status!: HTMLElement;
-    private faceOverlays!: HTMLElement;
-    private faceCount!: HTMLElement;
-    private selectedFaceCount!: HTMLElement;
+    protected faceOverlays!: HTMLElement;
+    protected faceCount!: HTMLElement;
+    protected selectedFaceCount!: HTMLElement;
     private selectAllFacesBtn!: HTMLButtonElement;
     private selectNoneFacesBtn!: HTMLButtonElement;
     private detectFacesBtn!: HTMLButtonElement;
@@ -370,11 +370,12 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         this.faceOverlays.innerHTML = '';
     }
 
-    private toggleFaceSelection(faceId: number): void {
-        if (this.selectedFaces.has(faceId)) {
-            this.selectedFaces.delete(faceId);
+    toggleFaceSelection(faceId: string | number): void {
+        const numericId = typeof faceId === 'string' ? parseInt(faceId) : faceId;
+        if (this.selectedFaces.has(numericId)) {
+            this.selectedFaces.delete(numericId);
         } else {
-            this.selectedFaces.add(faceId);
+            this.selectedFaces.add(numericId);
         }
         this.updateFaceOverlays();
         this.updateFaceCount();

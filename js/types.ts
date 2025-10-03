@@ -37,14 +37,32 @@ export interface FaceData {
         height: number;
     };
     confidence?: number;
+    // Extended properties for batch processing
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    index?: number;
+    quality?: {
+        score: number;
+        level: string;
+    };
 }
 
 export interface CropResult {
-    canvas: HTMLCanvasElement;
-    bbox: PixelBoundingBox;
+    canvas?: HTMLCanvasElement;
+    bbox?: PixelBoundingBox;
     face?: FaceData;
     image?: HTMLCanvasElement;
     fileName?: string;
+    // Extended properties for batch processing
+    dataUrl?: string;
+    faceIndex?: number;
+    faceId?: string;
+    sourceImage?: string;
+    filename?: string;
+    format?: string;
+    quality?: number;
 }
 
 export interface ImageData {

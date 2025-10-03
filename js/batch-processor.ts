@@ -1877,10 +1877,10 @@ class FaceCropper extends BaseFaceCropper {
                     const scale = image.width / processedImage.width;
                     faces = faces.map(face => ({
                         ...face,
-                        x: face.x * scale,
-                        y: face.y * scale,
-                        width: face.width * scale,
-                        height: face.height * scale
+                        x: (face.x || 0) * scale,
+                        y: (face.y || 0) * scale,
+                        width: (face.width || 0) * scale,
+                        height: (face.height || 0) * scale
                     }));
                 }
 
@@ -2688,52 +2688,6 @@ class FaceCropper extends BaseFaceCropper {
         this.updateStatus('Settings reset to defaults', 'success');
     }
 
-    calculateSmartCropPosition(face: any, cropWidth: number, cropHeight: number, imageWidth: number, imageHeight: number) {
-        const mode = this.positioningMode.value;
-        const vOffset = parseInt(this.verticalOffset.value) / 100;
-        const hOffset = parseInt(this.horizontalOffset.value) / 100;
-
-        const faceCenterX = face.x + face.width / 2;
-        const faceCenterY = face.y + face.height / 2;
-
-        let targetX, targetY;
-
-        switch (mode) {
-            case 'rule-of-thirds':
-                // Position eyes at rule of thirds points
-                // Eyes are typically at about 65% from top of face bounding box
-                const eyesY = face.y + face.height * 0.35;
-
-                // Place eyes at 1/3 from top of crop
-                targetX = faceCenterX + (hOffset * cropWidth / 2);
-                targetY = eyesY - (cropHeight / 3);
-                break;
-
-            case 'custom':
-                // Use manual offsets from center
-                targetX = faceCenterX + (hOffset * cropWidth / 2);
-                targetY = faceCenterY + (vOffset * cropHeight / 2);
-                break;
-
-            case 'center':
-            default:
-                // Center the face
-                targetX = faceCenterX;
-                targetY = faceCenterY;
-                break;
-        }
-
-        // Calculate crop position (top-left corner of crop area)
-        let cropX = targetX - cropWidth / 2;
-        let cropY = targetY - cropHeight / 2;
-
-        // Clamp to image boundaries
-        cropX = Math.max(0, Math.min(imageWidth - cropWidth, cropX));
-        cropY = Math.max(0, Math.min(imageHeight - cropHeight, cropY));
-
-        return { cropX, cropY };
-    }
-
     async waitForMediaPipe() {
         // Wait for MediaPipe Tasks Vision library to be available
         const maxWaitTime = 10000; // 10 seconds
@@ -2836,10 +2790,6 @@ class FaceCropper extends BaseFaceCropper {
         });
     }
 
-    generateImageId() {
-        return 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    }
-
     updateGallery() {
         this.galleryGrid.innerHTML = '';
 
@@ -2882,18 +2832,18 @@ class FaceCropper extends BaseFaceCropper {
         this.updateControls();
     }
 
-    updateSelectionCounter() {
+    override updateSelectionCounter() {
         const selected = Array.from(this.images!.values()).filter((img: any) => img.selected).length;
         const loaded = this.images!.size;
         const queued = this.imageLoadQueue.length * this.galleryPageSize;
         const total = loaded + queued;
 
-        this.selectedCount.textContent = String(selected);
+        this.selectedCount!.textContent = String(selected);
 
         if (queued > 0) {
-            this.totalCount.textContent = `${loaded} (+${queued} queued)`;
+            this.totalCount!.textContent = `${loaded} (+${queued} queued)`;
         } else {
-            this.totalCount.textContent = String(total);
+            this.totalCount!.textContent = String(total);
         }
     }
 
@@ -3005,128 +2955,6 @@ class FaceCropper extends BaseFaceCropper {
 
     }
 
-    async detectFacesWithQuality(image: HTMLImageElement) {
-        if (!this.detector) {
-            throw new Error('Face detection model not loaded. Please wait for model to load.');
-        }
-
-        const detectionResult = await this.detector.detect(image);
-        const detectedFaces = [];
-
-        if (detectionResult.detections && detectionResult.detections.length > 0) {
-            for (let i = 0; i < detectionResult.detections.length; i++) {
-                const detection = detectionResult.detections[i];
-                const bbox = detection.boundingBox;
-                const box = this.convertBoundingBoxToPixels(bbox, image.width, image.height);
-                if (!box) {
-                    continue;
-                }
-                const { x, y, width, height } = box;
-
-                // Use detection confidence from MediaPipe
-                const confidence = detection.categories && detection.categories.length > 0
-                    ? detection.categories[0].score
-                    : 0.8; // Default confidence
-
-                // Calculate face quality using blur detection
-                const quality = await this.calculateFaceQuality(image, x, y, width, height);
-
-                detectedFaces.push({
-                    id: `face_${i}`,
-                    x: x,
-                    y: y,
-                    width: width,
-                    height: height,
-                    box: {
-                        xMin: x,
-                        yMin: y,
-                        width: width,
-                        height: height
-                    },
-                    confidence: confidence,
-                    quality: quality,
-                    selected: true, // Default to selected
-                    index: i + 1
-                });
-            }
-        }
-
-        return detectedFaces;
-    }
-
-
-    async calculateFaceQuality(image: HTMLImageElement, x: number, y: number, width: number, height: number) {
-        const safeX = Math.max(0, Math.min(image.width, Math.floor(x)));
-        const safeY = Math.max(0, Math.min(image.height, Math.floor(y)));
-        const maxWidth = image.width - safeX;
-        const maxHeight = image.height - safeY;
-        const safeWidth = Math.max(1, Math.min(Math.floor(width), maxWidth));
-        const safeHeight = Math.max(1, Math.min(Math.floor(height), maxHeight));
-
-        if (safeWidth <= 0 || safeHeight <= 0) {
-            return { score: 0, level: 'unknown' };
-        }
-
-        const maxDimension = 1024;
-        const downscale = Math.min(1, maxDimension / Math.max(safeWidth, safeHeight));
-        const targetWidth = Math.max(1, Math.floor(safeWidth * downscale));
-        const targetHeight = Math.max(1, Math.floor(safeHeight * downscale));
-
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-
-        ctx!.drawImage(
-            image,
-            safeX, safeY, safeWidth, safeHeight,
-            0, 0, targetWidth, targetHeight
-        );
-
-        let imageData;
-        try {
-            imageData = ctx!.getImageData(0, 0, targetWidth, targetHeight);
-        } catch (error: unknown) {
-            console.warn('Face quality analysis skipped due to canvas limits', (error as Error));
-            return { score: 0, level: 'unknown' };
-        }
-
-        const data = imageData.data;
-
-        // Calculate Laplacian variance for blur detection
-        const laplacianVariance = this.calculateLaplacianVariance(data, targetWidth, targetHeight);
-
-        // Classify quality based on variance
-        if (laplacianVariance > 1000) return { score: laplacianVariance, level: 'high' };
-        if (laplacianVariance > 300) return { score: laplacianVariance, level: 'medium' };
-        return { score: laplacianVariance, level: 'low' };
-    }
-
-    calculateLaplacianVariance(data: Uint8ClampedArray, width: number, height: number) {
-        // Convert to grayscale and calculate Laplacian variance
-        const gray = [];
-        for (let i = 0; i < data.length; i += 4) {
-            gray.push(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        }
-
-        let variance = 0;
-        let count = 0;
-
-        for (let y = 1; y < height - 1; y++) {
-            for (let x = 1; x < width - 1; x++) {
-                const idx = y * width + x;
-                const laplacian =
-                    -gray[idx - width - 1] - gray[idx - width] - gray[idx - width + 1] +
-                    -gray[idx - 1] + 8 * gray[idx] - gray[idx + 1] +
-                    -gray[idx + width - 1] - gray[idx + width] - gray[idx + width + 1];
-
-                variance += laplacian * laplacian;
-                count++;
-            }
-        }
-
-        return count > 0 ? variance / count : 0;
-    }
 
     // Face selection and overlay methods
     async detectCurrentImageFaces() {
@@ -3152,32 +2980,7 @@ class FaceCropper extends BaseFaceCropper {
         }
     }
 
-    displayImageWithFaceOverlays(imageData: any) {
-        const maxWidth = 800;
-        const maxHeight = 600;
-
-        let { width, height } = imageData.image;
-        const scale = Math.min(maxWidth / width, maxHeight / height, 1);
-
-        const displayWidth = width * scale;
-        const displayHeight = height * scale;
-
-        this.inputCanvas.width = displayWidth;
-        this.inputCanvas.height = displayHeight;
-        this.ctx.clearRect(0, 0, displayWidth, displayHeight);
-        this.ctx.drawImage(imageData.image, 0, 0, displayWidth, displayHeight);
-
-        // Clear and recreate overlays
-        this.faceOverlays.innerHTML = '';
-        this.faceOverlays.style.width = displayWidth + 'px';
-        this.faceOverlays.style.height = displayHeight + 'px';
-
-        // Create face overlays
-        imageData.faces.forEach((face: any) => {
-            this.createFaceOverlay(face, scale);
-        });
-    }
-
+    // Override base createFaceOverlay to add resize handles and individual download
     createFaceOverlay(face: any, scale: number) {
         const faceBox = document.createElement('div');
         faceBox.className = 'face-box';
@@ -3262,30 +3065,6 @@ class FaceCropper extends BaseFaceCropper {
         const face = currentImage.faces.find(f => f.id === faceId);
         if (face) {
             face.selected = !face.selected;
-            this.displayImageWithFaceOverlays(currentImage);
-            this.updateFaceCounter();
-        }
-    }
-
-    selectAllFaces() {
-        const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
-        if (selectedImages.length === 0) return;
-
-        const currentImage = selectedImages[0];
-        if (currentImage.faces) {
-            currentImage.faces.forEach(face => face.selected = true);
-            this.displayImageWithFaceOverlays(currentImage);
-            this.updateFaceCounter();
-        }
-    }
-
-    selectNoneFaces() {
-        const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
-        if (selectedImages.length === 0) return;
-
-        const currentImage = selectedImages[0];
-        if (currentImage.faces) {
-            currentImage.faces.forEach(face => face.selected = false);
             this.displayImageWithFaceOverlays(currentImage);
             this.updateFaceCounter();
         }
@@ -3393,28 +3172,14 @@ class FaceCropper extends BaseFaceCropper {
                 sourceImage: imageData.file.name,
                 filename: filename,
                 format: format,
-                quality: format === 'jpeg' ? this.jpegQuality.value : 100
+                quality: format === 'jpeg' ? parseInt(this.jpegQuality.value) : 100
             });
         }
 
         return results;
     }
 
-    generateBatchFilename(originalName: string, faceIndex: number, width: number, height: number) {
-        const template = this.namingTemplate.value;
-        const format = this.outputFormat.value;
-        const baseName = originalName.replace(/\.[^/.]+$/, ''); // Remove extension
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-
-        return template
-            .replace(/{original}/g, baseName)
-            .replace(/{index}/g, String(faceIndex))
-            .replace(/{timestamp}/g, timestamp)
-            .replace(/{width}/g, String(width))
-            .replace(/{height}/g, String(height)) + '.' + format;
-    }
-
-    async downloadAllResults() {
+    override async downloadAllResults() {
         const allResults = [];
 
         // Collect results from loaded images
@@ -3439,7 +3204,7 @@ class FaceCropper extends BaseFaceCropper {
         if (this.zipDownload.checked) {
             await this.downloadAsZip(allResults);
         } else {
-            this.downloadIndividually(allResults);
+            await this.downloadIndividually(allResults);
         }
     }
 
@@ -3472,22 +3237,6 @@ class FaceCropper extends BaseFaceCropper {
             console.error('Error creating ZIP:', (error as Error));
             this.updateStatus(`Error creating ZIP: ${(error as Error).message}`, 'error');
         }
-    }
-
-    downloadIndividually(results: any[]) {
-        let totalDownloads = 0;
-
-        results.forEach((result) => {
-            const link = document.createElement('a');
-            link.download = result.filename;
-            link.href = result.dataUrl;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            totalDownloads++;
-        });
-
-        this.updateStatus(`Downloaded ${totalDownloads} cropped faces!`, 'success');
     }
 
     async downloadIndividualFace(faceId: string) {

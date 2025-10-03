@@ -1,11 +1,11 @@
-import { BaseFaceCropper } from './base-face-cropper';
+import { BaseFaceCropper } from './base-face-cropper.js';
 import type {
     ImageData,
     FaceData,
     CropResult,
     Statistics,
     BoundingBox
-} from './types';
+} from './types.js';
 
 interface CSVImageData extends ImageData {
     csvOutputName: string;
@@ -89,14 +89,14 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
 
     // Canvas elements
     private canvasContainer!: HTMLElement;
-    private inputCanvas!: HTMLCanvasElement;
+    protected inputCanvas!: HTMLCanvasElement;
     private outputCanvas!: HTMLCanvasElement;
     private croppedFaces!: HTMLElement;
     private croppedContainer!: HTMLElement;
     protected status!: HTMLElement;
-    private faceOverlays!: HTMLElement;
-    private faceCount!: HTMLElement;
-    private selectedFaceCount!: HTMLElement;
+    protected faceOverlays!: HTMLElement;
+    protected faceCount!: HTMLElement;
+    protected selectedFaceCount!: HTMLElement;
     private selectAllFacesBtn!: HTMLButtonElement;
     private selectNoneFacesBtn!: HTMLButtonElement;
     private detectFacesBtn!: HTMLButtonElement;
@@ -294,7 +294,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
 
     private setupDropZone(element: HTMLElement, dropHandler: (files: FileList) => void): void {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            element.addEventListener(eventName, this.preventDefaults, false);
+            element.addEventListener(eventName, (e) => this.preventDefaults(e), false);
         });
 
         ['dragenter', 'dragover'].forEach(eventName => {
@@ -1032,7 +1032,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         }
     }
 
-    private async downloadAllResults(): Promise<void> {
+    async downloadAllResults(): Promise<void> {
         // Collect results from both loaded images and streamed processing (like batch-processing.html)
         const allResults: Array<{ result: CropResult; imageData: CSVImageData | { csvOutputName: string; file: { name: string } }; faceIndex: number }> = [];
 
@@ -1077,7 +1077,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
             const filename = this.generateFilename(imageData as CSVImageData, faceIndex);
 
             const blob = await new Promise<Blob>((resolve) => {
-                result.canvas.toBlob((b) => resolve(b!), `image/${settings.format}`, settings.quality);
+                result.canvas?.toBlob((b) => resolve(b!), `image/${settings.format}`, settings.quality);
             });
 
             zip.file(filename, blob);
@@ -1202,14 +1202,6 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
     private updateFaceOverlays(imageData: CSVImageData): void {
         // This would be implemented similar to other files
         // For brevity, keeping it simple here
-    }
-
-    selectAllFaces(): void {
-        // Implementation for selecting all faces in current image
-    }
-
-    selectNoneFaces(): void {
-        // Implementation for deselecting all faces in current image
     }
 
     private detectCurrentImageFaces(): void {
