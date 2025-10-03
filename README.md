@@ -159,10 +159,10 @@ This runs TypeScript in watch mode alongside the Node.js server, automatically r
 - `single-processing.html` - Single image processing interface
 - `batch-processing.html` - Multiple images batch processing
 - `csv-processing.html` - CSV-driven batch operations
-- `js/face-detection-worker.js` - Web Worker for face detection
-- `js/batch-processor.js` - Main application logic for multiple images
-- `js/single-processor.js` - Single image processing logic
-- `js/csv-processor.js` - CSV batch processing logic
+- `src/face-detection-worker.ts` - Web Worker for face detection
+- `src/batch-processor.ts` - Main application logic for multiple images
+- `src/single-processor.ts` - Single image processing logic
+- `src/csv-processor.ts` - CSV batch processing logic
 
 ### Performance Features
 
@@ -198,20 +198,21 @@ This runs TypeScript in watch mode alongside the Node.js server, automatically r
 ├── csv-processing.html             # CSV-driven batch operations
 ├── package.json                    # NPM dependencies and scripts
 ├── tsconfig.json                   # TypeScript configuration
-├── server.ts                       # Development server (TypeScript)
+├── server.js                       # Development server
 ├── README.md                       # Project documentation
 ├── assets/
 │   └── favicon.svg                 # Application favicon
 ├── css/
 │   └── styles.css                  # Global styles and responsive design
-└── js/
-    ├── types.ts                    # TypeScript type definitions
-    ├── base-face-cropper.ts        # Base class for face processing
-    ├── single-processor.ts         # Single image processing (TypeScript)
-    ├── batch-processor.ts          # Batch processing (TypeScript)
-    ├── csv-processor.ts            # CSV batch processing (TypeScript)
-    ├── face-detection-worker.ts    # Web Worker (TypeScript)
-    └── *.js                        # Compiled JavaScript (git-ignored)
+├── src/                            # TypeScript source files
+│   ├── types.ts                    # TypeScript type definitions
+│   ├── base-face-cropper.ts        # Base class for face processing
+│   ├── single-processor.ts         # Single image processing
+│   ├── batch-processor.ts          # Batch processing
+│   ├── csv-processor.ts            # CSV batch processing
+│   └── face-detection-worker.ts    # Web Worker for face detection
+└── dist/                           # Compiled JavaScript (git-ignored)
+    └── *.js                        # Auto-generated from TypeScript
 ```
 
 ### Key Files
@@ -277,7 +278,7 @@ The application uses CSS custom properties for easy theming:
 
 ### Face Detection Parameters
 
-Modify detection settings in the TypeScript files (e.g., `js/base-face-cropper.ts`):
+Modify detection settings in the TypeScript files (e.g., `src/base-face-cropper.ts`):
 
 ```typescript
 const detectionConfig = {
