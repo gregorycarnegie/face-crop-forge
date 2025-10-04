@@ -75,8 +75,7 @@ class FaceCropper extends BaseFaceCropper {
     currentProcessingId!: string | null;
     currentImageIndex!: number;
     currentFaceIndex!: number;
-    undoStack!: Array<any>;
-    redoStack!: Array<any>;
+    // undoStack and redoStack inherited from BaseFaceCropper
     savedSettings!: Map<string, any>;
     recentSettings!: string[];
     faceDetectionWorker!: Worker | null;
@@ -193,8 +192,7 @@ class FaceCropper extends BaseFaceCropper {
         // UI state
         this.currentImageIndex = 0;
         this.currentFaceIndex = 0;
-        this.undoStack = [];
-        this.redoStack = [];
+        // undoStack and redoStack initialized in BaseFaceCropper
 
         this.processingLog = [];
         this.savedSettings = new Map();
@@ -212,7 +210,7 @@ class FaceCropper extends BaseFaceCropper {
 
         this.initializeElements();
         this.setupEventListeners();
-        this.setupKeyboardShortcuts();
+        super.setupKeyboardShortcuts(); // Call base class method
         this.loadModel();
     }
 
@@ -431,93 +429,68 @@ class FaceCropper extends BaseFaceCropper {
         this.setupErrorLogCollapsible();
     }
 
-    setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // Don't handle shortcuts when typing in input fields
-            const target = e.target as HTMLElement;
-            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
-                return;
-            }
+    // Override handleKeyPress to add batch-specific shortcuts
+    protected handleKeyPress(e: KeyboardEvent): void {
+        // Call base class method first (handles undo/redo/escape)
+        super.handleKeyPress(e);
 
-            const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
-            const currentImage = selectedImages.length > 0 ? selectedImages[0] : null;
+        const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
+        const currentImage = selectedImages.length > 0 ? selectedImages[0] : null;
 
-            switch (e.key) {
-                case ' ': // Space - Toggle current face selection
+        switch (e.key) {
+            case ' ': // Space - Toggle current face selection
+                e.preventDefault();
+                if (currentImage && currentImage.faces && currentImage.faces.length > 0) {
+                    this.toggleCurrentFaceSelection();
+                }
+                break;
+
+            case 'ArrowLeft': // Navigate to previous face
+                e.preventDefault();
+                this.navigateFace(-1);
+                break;
+
+            case 'ArrowRight': // Navigate to next face
+                e.preventDefault();
+                this.navigateFace(1);
+                break;
+
+            case 'ArrowUp': // Navigate to previous image
+                e.preventDefault();
+                this.navigateImage(-1);
+                break;
+
+            case 'ArrowDown': // Navigate to next image
+                e.preventDefault();
+                this.navigateImage(1);
+                break;
+
+            case 'Enter': // Process selected
+                e.preventDefault();
+                if (!this.isProcessing) {
+                    this.processSelected();
+                }
+                break;
+
+            case 'Delete': // Remove current image
+                e.preventDefault();
+                if (currentImage) {
+                    this.removeCurrentImage();
+                }
+                break;
+
+            case 'a': // Ctrl+A - Select all faces
+                if (e.ctrlKey) {
                     e.preventDefault();
-                    if (currentImage && currentImage!.faces && currentImage!.faces.length > 0) {
-                        this.toggleCurrentFaceSelection();
-                    }
-                    break;
+                    this.selectAllFaces();
+                }
+                break;
+        }
+    }
 
-                case 'ArrowLeft': // Navigate to previous face
-                    e.preventDefault();
-                    this.navigateFace(-1);
-                    break;
-
-                case 'ArrowRight': // Navigate to next face
-                    e.preventDefault();
-                    this.navigateFace(1);
-                    break;
-
-                case 'ArrowUp': // Navigate to previous image
-                    e.preventDefault();
-                    this.navigateImage(-1);
-                    break;
-
-                case 'ArrowDown': // Navigate to next image
-                    e.preventDefault();
-                    this.navigateImage(1);
-                    break;
-
-                case 'Enter': // Process selected
-                    e.preventDefault();
-                    if (!this.isProcessing) {
-                        this.processSelected();
-                    }
-                    break;
-
-                case 'Delete': // Remove current image
-                    e.preventDefault();
-                    if (currentImage) {
-                        this.removeCurrentImage();
-                    }
-                    break;
-
-                case 'a': // Ctrl+A - Select all faces
-                    if (e.ctrlKey) {
-                        e.preventDefault();
-                        this.selectAllFaces();
-                    }
-                    break;
-
-                case 'z': // Ctrl+Z - Undo
-                    if (e.ctrlKey && !e.shiftKey) {
-                        e.preventDefault();
-                        this.undo();
-                    }
-                    break;
-
-                case 'y': // Ctrl+Y - Redo
-                    if (e.ctrlKey) {
-                        e.preventDefault();
-                        this.redo();
-                    }
-                    break;
-
-                case 'Z': // Ctrl+Shift+Z - Redo (alternative)
-                    if (e.ctrlKey && e.shiftKey) {
-                        e.preventDefault();
-                        this.redo();
-                    }
-                    break;
-
-                case 'Escape': // Clear selection/cancel
-                    e.preventDefault();
-                    this.clearFaceSelection();
-                    break;
-            }
-        });
+    // Override handleEscapeKey for batch-specific behavior
+    protected handleEscapeKey(): void {
+        this.clearFaceSelection();
     }
 
     toggleCurrentFaceSelection() {
@@ -649,48 +622,12 @@ class FaceCropper extends BaseFaceCropper {
     }
 
     saveState() {
-        // Save current state for undo functionality
-        const state = {
-            images: new Map(),
-            currentImageIndex: this.currentImageIndex,
-            currentFaceIndex: this.currentFaceIndex
-        };
-
-        // Deep copy the images state
-        for (const [id, imageData] of this.images!) {
-            state.images.set(id, {
-                ...imageData,
-                faces: imageData.faces ? imageData.faces.map(face => ({ ...face })) : [],
-                results: [...imageData.results]
-            });
-        }
-
-        this.undoStack.push(state);
-
-        // Limit undo stack size
-        if (this.undoStack.length > 50) {
-            this.undoStack.shift();
-        }
-
-        // Clear redo stack when new action is performed
-        this.redoStack = [];
+        // saveState inherited from BaseFaceCropper
+        super.saveState();
     }
 
-    undo() {
-        if (this.undoStack.length === 0) {
-            this.updateStatus('Nothing to undo', 'info');
-            return;
-        }
-
-        // Save current state to redo stack
-        this.saveCurrentStateToRedo();
-
-        // Restore previous state
-        const previousState = this.undoStack.pop();
-        this.images = previousState.images;
-        this.currentImageIndex = previousState.currentImageIndex;
-        this.currentFaceIndex = previousState.currentFaceIndex;
-
+    // Override refreshImageDisplay for batch-specific implementation
+    protected refreshImageDisplay(): void {
         this.updateGallery();
         this.updateControls();
 
@@ -700,77 +637,26 @@ class FaceCropper extends BaseFaceCropper {
             this.displayImageWithFaceOverlays(selectedImages[0]);
             this.highlightCurrentFace();
         }
-
-        this.updateStatus('Undid last action', 'success');
     }
 
-    redo() {
-        if (this.redoStack.length === 0) {
-            this.updateStatus('Nothing to redo', 'info');
-            return;
-        }
-
-        // Save current state to undo stack
-        this.saveState();
-
-        // Restore next state
-        const nextState = this.redoStack.pop();
-        this.images = nextState.images;
-        this.currentImageIndex = nextState.currentImageIndex;
-        this.currentFaceIndex = nextState.currentFaceIndex;
-
-        this.updateGallery();
-        this.updateControls();
-
-        // Refresh display if there's a selected image
-        const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
-        if (selectedImages.length > 0 && selectedImages[0].faces) {
-            this.displayImageWithFaceOverlays(selectedImages[0]);
-            this.highlightCurrentFace();
-        }
-
-        this.updateStatus('Redid last action', 'success');
-    }
-
-    saveCurrentStateToRedo() {
-        const state = {
-            images: new Map(),
-            currentImageIndex: this.currentImageIndex,
-            currentFaceIndex: this.currentFaceIndex
-        };
-
-        // Deep copy the images state
-        for (const [id, imageData] of this.images!) {
-            state.images.set(id, {
-                ...imageData,
-                faces: imageData.faces ? imageData.faces.map(face => ({ ...face })) : [],
-                results: [...imageData.results]
-            });
-        }
-
-        this.redoStack.push(state);
-
-        // Limit redo stack size
-        if (this.redoStack.length > 50) {
-            this.redoStack.shift();
-        }
-    }
+    // undo(), redo(), saveState(), and saveCurrentStateToRedo() inherited from BaseFaceCropper
 
 
 
-    loadThemePreference() {
-        const savedTheme = localStorage.getItem('faceCropperTheme');
-        if (savedTheme === 'dark') {
-            this.isDarkMode = true;
-            document.documentElement.setAttribute('data-theme', 'dark');
-        }
-
+    // Override updateDarkModeButton for batch-specific implementation
+    protected updateDarkModeButton(): void {
         const icon = this.isDarkMode ? '☀️' : '🌙';
         const tooltip = this.isDarkMode ? 'Switch to light mode' : 'Switch to dark mode';
         this.darkModeBtn.textContent = icon;
         this.darkModeBtn.setAttribute('aria-label', tooltip);
         this.darkModeBtn.setAttribute('title', tooltip);
         this.darkModeBtn.setAttribute('aria-pressed', this.isDarkMode.toString());
+    }
+
+    // Call after loadThemePreference to update button
+    loadThemePreference() {
+        super.loadThemePreference();
+        this.updateDarkModeButton();
     }
 
 
@@ -1785,261 +1671,9 @@ class FaceCropper extends BaseFaceCropper {
         this.updateStatus('CSV report exported successfully', 'success');
     }
 
-    // Production Optimization Methods
-    async initializeWebWorker() {
-        if (!this.enableWebWorkers.checked) return;
+    // Web Worker and production optimization methods inherited from BaseFaceCropper
 
-        try {
-            this.faceDetectionWorker = new Worker('js/face-detection-worker.js');
-
-            this.faceDetectionWorker.onmessage = (e) => {
-                const { type, data, id, success, faces, error } = e.data;
-
-                switch (type) {
-                    case 'initialized':
-                        this.workerInitialized = success;
-                        if (success) {
-                            this.addToProcessingLog('Web Worker initialized successfully', 'success');
-                        } else {
-                            this.addToDetailedErrorLog('Web Worker initialization failed', (error as Error).message, 'critical');
-                            this.enableWebWorkers.checked = false;
-                        }
-                        break;
-
-                    case 'faceDetectionResult':
-                        this.handleWorkerDetectionResult(id, faces);
-                        break;
-
-                    case 'error':
-                        this.addToDetailedErrorLog(`Worker error for task ${id}`, (error as Error).message, 'critical');
-                        break;
-                }
-            };
-
-            this.faceDetectionWorker.onerror = (error) => {
-                this.addToDetailedErrorLog('Web Worker error', error.message, 'critical');
-                this.workerInitialized = false;
-                this.enableWebWorkers.checked = false;
-            };
-
-            // Initialize the worker
-            this.faceDetectionWorker!.postMessage({ type: 'initialize' });
-
-        } catch (error: unknown) {
-            this.addToDetailedErrorLog('Failed to create Web Worker', (error as Error).message, 'critical');
-            this.enableWebWorkers.checked = false;
-        }
-    }
-
-    toggleWebWorkers() {
-        if (this.enableWebWorkers.checked) {
-            this.initializeWebWorker();
-        } else {
-            if (this.faceDetectionWorker) {
-                this.faceDetectionWorker.terminate();
-                this.faceDetectionWorker = null;
-                this.workerInitialized = false;
-                this.addToProcessingLog('Web Worker disabled', 'info');
-            }
-        }
-    }
-
-
-    async detectFacesWithQualityProduction(image: HTMLImageElement, imageId: string) {
-        // Enhanced version with error handling and retry logic
-        const maxRetries = parseInt(this.retryAttempts.value) || 0;
-        let lastError = null;
-
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-                if (attempt > 0) {
-                    this.addToProcessingLog(`Retry attempt ${attempt} for ${imageId}`, 'warning');
-                    await this.delay(1000 * attempt); // Progressive delay
-                }
-
-                let processedImage = image;
-
-                // Apply reduced resolution if enabled
-                if (this.reducedResolution.checked) {
-                    processedImage = await this.createReducedResolutionImage(image);
-                }
-
-                let faces;
-
-                if (this.enableWebWorkers.checked && this.workerInitialized) {
-                    faces = await this.detectFacesWithWorker(processedImage, imageId);
-                } else {
-                    faces = await this.detectFacesWithQuality(processedImage);
-                }
-
-                // If we used reduced resolution, scale back the coordinates
-                if (this.reducedResolution.checked) {
-                    const scale = image.width / processedImage.width;
-                    faces = faces.map(face => ({
-                        ...face,
-                        x: (face.x || 0) * scale,
-                        y: (face.y || 0) * scale,
-                        width: (face.width || 0) * scale,
-                        height: (face.height || 0) * scale
-                    }));
-                }
-
-                return faces;
-
-            } catch (error: unknown) {
-                lastError = error;
-                this.addToDetailedErrorLog(`Detection attempt ${attempt + 1} failed for ${imageId}`, (error as Error).message, 'error');
-
-                if (attempt === maxRetries) {
-                    throw new Error(`Face detection failed after ${maxRetries + 1} attempts: ${(error as Error).message}`);
-                }
-            }
-        }
-
-        // Fallback return (should never reach here due to throw above)
-        return [];
-    }
-
-    async detectFacesWithWorker(image: HTMLImageElement, imageId: string): Promise<Face[]> {
-        return new Promise((resolve, reject) => {
-            if (!this.workerInitialized) {
-                reject(new Error('Worker not initialized'));
-                return;
-            }
-
-            // Create canvas to get image data
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            canvas.width = image.width;
-            canvas.height = image.height;
-            ctx!.drawImage(image, 0, 0);
-
-            const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
-
-            // Store callback for this request
-            const requestId = `${imageId}_${Date.now()}`;
-            this.workerCallbacks = this.workerCallbacks || new Map();
-            this.workerCallbacks.set(requestId, { resolve, reject });
-
-            // Send to worker
-            this.faceDetectionWorker!.postMessage({
-                type: 'detectFaces',
-                id: requestId,
-                data: {
-                    imageData: {
-                        data: imageData.data,
-                        width: imageData.width,
-                        height: imageData.height
-                    },
-                    options: { includeQuality: true }
-                }
-            });
-
-            // Set timeout
-            setTimeout(() => {
-                if (this.workerCallbacks!.has(requestId)) {
-                    this.workerCallbacks!.delete(requestId);
-                    reject(new Error('Worker detection timeout'));
-                }
-            }, 30000); // 30 second timeout
-        });
-    }
-
-    handleWorkerDetectionResult(requestId: string, faces: any[]) {
-        if (this.workerCallbacks && this.workerCallbacks.has(requestId)) {
-            const callback = this.workerCallbacks.get(requestId);
-            if (callback) {
-                const { resolve } = callback;
-                this.workerCallbacks.delete(requestId);
-                resolve(faces);
-            }
-        }
-    }
-
-    async createReducedResolutionImage(image: HTMLImageElement): Promise<HTMLImageElement> {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        canvas.width = Math.floor(image.width * 0.5);
-        canvas.height = Math.floor(image.height * 0.5);
-
-        ctx!.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-        return new Promise((resolve) => {
-            const reducedImage = new Image();
-            reducedImage.onload = () => resolve(reducedImage);
-            reducedImage.src = canvas.toDataURL();
-        });
-    }
-
-    delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    addToDetailedErrorLog(title: string, details: string, severity: ErrorSeverity = 'error'): void {
-        const timestamp = new Date().toLocaleTimeString();
-        const entry = {
-            timestamp,
-            title,
-            details,
-            severity
-        };
-
-        this.errorLog!.push(entry);
-
-        // Keep only last 50 error entries
-        if (this.errorLog!.length > 50) {
-            this.errorLog!.shift();
-        }
-
-        this.updateErrorLogDisplay();
-    }
-
-    updateErrorLogDisplay() {
-        const logHtml = this.errorLog!
-            .slice(-10) // Show last 10 entries
-            .map(entry => `
-                <div class="log-entry ${entry.severity}">
-                    <span class="log-timestamp">${entry.timestamp}</span>
-                    <strong>${entry.title}</strong>: ${entry.details}
-                </div>
-            `)
-            .join('');
-
-        this.errorLogElement.innerHTML = logHtml || '<div class="log-entry">No errors detected</div>';
-
-        // Auto-scroll to bottom
-        this.errorLogElement.scrollTop = this.errorLogElement.scrollHeight;
-    }
-
-    clearErrorLog() {
-        this.errorLog = [];
-        this.updateErrorLogDisplay();
-        this.addToProcessingLog('Error log cleared', 'info');
-        this.updateStatus('Error log cleared successfully', 'success');
-    }
-
-    exportErrorLog() {
-        const errorData = {
-            exportedAt: new Date().toISOString(),
-            totalErrors: this.errorLog!.length,
-            errors: this.errorLog!
-        };
-
-        const blob = new Blob([JSON.stringify(errorData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-
-        const link = document.createElement('a');
-        link.download = `face-cropper-errors-${new Date().toISOString().slice(0, 10)}.json`;
-        link.href = url;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        URL.revokeObjectURL(url);
-        this.addToProcessingLog('Error log exported', 'success');
-        this.updateStatus('Error log exported successfully', 'success');
-    }
+    // Error logging methods inherited from BaseFaceCropper
 
     setupErrorLogCollapsible() {
         const errorHeader = document.querySelector('.error-log-header');
@@ -2059,93 +1693,7 @@ class FaceCropper extends BaseFaceCropper {
         }
     }
 
-    createMemoryIndicator() {
-        const indicator = document.createElement('div');
-        indicator.className = 'memory-indicator';
-        indicator.id = 'memoryIndicator';
-        document.body.appendChild(indicator);
-
-        // Update memory indicator periodically
-        setInterval(() => this.updateMemoryIndicator(), 5000);
-    }
-
-    updateMemoryIndicator() {
-        const indicator = document.getElementById('memoryIndicator');
-        if (!indicator) return;
-
-        const memoryInfo = {
-            images: this.images!.size,
-            processed: Array.from(this.images!.values()).filter((img: any) => img.processed).length,
-            errors: this.errorLog!.length
-        };
-
-        const memoryScore = memoryInfo.images * 10 + memoryInfo.processed * 5;
-        indicator.textContent = `Memory: ${memoryInfo.images} images, ${memoryInfo.processed} processed`;
-
-        indicator.classList.remove('warning', 'critical', 'show');
-
-        if (memoryScore > 200) {
-            indicator.classList.add('critical', 'show');
-        } else if (memoryScore > 100) {
-            indicator.classList.add('warning', 'show');
-        } else if (memoryInfo.images > 0) {
-            indicator.classList.add('show');
-        }
-    }
-
-    updateMemorySettings() {
-        const mode = this.memoryManagement.value;
-        switch (mode) {
-            case 'aggressive':
-                this.cleanupMemoryAggressive();
-                break;
-            case 'auto':
-                this.cleanupMemoryAuto();
-                break;
-            case 'manual':
-                // Do nothing, user handles cleanup
-                break;
-        }
-    }
-
-    cleanupMemoryAuto() {
-        // Clean up processed images older than 5 minutes
-        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-
-        for (const [id, imageData] of this.images!) {
-            const imgEntry = imageData as unknown as ImageEntry;
-            if (imgEntry.processed && imgEntry.processedAt && imgEntry.processedAt < fiveMinutesAgo) {
-                this.cleanupImageData(imgEntry);
-            }
-        }
-    }
-
-    cleanupMemoryAggressive() {
-        // Clean up all processed images immediately
-        for (const [id, imageData] of this.images!) {
-            if (imageData.processed) {
-                this.cleanupImageData(imageData);
-            }
-        }
-    }
-
-    cleanupImageData(imageData: any) {
-        // Clean up blob URLs
-        if (imageData.image && imageData.image.src.startsWith('blob:')) {
-            URL.revokeObjectURL(imageData.image.src);
-        }
-
-        if (imageData.enhancedImage && imageData.enhancedImage.src.startsWith('blob:')) {
-            URL.revokeObjectURL(imageData.enhancedImage.src);
-        }
-
-        // Clear large data
-        imageData.image = null;
-        imageData.enhancedImage = null;
-
-        // Mark as cleaned
-        imageData.memoryCleanedUp = true;
-    }
+    // Memory management methods inherited from BaseFaceCropper
 
     async handleMultipleImageUploadProduction(event: Event) {
         const target = event.target as HTMLInputElement;
@@ -2162,144 +1710,11 @@ class FaceCropper extends BaseFaceCropper {
         }
     }
 
-    async handleLargeImageBatch(files: File[]) {
-        this.addToProcessingLog(`Loading large batch: ${files.length} images`, 'info');
-
-        // Load first page immediately
-        const firstPage = files.slice(0, this.galleryPageSize);
-        await this.loadImagePage(firstPage, 0);
-
-        // Queue remaining files
-        for (let i = this.galleryPageSize; i < files.length; i += this.galleryPageSize) {
-            const page = files.slice(i, i + this.galleryPageSize);
-            this.imageLoadQueue.push({ files: page, page: Math.floor(i / this.galleryPageSize) });
-        }
-
-        this.setupLazyLoading();
-        this.updateStatus(`Loaded first ${firstPage.length} images. ${files.length - firstPage.length} queued for lazy loading.`, 'success');
-    }
+    // Lazy loading methods inherited from BaseFaceCropper
 
     async handleStandardImageBatch(files: File[]) {
         await this.loadImagePage(files, 0);
         this.updateStatus(`Loaded ${files.length} images.`, 'success');
-    }
-
-    async loadImagePage(files: File[], pageIndex: number) {
-        for (const file of files) {
-            const imageId = this.generateImageId();
-
-            try {
-                const image = await this.loadImageFromFileWithErrorHandling(file);
-                this.images!.set(imageId, {
-                    id: imageId,
-                    file: file,
-                    image: image,
-                    faces: [],
-                    results: [],
-                    selected: true,
-                    processed: false,
-                    status: 'loaded',
-                    page: pageIndex
-                });
-            } catch (error: unknown) {
-                this.addToDetailedErrorLog(`Failed to load image: ${file.name}`, (error as Error).message, 'error');
-            }
-        }
-
-        this.updateGallery();
-        this.updateControls();
-        this.imageGallery.classList.remove('hidden');
-    }
-
-    async loadImageFromFileWithErrorHandling(file: File): Promise<HTMLImageElement> {
-        return new Promise<HTMLImageElement>((resolve, reject) => {
-            // Validate file type
-            if (!file.type.startsWith('image/')) {
-                reject(new Error('Invalid file type. Please select an image file.'));
-                return;
-            }
-
-            // Validate file size (max 50MB)
-            if (file.size > 50 * 1024 * 1024) {
-                reject(new Error('File too large. Maximum size is 50MB.'));
-                return;
-            }
-
-            const img = new Image();
-
-            img.onload = () => {
-                // Validate image dimensions
-                if (img.width < 50 || img.height < 50) {
-                    reject(new Error('Image too small. Minimum size is 50x50 pixels.'));
-                    return;
-                }
-
-                if (img.width > 8192 || img.height > 8192) {
-                    reject(new Error('Image too large. Maximum size is 8192x8192 pixels.'));
-                    return;
-                }
-
-                resolve(img);
-            };
-
-            img.onerror = () => {
-                reject(new Error('Corrupted or invalid image file.'));
-            };
-
-            try {
-                img.src = URL.createObjectURL(file);
-            } catch (error: unknown) {
-                reject(new Error('Failed to create object URL for image.'));
-            }
-        });
-    }
-
-    setupLazyLoading() {
-        // Add lazy loading indicator to gallery
-        const indicator = document.createElement('div');
-        indicator.className = 'gallery-lazy-loading';
-        indicator.innerHTML = 'Scroll to load more images...';
-        this.galleryGrid.appendChild(indicator);
-
-        // Setup intersection observer for lazy loading
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting && !this.isLoadingImages && this.imageLoadQueue.length > 0) {
-                    this.loadNextImagePage();
-                }
-            });
-        });
-
-        observer.observe(indicator);
-    }
-
-    async loadNextImagePage() {
-        if (this.imageLoadQueue.length === 0) return;
-
-        this.isLoadingImages = true;
-        const indicator = document.querySelector('.gallery-lazy-loading');
-
-        if (indicator) {
-            indicator.className = 'gallery-lazy-loading loading';
-            indicator.innerHTML = '<span class="spinner"></span>Loading more images...';
-        }
-
-        const batch = this.imageLoadQueue.shift();
-        if (!batch) return;
-
-        const { files, page } = batch;
-        await this.loadImagePage(files, page);
-
-        this.isLoadingImages = false;
-
-        if (indicator) {
-            if (this.imageLoadQueue.length > 0) {
-                indicator.className = 'gallery-lazy-loading';
-                indicator.innerHTML = `Scroll to load more images... (${this.imageLoadQueue.length} pages remaining)`;
-            } else {
-                indicator.remove();
-            }
-        }
     }
 
     async loadAllQueuedImages() {
@@ -2525,20 +1940,7 @@ class FaceCropper extends BaseFaceCropper {
     }
 
 
-    updateAspectRatioDisplay() {
-        const width = parseInt(this.outputWidth.value);
-        const height = parseInt(this.outputHeight.value);
-        const ratio = width / height;
-
-        let ratioText = `${ratio.toFixed(2)}:1`;
-        if (Math.abs(ratio - 1) < 0.01) ratioText = '1:1 (Square)';
-        else if (Math.abs(ratio - 4/3) < 0.01) ratioText = '4:3 (Standard)';
-        else if (Math.abs(ratio - 16/9) < 0.01) ratioText = '16:9 (Widescreen)';
-        else if (Math.abs(ratio - 3/4) < 0.01) ratioText = '3:4 (Portrait)';
-
-        this.aspectRatioText.textContent = `${ratioText} ratio`;
-        this.currentAspectRatio = ratio;
-    }
+    // updateAspectRatioDisplay inherited from BaseFaceCropper
 
     updateFormatControls() {
         const format = this.outputFormat.value;
@@ -2606,24 +2008,7 @@ class FaceCropper extends BaseFaceCropper {
         this.updatePreview();
     }
 
-    findMatchingPreset(width: number, height: number) {
-        const presets = {
-            linkedin: { width: 400, height: 400 },
-            passport: { width: 413, height: 531 },
-            instagram: { width: 1080, height: 1080 },
-            idcard: { width: 332, height: 498 },
-            avatar: { width: 512, height: 512 },
-            headshot: { width: 600, height: 800 }
-        };
-
-        for (const [name, dimensions] of Object.entries(presets)) {
-            if (dimensions.width === width && dimensions.height === height) {
-                return name;
-            }
-        }
-
-        return 'custom';
-    }
+    // findMatchingPreset inherited from BaseFaceCropper
 
     updatePositioningControls() {
         const mode = this.positioningMode.value;
@@ -2635,18 +2020,7 @@ class FaceCropper extends BaseFaceCropper {
         this.updatePreview();
     }
 
-    updateOffsetDisplay(direction: string) {
-        if (direction === 'vertical') {
-            this.verticalOffsetValue.textContent = this.verticalOffset.value + '%';
-        } else {
-            this.horizontalOffsetValue.textContent = this.horizontalOffset.value + '%';
-        }
-    }
-
-    updateOffsetDisplays() {
-        this.updateOffsetDisplay('vertical');
-        this.updateOffsetDisplay('horizontal');
-    }
+    // updateOffsetDisplay and updateOffsetDisplays inherited from BaseFaceCropper
 
     applySettingsToAll() {
         // Get current settings
@@ -3057,19 +2431,17 @@ class FaceCropper extends BaseFaceCropper {
         this.faceOverlays.appendChild(faceBox);
     }
 
+    // Override base class method for batch-specific implementation
     toggleFaceSelection(faceId: string) {
         const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
         if (selectedImages.length === 0) return;
 
         const currentImage = selectedImages[0];
-        const face = currentImage.faces.find(f => f.id === faceId);
-        if (face) {
-            face.selected = !face.selected;
-            this.displayImageWithFaceOverlays(currentImage);
-            this.updateFaceCounter();
-        }
+        super.toggleFaceSelection(faceId, currentImage);
+        this.displayImageWithFaceOverlays(currentImage);
     }
 
+    // Override base class method for batch-specific implementation
     updateFaceCounter() {
         const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
         if (selectedImages.length === 0) {
@@ -3081,9 +2453,36 @@ class FaceCropper extends BaseFaceCropper {
         const currentImage = selectedImages[0];
         if (currentImage.faces) {
             const total = currentImage.faces.length;
-            const selected = currentImage.faces.filter(f => f.selected).length;
+            const selected = currentImage.faces.filter((f: any) => f.selected).length;
             this.faceCount.textContent = String(total);
             this.selectedFaceCount.textContent = String(selected);
+        }
+    }
+
+    // Select all faces in current image
+    selectAllFaces() {
+        const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
+        if (selectedImages.length === 0) return;
+
+        const currentImage = selectedImages[0];
+        super.selectAllFaces(currentImage);
+        this.displayImageWithFaceOverlays(currentImage);
+    }
+
+    // Deselect all faces in current image
+    selectNoneFaces() {
+        const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
+        if (selectedImages.length === 0) return;
+
+        const currentImage = selectedImages[0];
+        super.selectNoneFaces(currentImage);
+        this.displayImageWithFaceOverlays(currentImage);
+    }
+
+    // Override refreshFaceDisplay to use batch-specific display method
+    protected refreshFaceDisplay(imageData?: any): void {
+        if (imageData) {
+            this.displayImageWithFaceOverlays(imageData);
         }
     }
 
@@ -3208,122 +2607,22 @@ class FaceCropper extends BaseFaceCropper {
         }
     }
 
+    // Download as ZIP - delegates to base class method
     async downloadAsZip(results: any[]) {
-        try {
-            this.updateStatus('Creating ZIP archive...', 'loading');
-
-            const zip = new JSZip();
-
-            results.forEach((result: any, index: number) => {
-                // Convert data URL to binary data
-                const base64Data = result.dataUrl.split(',')[1];
-                zip.file(result.filename, base64Data, { base64: true });
-            });
-
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const zipUrl = URL.createObjectURL(zipBlob);
-
-            const link = document.createElement('a');
-            link.download = `cropped_faces_${new Date().toISOString().slice(0, 10)}.zip`;
-            link.href = zipUrl;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            URL.revokeObjectURL(zipUrl);
-
-            this.updateStatus(`Downloaded ${results.length} cropped faces as ZIP archive!`, 'success');
-        } catch (error: unknown) {
-            console.error('Error creating ZIP:', (error as Error));
-            this.updateStatus(`Error creating ZIP: ${(error as Error).message}`, 'error');
-        }
+        await this.downloadResultsAsZip(results);
     }
 
+    // Download individual face - wrapper for batch-specific logic
     async downloadIndividualFace(faceId: string) {
         const selectedImages = Array.from(this.images!.values()).filter((img: any) => img.selected);
         if (selectedImages.length === 0) return;
 
         const currentImage = selectedImages[0];
-        const face = currentImage.faces.find(f => f.id === faceId);
-        if (!face) return;
-
-        try {
-            this.updateStatus('Cropping individual face...', 'loading');
-
-            // Crop just this face
-            const result = await this.cropSingleFace(currentImage, face);
-
-            // Download directly
-            const link = document.createElement('a');
-            link.download = result.filename;
-            link.href = result.dataUrl;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            this.updateStatus('Individual face downloaded!', 'success');
-        } catch (error: unknown) {
-            console.error('Error downloading individual face:', (error as Error));
-            this.updateStatus(`Error downloading face: ${(error as Error).message}`, 'error');
-        }
+        // Call the base class method with the current image
+        await super.downloadIndividualFace(faceId, currentImage);
     }
 
-    async cropSingleFace(imageData: any, face: any) {
-        const outputWidth = parseInt(this.outputWidth.value);
-        const outputHeight = parseInt(this.outputHeight.value);
-        const faceHeightPct = parseInt(this.faceHeightPct.value) / 100;
-
-        // Create temporary canvas for processing
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCanvas.width = imageData.image.width;
-        tempCanvas.height = imageData.image.height;
-        tempCtx!.drawImage(imageData.image, 0, 0);
-
-        // Create crop canvas
-        const cropCanvas = document.createElement('canvas');
-        const cropCtx = cropCanvas.getContext('2d');
-        cropCanvas.width = outputWidth;
-        cropCanvas.height = outputHeight;
-
-        // Calculate crop parameters
-        const targetFaceHeight = outputHeight * faceHeightPct;
-        const scale = targetFaceHeight / face.height;
-        const cropWidthSrc = outputWidth / scale;
-        const cropHeightSrc = outputHeight / scale;
-
-        // Calculate face position based on positioning mode
-        const { cropX, cropY } = this.calculateSmartCropPosition(
-            face, cropWidthSrc, cropHeightSrc, imageData.image.width, imageData.image.height
-        );
-
-        const finalCropWidth = Math.min(cropWidthSrc, imageData.image.width - cropX);
-        const finalCropHeight = Math.min(cropHeightSrc, imageData.image.height - cropY);
-
-        // Crop and resize
-        cropCtx!.drawImage(
-            tempCanvas,
-            cropX, cropY, finalCropWidth, finalCropHeight,
-            0, 0, outputWidth, outputHeight
-        );
-
-        // Generate image with selected format and quality
-        const format = this.outputFormat.value;
-        const quality = format === 'jpeg' ? parseInt(this.jpegQuality.value) / 100 : 1.0;
-
-        let mimeType = 'image/png';
-        if (format === 'jpeg') mimeType = 'image/jpeg';
-        if (format === 'webp') mimeType = 'image/webp';
-
-        const croppedDataUrl = cropCanvas.toDataURL(mimeType, quality);
-        const filename = this.generateBatchFilename(imageData.file.name, face.index, outputWidth, outputHeight);
-
-        return {
-            dataUrl: croppedDataUrl,
-            filename: filename,
-            faceId: face.id
-        };
-    }
+    // cropSingleFace inherited from BaseFaceCropper
 
     clearAll() {
         // Clean up object URLs

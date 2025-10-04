@@ -43,9 +43,8 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
     private isProcessing: boolean = false;
     private currentProcessingId: string | null = null;
 
-    // UI state
-    private currentImageIndex: number = 0;
-    private currentFaceIndex: number = 0;
+    // UI state - inherited from BaseFaceCropper
+    // currentImageIndex and currentFaceIndex are now in base class
 
     // Logs
     protected processingLog: string[] = [];
@@ -53,10 +52,10 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
     protected errorLog: string[] = [];
 
     // Lazy loading state
-    private galleryPage: number = 0;
-    private galleryPageSize: number = 20;
-    private imageLoadQueue: ImageLoadQueueItem[] = [];
-    private isLoadingImages: boolean = false;
+    protected galleryPage: number = 0;
+    protected galleryPageSize: number = 20;
+    protected imageLoadQueue: ImageLoadQueueItem[] = [];
+    protected isLoadingImages: boolean = false;
     private lazyLoadingObserver: IntersectionObserver | null = null;
     private lazyLoadingIndicator: HTMLElement | null = null;
 
@@ -81,7 +80,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
     protected progressFill!: HTMLElement;
     protected progressText!: HTMLElement;
     private imageGallery!: HTMLElement;
-    private galleryGrid!: HTMLElement;
+    protected galleryGrid!: HTMLElement;
     private selectAllBtn!: HTMLButtonElement;
     private selectNoneBtn!: HTMLButtonElement;
     protected selectedCount!: HTMLElement;
@@ -279,7 +278,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         });
     }
 
-    private setupDragAndDrop(): void {
+    setupDragAndDrop(): void {
         // Setup drag and drop for CSV upload card
         const csvUploadCard = this.csvInput.closest('.upload-card');
         if (csvUploadCard) {
@@ -574,7 +573,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         }
     }
 
-    private async handleLargeImageBatch(matchedFiles: MatchedFile[]): Promise<void> {
+    protected async handleLargeImageBatch(matchedFiles: MatchedFile[]): Promise<void> {
         this.addToLoadingLog(`Loading large batch: ${matchedFiles.length} images`);
 
         // Load first page immediately
@@ -596,7 +595,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         this.updateStatus(`Loaded ${matchedFiles.length} images.`);
     }
 
-    private async loadImagePage(matchedFiles: MatchedFile[], pageIndex: number): Promise<void> {
+    protected async loadImagePage(matchedFiles: MatchedFile[], pageIndex: number): Promise<void> {
         let imageId = this.images.size; // Continue from current count
 
         for (const { file, outputName } of matchedFiles) {
@@ -620,7 +619,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         }
     }
 
-    private setupLazyLoading(): void {
+    protected setupLazyLoading(): void {
         // Add lazy loading indicator to gallery
         const indicator = document.createElement('div');
         indicator.className = 'gallery-lazy-loading';
@@ -650,7 +649,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         this.lazyLoadingIndicator = indicator;
     }
 
-    private async loadNextImagePage(): Promise<void> {
+    protected async loadNextImagePage(): Promise<void> {
         if (this.isLoadingImages || this.imageLoadQueue.length === 0) return;
 
         this.isLoadingImages = true;
@@ -1097,7 +1096,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
     generateFilename(imageData: CSVImageData | { csvOutputName?: string; file?: { name: string } }, faceIndex: number): string {
         const settings = this.getSettings();
         const template = this.namingTemplate.value || '{csv_name}';
-        const extension = settings.format === 'jpeg' ? 'jpg' : settings.format;
+        const extension = settings.outputFormat === 'jpeg' ? 'jpg' : settings.outputFormat;
         const originalName = imageData.file ? imageData.file.name.replace(/\.[^/.]+$/, '') : 'image';
 
         return template

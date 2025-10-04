@@ -482,7 +482,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
             a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
-        }, `image/${settings.format}`, settings.quality);
+        }, `image/${settings.outputFormat}`, settings.quality);
     }
 
     private downloadResults(): void {
@@ -500,7 +500,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         const settings = this.getSettings();
         const template = this.namingTemplate.value || 'face_{original}_{index}';
         const originalName = this.currentFile ? this.currentFile.name.replace(/\.[^/.]+$/, '') : 'image';
-        const extension = settings.format === 'jpeg' ? 'jpg' : settings.format;
+        const extension = settings.outputFormat === 'jpeg' ? 'jpg' : settings.outputFormat;
 
         return template
             .replace('{original}', originalName)
