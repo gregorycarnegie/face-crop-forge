@@ -962,37 +962,8 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         try {
             // Detect faces if not already done
             if (imageData.faces.length === 0) {
-                const detectionResult: FaceDetectorResult = await this.detector!.detect(imageData.image);
-
-                imageData.faces = [];
-                if (detectionResult.detections && detectionResult.detections.length > 0) {
-                    imageData.faces = detectionResult.detections
-                        .map((detection, index) => {
-                            const bbox = detection.boundingBox;
-                            const box = this.convertBoundingBoxToPixels(bbox, imageData.image.width, imageData.image.height);
-                            if (!box) {
-                                return null;
-                            }
-
-                            const { x, y, width, height } = box;
-
-                            return {
-                                id: index,
-                                box: {
-                                    xMin: x,
-                                    yMin: y,
-                                    width: width,
-                                    height: height
-                                },
-                                confidence: detection.categories && detection.categories.length > 0
-                                    ? detection.categories[0].score
-                                    : 0.8,
-                                selected: true,
-                                bbox: { x, y, width, height }
-                            };
-                        })
-                        .filter((face): face is NonNullable<typeof face> => face !== null) as FaceData[];
-                }
+                // Use detectFacesWithLandmarks for segmentation support
+                imageData.faces = await this.detectFacesWithLandmarks(imageData.image);
                 this.statistics.totalFacesDetected += imageData.faces.length;
             }
 

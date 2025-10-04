@@ -49,7 +49,7 @@ export interface FaceData {
     // Optional properties
     canvas?: HTMLCanvasElement;
     score?: number;
-    landmarks?: Array<{ x: number; y: number }>;
+    landmarks?: Array<{ x: number; y: number; z?: number }>; // 478 3D landmarks from Face Landmarker
 }
 
 export interface CropResult {
@@ -153,6 +153,21 @@ declare global {
                     }
                 ): Promise<FaceDetector>;
             };
+            FaceLandmarker: {
+                createFromOptions(
+                    fileset: any,
+                    options: {
+                        baseOptions: {
+                            modelAssetPath: string;
+                            delegate: string;
+                        };
+                        runningMode: string;
+                        numFaces?: number;
+                        outputFaceBlendshapes?: boolean;
+                        outputFacialTransformationMatrixes?: boolean;
+                    }
+                ): Promise<FaceLandmarker>;
+            };
         };
     }
 
@@ -166,6 +181,20 @@ declare global {
 
     interface FaceDetectorResult {
         detections: FaceDetection[];
+    }
+
+    interface FaceLandmarker {
+        detect(image: HTMLImageElement): FaceLandmarkerResult;
+        detectForVideo(
+            video: HTMLVideoElement,
+            timestamp: number
+        ): FaceLandmarkerResult;
+    }
+
+    interface FaceLandmarkerResult {
+        faceLandmarks: Array<Array<{x: number, y: number, z: number}>>;
+        faceBlendshapes?: Array<any>;
+        facialTransformationMatrixes?: Array<any>;
     }
 
     // JSZip library (loaded via CDN)

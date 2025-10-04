@@ -27,8 +27,17 @@ interface SliderMap {
     [key: string]: SliderConfig;
 }
 
+// Face mesh contour indices (from MediaPipe FACEMESH_FACE_OVAL)
+const FACE_OVAL_INDICES = [
+    10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+    397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+    172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109
+];
+
 export class BaseFaceCropper {
     protected detector: FaceDetector | null;
+    protected faceLandmarker: FaceLandmarker | null;
+    protected useSegmentation: boolean;
     protected aspectRatioLocked: boolean;
     protected currentAspectRatio: number;
     protected isDarkMode: boolean;
@@ -117,6 +126,8 @@ export class BaseFaceCropper {
 
     constructor() {
         this.detector = null;
+        this.faceLandmarker = null;
+        this.useSegmentation = true; // Use face segmentation by default
         this.aspectRatioLocked = false;
         this.currentAspectRatio = 1;
         this.isDarkMode = false;
@@ -208,7 +219,7 @@ export class BaseFaceCropper {
 
     async loadModel(): Promise<void> {
         try {
-            this.updateStatus('Loading face detection model...');
+            this.updateStatus('Loading face detection models...');
 
             await this.waitForMediaPipe();
 
@@ -220,6 +231,7 @@ export class BaseFaceCropper {
                 "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
             );
 
+            // Load Face Detector (for bounding boxes)
             this.detector = await window.vision.FaceDetector.createFromOptions(visionFileset, {
                 baseOptions: {
                     modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
@@ -227,6 +239,28 @@ export class BaseFaceCropper {
                 },
                 runningMode: "IMAGE"
             });
+
+            // Load Face Landmarker (for segmentation with 478 landmarks)
+            if (window.vision.FaceLandmarker) {
+                try {
+                    this.faceLandmarker = await window.vision.FaceLandmarker.createFromOptions(visionFileset, {
+                        baseOptions: {
+                            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                            delegate: "GPU"
+                        },
+                        runningMode: "IMAGE",
+                        numFaces: 10,
+                        outputFaceBlendshapes: false,
+                        outputFacialTransformationMatrixes: false
+                    });
+                    this.addToLog('Face Landmarker loaded successfully for segmentation');
+                } catch (landmarkerError) {
+                    console.warn('Face Landmarker failed to load, falling back to bounding box detection:', landmarkerError);
+                    this.useSegmentation = false;
+                }
+            } else {
+                this.useSegmentation = false;
+            }
 
             this.updateStatus('Model loaded successfully. Ready to process images.');
             this.addToLog('Face detection model loaded successfully');
@@ -284,6 +318,141 @@ export class BaseFaceCropper {
             cropX, cropY, cropWidth, cropHeight,
             0, 0, settings.outputWidth, settings.outputHeight
         );
+
+        await this.applyEnhancements(ctx, canvas);
+
+        return canvas;
+    }
+
+    /**
+     * Create a face contour mask from Face Landmarker landmarks
+     */
+    protected createFaceContourMask(
+        landmarks: Array<{x: number, y: number, z?: number}>,
+        imageWidth: number,
+        imageHeight: number
+    ): HTMLCanvasElement {
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = imageWidth;
+        maskCanvas.height = imageHeight;
+        const ctx = maskCanvas.getContext('2d');
+
+        if (!ctx) {
+            throw new Error('Failed to get canvas context for face mask');
+        }
+
+        // Clear canvas
+        ctx.clearRect(0, 0, imageWidth, imageHeight);
+
+        // Create path from face oval landmarks
+        ctx.beginPath();
+        FACE_OVAL_INDICES.forEach((index, i) => {
+            const landmark = landmarks[index];
+            if (!landmark) return;
+
+            const x = landmark.x * imageWidth;
+            const y = landmark.y * imageHeight;
+
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.closePath();
+
+        // Fill the face contour
+        ctx.fillStyle = 'white';
+        ctx.fill();
+
+        return maskCanvas;
+    }
+
+    /**
+     * Crop face using segmentation mask instead of bounding box
+     */
+    async cropFaceWithSegmentation(
+        image: HTMLImageElement,
+        landmarks: Array<{x: number, y: number, z?: number}>,
+        boundingBox: { xMin: number; yMin: number; width: number; height: number },
+        settings?: CropSettings
+    ): Promise<HTMLCanvasElement> {
+        if (!settings) {
+            settings = this.getSettings();
+        }
+
+        // Create face contour mask
+        const mask = this.createFaceContourMask(landmarks, image.width, image.height);
+
+        // Calculate crop region similar to cropFace but using the mask
+        const box = boundingBox;
+        const faceHeight = settings.outputHeight * (settings.faceHeightPct / 100);
+        const scale = faceHeight / box.height;
+
+        let cropWidth = settings.outputWidth / scale;
+        let cropHeight = settings.outputHeight / scale;
+
+        let centerX = box.xMin + (box.width / 2);
+        let centerY = box.yMin + (box.height / 2);
+
+        if (settings.positioningMode === 'rule-of-thirds') {
+            centerY = box.yMin + (box.height * 0.33);
+        } else if (settings.positioningMode === 'custom') {
+            centerX += (settings.horizontalOffset / 100) * cropWidth;
+            centerY += (settings.verticalOffset / 100) * cropHeight;
+        }
+
+        let cropX = centerX - (cropWidth / 2);
+        let cropY = centerY - (cropHeight / 2);
+
+        cropX = Math.max(0, Math.min(cropX, image.width - cropWidth));
+        cropY = Math.max(0, Math.min(cropY, image.height - cropHeight));
+
+        // Create output canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = settings.outputWidth;
+        canvas.height = settings.outputHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        if (!ctx) {
+            throw new Error('Failed to get canvas 2d context');
+        }
+
+        // Draw the image
+        ctx.drawImage(
+            image,
+            cropX, cropY, cropWidth, cropHeight,
+            0, 0, settings.outputWidth, settings.outputHeight
+        );
+
+        // Apply mask to create transparent background outside face contour
+        const imageData = ctx.getImageData(0, 0, settings.outputWidth, settings.outputHeight);
+        const maskCtx = mask.getContext('2d');
+        if (maskCtx) {
+            // Scale and position mask to match crop region
+            const tempMaskCanvas = document.createElement('canvas');
+            tempMaskCanvas.width = settings.outputWidth;
+            tempMaskCanvas.height = settings.outputHeight;
+            const tempMaskCtx = tempMaskCanvas.getContext('2d');
+
+            if (tempMaskCtx) {
+                tempMaskCtx.drawImage(
+                    mask,
+                    cropX, cropY, cropWidth, cropHeight,
+                    0, 0, settings.outputWidth, settings.outputHeight
+                );
+
+                const maskData = tempMaskCtx.getImageData(0, 0, settings.outputWidth, settings.outputHeight);
+
+                // Apply mask to alpha channel
+                for (let i = 0; i < imageData.data.length; i += 4) {
+                    const maskAlpha = maskData.data[i]; // Use red channel as mask
+                    imageData.data[i + 3] = maskAlpha; // Set alpha channel
+                }
+
+                ctx.putImageData(imageData, 0, 0);
+            }
+        }
 
         await this.applyEnhancements(ctx, canvas);
 
@@ -785,49 +954,18 @@ export class BaseFaceCropper {
 
     // Face detection with quality analysis
     async detectFacesWithQuality(image: HTMLImageElement): Promise<FaceData[]> {
-        if (!this.detector) {
+        if (!this.detector && !this.faceLandmarker) {
             throw new Error('Face detection model not loaded. Please wait for model to load.');
         }
 
-        const detectionResult = await this.detector.detect(image);
-        const detectedFaces: FaceData[] = [];
+        // Use detectFacesWithLandmarks which handles both Face Landmarker and Face Detector
+        const detectedFaces = await this.detectFacesWithLandmarks(image);
 
-        if (detectionResult.detections && detectionResult.detections.length > 0) {
-            for (let i = 0; i < detectionResult.detections.length; i++) {
-                const detection = detectionResult.detections[i];
-                const bbox = detection.boundingBox;
-                const box = this.convertBoundingBoxToPixels(bbox, image.width, image.height);
-                if (!box) {
-                    continue;
-                }
-                const { x, y, width, height } = box;
-
-                // Use detection confidence from MediaPipe
-                const confidence = detection.categories && detection.categories.length > 0
-                    ? detection.categories[0].score
-                    : 0.8; // Default confidence
-
-                // Calculate face quality using blur detection
-                const quality = await this.calculateFaceQuality(image, x, y, width, height);
-
-                detectedFaces.push({
-                    bbox: box,
-                    id: `face_${i}`,
-                    x: x,
-                    y: y,
-                    width: width,
-                    height: height,
-                    box: {
-                        xMin: x,
-                        yMin: y,
-                        width: width,
-                        height: height
-                    },
-                    confidence: confidence,
-                    quality: quality,
-                    selected: true, // Default to selected
-                    index: i + 1
-                });
+        // Add quality analysis to each detected face
+        for (const face of detectedFaces) {
+            if (face.x !== undefined && face.y !== undefined && face.width && face.height) {
+                const quality = await this.calculateFaceQuality(image, face.x, face.y, face.width, face.height);
+                face.quality = quality;
             }
         }
 
@@ -1122,6 +1260,102 @@ export class BaseFaceCropper {
     // toggleFaceSelection and updateFaceCounter are implemented later in file with proper method signatures
 
     // Crop faces from image data
+    /**
+     * Detect faces using Face Landmarker (with 478 landmarks) for segmentation
+     * Falls back to Face Detector if Face Landmarker is not available
+     */
+    async detectFacesWithLandmarks(image: HTMLImageElement): Promise<FaceData[]> {
+        const faces: FaceData[] = [];
+
+        // Try Face Landmarker first for segmentation
+        if (this.useSegmentation && this.faceLandmarker) {
+            try {
+                const landmarkerResult = await this.faceLandmarker.detect(image);
+
+                if (landmarkerResult.faceLandmarks && landmarkerResult.faceLandmarks.length > 0) {
+                    landmarkerResult.faceLandmarks.forEach((landmarks, index) => {
+                        // Calculate bounding box from landmarks
+                        const xs = landmarks.map(l => l.x);
+                        const ys = landmarks.map(l => l.y);
+                        const xMin = Math.min(...xs);
+                        const xMax = Math.max(...xs);
+                        const yMin = Math.min(...ys);
+                        const yMax = Math.max(...ys);
+
+                        const width = xMax - xMin;
+                        const height = yMax - yMin;
+
+                        const bbox: PixelBoundingBox = {
+                            x: xMin * image.width,
+                            y: yMin * image.height,
+                            width: width * image.width,
+                            height: height * image.height
+                        };
+
+                        faces.push({
+                            id: index,
+                            bbox: bbox,
+                            box: {
+                                xMin: bbox.x,
+                                yMin: bbox.y,
+                                width: bbox.width,
+                                height: bbox.height
+                            },
+                            selected: true,
+                            confidence: 0.95, // Face Landmarker doesn't provide confidence
+                            x: bbox.x,
+                            y: bbox.y,
+                            width: bbox.width,
+                            height: bbox.height,
+                            landmarks: landmarks // Store all 478 landmarks
+                        });
+                    });
+
+                    return faces;
+                }
+            } catch (error) {
+                console.warn('Face Landmarker detection failed, falling back to Face Detector:', error);
+            }
+        }
+
+        // Fallback to Face Detector
+        if (!this.detector) {
+            throw new Error('No face detection model available');
+        }
+
+        const detectionResult = await this.detector.detect(image);
+        if (detectionResult.detections && detectionResult.detections.length > 0) {
+            detectionResult.detections.forEach((detection, index) => {
+                const bbox = detection.boundingBox;
+                const box = this.convertBoundingBoxToPixels(bbox, image.width, image.height);
+                if (!box) return;
+
+                const { x, y, width, height } = box;
+
+                faces.push({
+                    id: index,
+                    bbox: box,
+                    box: {
+                        xMin: x,
+                        yMin: y,
+                        width: width,
+                        height: height
+                    },
+                    confidence: detection.categories && detection.categories.length > 0
+                        ? detection.categories[0].score
+                        : 0.8,
+                    selected: true,
+                    x,
+                    y,
+                    width,
+                    height
+                });
+            });
+        }
+
+        return faces;
+    }
+
     async cropFacesFromImageData(imageData: ProcessorImageData): Promise<CropResult[]> {
         if (!imageData.faces || imageData.faces.length === 0) return [];
 
@@ -1153,28 +1387,26 @@ export class BaseFaceCropper {
         for (let i = 0; i < selectedFaces.length; i++) {
             const face = selectedFaces[i];
 
-            // Calculate target face height and scale
-            const targetFaceHeight = outputHeight * faceHeightPct;
-            const scale = targetFaceHeight / (face.height || 1);
+            let croppedCanvas: HTMLCanvasElement;
 
-            // Calculate crop dimensions
-            const cropWidthSrc = outputWidth / scale;
-            const cropHeightSrc = outputHeight / scale;
-
-            // Calculate face position based on positioning mode
-            const { cropX, cropY } = this.calculateSmartCropPosition(
-                face, cropWidthSrc, cropHeightSrc, sourceImage.width, sourceImage.height
-            );
-
-            const finalCropWidth = Math.min(cropWidthSrc, sourceImage.width - cropX);
-            const finalCropHeight = Math.min(cropHeightSrc, sourceImage.height - cropY);
-
-            // Crop and resize
-            cropCtx!.drawImage(
-                tempCanvas,
-                cropX, cropY, finalCropWidth, finalCropHeight,
-                0, 0, outputWidth, outputHeight
-            );
+            // Use segmentation if landmarks are available
+            if (this.useSegmentation && face.landmarks && face.landmarks.length > 0) {
+                try {
+                    croppedCanvas = await this.cropFaceWithSegmentation(
+                        sourceImage,
+                        face.landmarks,
+                        face.box!,
+                        this.getSettings()
+                    );
+                } catch (error) {
+                    console.warn('Segmentation crop failed, using bounding box:', error);
+                    // Fallback to regular crop
+                    croppedCanvas = await this.cropFace(sourceImage, face as any, this.getSettings());
+                }
+            } else {
+                // Use regular bounding box crop
+                croppedCanvas = await this.cropFace(sourceImage, face as any, this.getSettings());
+            }
 
             // Generate image with selected format and quality
             const format = this.outputFormat.value;
@@ -1184,7 +1416,7 @@ export class BaseFaceCropper {
             if (format === 'jpeg') mimeType = 'image/jpeg';
             if (format === 'webp') mimeType = 'image/webp';
 
-            const croppedDataUrl = cropCanvas.toDataURL(mimeType, quality);
+            const croppedDataUrl = croppedCanvas.toDataURL(mimeType, quality);
 
             // Generate filename using template
             const filename = this.generateBatchFilename(imageData.file.name, face.index || 0, outputWidth, outputHeight);

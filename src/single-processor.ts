@@ -267,7 +267,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     }
 
     private async detectFaces(): Promise<void> {
-        if (!this.detector || !this.currentImage) {
+        if ((!this.detector && !this.faceLandmarker) || !this.currentImage) {
             this.updateStatus('Model not loaded or no image selected.');
             return;
         }
@@ -277,46 +277,16 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         this.processingStartTime = Date.now();
 
         try {
-            const detectionResult = await this.detector.detect(this.currentImage);
-
-            this.faces = [];
-            if (detectionResult.detections && detectionResult.detections.length > 0) {
-                const detectedFaces: FaceData[] = [];
-                detectionResult.detections.forEach((detection, index) => {
-                    const bbox = detection.boundingBox;
-                    const box = this.convertBoundingBoxToPixels(bbox, this.currentImage!.width, this.currentImage!.height);
-                    if (!box) return;
-
-                    const { x, y, width, height } = box;
-
-                    detectedFaces.push({
-                        id: index,
-                        bbox: box,
-                        box: {
-                            xMin: x,
-                            yMin: y,
-                            width: width,
-                            height: height
-                        },
-                        confidence: detection.categories && detection.categories.length > 0
-                            ? detection.categories[0].score
-                            : 0.8,
-                        selected: true,
-                        x,
-                        y,
-                        width,
-                        height
-                    });
-                });
-                this.faces = detectedFaces;
-            }
+            // Use the base class method that handles both Face Landmarker and Face Detector
+            this.faces = await this.detectFacesWithLandmarks(this.currentImage);
 
             this.selectedFaces = new Set(this.faces.map(f => f.id));
             this.updateFaceOverlays();
             this.updateFaceCount();
 
             const processingTime = Date.now() - this.processingStartTime;
-            this.updateStatus(`Detected ${this.faces.length} face(s) in ${processingTime}ms`);
+            const detectionMethod = this.useSegmentation && this.faceLandmarker ? 'with segmentation' : 'with bounding boxes';
+            this.updateStatus(`Detected ${this.faces.length} face(s) ${detectionMethod} in ${processingTime}ms`);
             this.addToLog(`Face detection completed: ${this.faces.length} faces found in ${processingTime}ms`);
 
             this.updateStats();
