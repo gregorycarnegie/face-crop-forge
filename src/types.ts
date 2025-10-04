@@ -26,16 +26,15 @@ export interface FaceDetection {
 }
 
 export interface FaceData {
+    id: number | string;
     bbox: PixelBoundingBox;
-    selected: boolean;
-    canvas?: HTMLCanvasElement;
-    id?: number | string;
     box?: {
         xMin: number;
         yMin: number;
         width: number;
         height: number;
     };
+    selected: boolean;
     confidence?: number;
     // Extended properties for batch processing
     x?: number;
@@ -47,6 +46,10 @@ export interface FaceData {
         score: number;
         level: string;
     };
+    // Optional properties
+    canvas?: HTMLCanvasElement;
+    score?: number;
+    landmarks?: Array<{ x: number; y: number }>;
 }
 
 export interface CropResult {
@@ -63,9 +66,13 @@ export interface CropResult {
     filename?: string;
     format?: string;
     quality?: number;
+    // Batch processor properties
+    blobUrl?: string;
+    width?: number;
+    height?: number;
 }
 
-export interface ImageData {
+export interface ProcessorImageData {
     id: string;
     file: File;
     image: HTMLImageElement;
@@ -73,9 +80,13 @@ export interface ImageData {
     results: CropResult[];
     selected: boolean;
     processed: boolean;
-    status?: string;
+    status?: string | 'loaded' | 'processing' | 'processed' | 'error';
     csvOutputName?: string;
     page?: number;
+    // Batch processor extended properties
+    enhancedImage?: HTMLImageElement | null;
+    processedAt?: number;
+    memoryCleanedUp?: boolean;
 }
 
 export interface Statistics {
@@ -100,8 +111,25 @@ export interface CropSettings {
     quality?: number; // Alias for jpegQuality
 }
 
+// Log types
+export type LogLevel = 'info' | 'success' | 'warning' | 'error';
+export type ErrorSeverity = 'error' | 'critical' | 'warning' | 'info';
+
+export interface ProcessingLogEntry {
+    timestamp: string;
+    message: string;
+    type: LogLevel;
+}
+
+export interface ErrorLogEntry {
+    timestamp: string;
+    title: string;
+    details: string;
+    severity: ErrorSeverity;
+}
+
 export interface ProcessingState {
-    images: Map<string, ImageData>;
+    images: Map<string, ProcessorImageData>;
     settings: CropSettings;
     selectedImages: string[];
 }

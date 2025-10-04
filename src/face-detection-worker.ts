@@ -301,5 +301,3 @@ self.onmessage = async function(e: MessageEvent<WorkerMessage>): Promise<void> {
 
 // Initialize on worker startup
 initializeDetector();
-
-export {};

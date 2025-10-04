@@ -1,71 +1,8 @@
 import { BaseFaceCropper } from './base-face-cropper.js';
 import type {
-    ImageData as TypedImageData,
-    FaceData,
-    CropResult,
-    Statistics as TypedStatistics,
-    BoundingBox
+    ProcessorImageData,
+    FaceData
 } from './types.js';
-
-interface Face {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  selected: boolean;
-  score?: number;
-  landmarks?: Array<{ x: number; y: number }>;
-}
-
-interface ProcessingResult {
-  faceId: string;
-  blobUrl: string;
-  fileName: string;
-  format: 'png' | 'jpeg' | 'webp';
-  width: number;
-  height: number;
-}
-
-interface ImageEntry {
-  id: string;
-  file: File;
-  image: HTMLImageElement | null;
-  faces: Face[];
-  results: ProcessingResult[];
-  selected: boolean;
-  processed: boolean;
-  status: 'loaded' | 'processing' | 'processed' | 'error';
-  enhancedImage?: HTMLImageElement | null;
-  processedAt?: number;
-  memoryCleanedUp?: boolean;
-  page?: number;
-}
-
-type LogLevel = 'info' | 'success' | 'warning' | 'error';
-type ErrorSeverity = 'error' | 'critical' | 'warning' | 'info';
-
-interface ProcessingLogEntry {
-  timestamp: string;
-  message: string;
-  type: LogLevel;
-}
-
-interface ErrorLogEntry {
-  timestamp: string;
-  title: string;
-  details: string;
-  severity: ErrorSeverity;
-}
-
-interface Statistics {
-  totalFacesDetected: number;
-  imagesProcessed: number;
-  successfulProcessing: number;
-  processingTimes: number[];
-  startTime: number | null;
-}
-//#endregion
 
 class FaceCropper extends BaseFaceCropper {
     // State properties
@@ -179,7 +116,7 @@ class FaceCropper extends BaseFaceCropper {
     clearErrorsBtn!: HTMLButtonElement;
     exportErrorsBtn!: HTMLButtonElement;
     ctx!: CanvasRenderingContext2D;
-    workerCallbacks?: Map<string, { resolve: (faces: Face[]) => void; reject: (e: Error) => void }>;
+    workerCallbacks?: Map<string, { resolve: (faces: FaceData[]) => void; reject: (e: Error) => void }>;
 
     constructor() {
         super();
@@ -979,8 +916,8 @@ class FaceCropper extends BaseFaceCropper {
 
         try {
             for (const imageData of allImages) {
-                const imgEntry = imageData as unknown as ImageEntry;
-                imgEntry.enhancedImage = await this.applyImageEnhancements(imgEntry.image!);
+                const imgEntry = imageData as unknown as ProcessorImageData;
+                imgEntry.enhancedImage = await this.applyImageEnhancements(imgEntry.image);
             }
             this.updateStatus(`Applied enhancements to ${allImages.length} images!`, 'success');
         } catch (error: unknown) {
@@ -1714,6 +1651,7 @@ class FaceCropper extends BaseFaceCropper {
 
     async handleStandardImageBatch(files: File[]) {
         await this.loadImagePage(files, 0);
+        this.updateGallery();
         this.updateStatus(`Loaded ${files.length} images.`, 'success');
     }
 
@@ -2167,15 +2105,21 @@ class FaceCropper extends BaseFaceCropper {
     updateGallery() {
         this.galleryGrid.innerHTML = '';
 
+        if (this.images!.size === 0) {
+            this.imageGallery.classList.add('hidden');
+            return;
+        }
+
         for (const [imageId, imageData] of this.images!) {
             const galleryItem = this.createGalleryItem(imageData);
             this.galleryGrid.appendChild(galleryItem);
         }
 
+        this.imageGallery.classList.remove('hidden');
         this.updateSelectionCounter();
     }
 
-    createGalleryItem(imageData: any) {
+    createGalleryItem(imageData: ProcessorImageData): HTMLDivElement {
         const item = super.createGalleryItem(imageData);
         item.addEventListener('click', () => this.toggleSelection(imageData.id));
         return item;

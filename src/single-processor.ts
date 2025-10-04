@@ -1,23 +1,9 @@
 import { BaseFaceCropper } from './base-face-cropper.js';
-import { CropSettings } from './types';
+import type { FaceData } from './types.js';
 
-// Face interface specific to SingleImageFaceCropper
-interface FaceBox {
-    xMin: number;
-    yMin: number;
-    width: number;
-    height: number;
-}
-
-interface Face {
-    id: number;
-    box: FaceBox;
-    confidence: number;
-    selected: boolean;
-}
-
+// Single processor specific result interface
 interface CroppedResult {
-    face: Face;
+    face: FaceData;
     image: HTMLCanvasElement;
     index: number;
 }
@@ -25,8 +11,8 @@ interface CroppedResult {
 class SingleImageFaceCropper extends BaseFaceCropper {
     private currentImage: HTMLImageElement | null;
     private currentFile: File | null;
-    private faces: Face[];
-    private selectedFaces: Set<number>;
+    private faces: FaceData[];
+    private selectedFaces: Set<number | string>;
 
     // UI Elements
     private imageInput!: HTMLInputElement;
@@ -295,31 +281,34 @@ class SingleImageFaceCropper extends BaseFaceCropper {
 
             this.faces = [];
             if (detectionResult.detections && detectionResult.detections.length > 0) {
-                this.faces = detectionResult.detections
-                    .map((detection, index) => {
-                        const bbox = detection.boundingBox;
-                        const box = this.convertBoundingBoxToPixels(bbox, this.currentImage!.width, this.currentImage!.height);
-                        if (!box) {
-                            return null;
-                        }
+                const detectedFaces: FaceData[] = [];
+                detectionResult.detections.forEach((detection, index) => {
+                    const bbox = detection.boundingBox;
+                    const box = this.convertBoundingBoxToPixels(bbox, this.currentImage!.width, this.currentImage!.height);
+                    if (!box) return;
 
-                        const { x, y, width, height } = box;
+                    const { x, y, width, height } = box;
 
-                        return {
-                            id: index,
-                            box: {
-                                xMin: x,
-                                yMin: y,
-                                width: width,
-                                height: height
-                            },
-                            confidence: detection.categories && detection.categories.length > 0
-                                ? detection.categories[0].score
-                                : 0.8,
-                            selected: true
-                        };
-                    })
-                    .filter((face): face is Face => face !== null);
+                    detectedFaces.push({
+                        id: index,
+                        bbox: box,
+                        box: {
+                            xMin: x,
+                            yMin: y,
+                            width: width,
+                            height: height
+                        },
+                        confidence: detection.categories && detection.categories.length > 0
+                            ? detection.categories[0].score
+                            : 0.8,
+                        selected: true,
+                        x,
+                        y,
+                        width,
+                        height
+                    });
+                });
+                this.faces = detectedFaces;
             }
 
             this.selectedFaces = new Set(this.faces.map(f => f.id));
@@ -352,7 +341,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         const scaleY = canvas.height / this.currentImage.height;
 
         this.faces.forEach((face) => {
-            const box = face.box;
+            const box = face.box!;
             const overlay = document.createElement('div');
             overlay.className = `face-overlay ${this.selectedFaces.has(face.id) ? 'selected' : ''}`;
             overlay.style.left = (box.xMin * scaleX) + 'px';
@@ -371,11 +360,10 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     }
 
     toggleFaceSelection(faceId: string | number): void {
-        const numericId = typeof faceId === 'string' ? parseInt(faceId) : faceId;
-        if (this.selectedFaces.has(numericId)) {
-            this.selectedFaces.delete(numericId);
+        if (this.selectedFaces.has(faceId)) {
+            this.selectedFaces.delete(faceId);
         } else {
-            this.selectedFaces.add(numericId);
+            this.selectedFaces.add(faceId);
         }
         this.updateFaceOverlays();
         this.updateFaceCount();
@@ -439,8 +427,8 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         }
     }
 
-    private async cropCurrentFace(face: Face): Promise<HTMLCanvasElement> {
-        return super.cropFace(this.currentImage!, face);
+    private async cropCurrentFace(face: FaceData): Promise<HTMLCanvasElement> {
+        return super.cropFace(this.currentImage!, face as any);
     }
 
     private displayResults(results: CroppedResult[]): void {

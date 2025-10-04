@@ -2,7 +2,7 @@ import {
     BoundingBox,
     PixelBoundingBox,
     FaceData,
-    ImageData,
+    ProcessorImageData,
     Statistics,
     CropSettings,
     CropResult
@@ -83,7 +83,7 @@ export class BaseFaceCropper {
     protected errorLog?: any[];
 
     // Images map (used by subclasses)
-    protected images?: Map<string, ImageData>;
+    protected images?: Map<string, ProcessorImageData>;
 
     // Memory management
     protected memoryUsage?: { images: number; processed: number };
@@ -311,7 +311,7 @@ export class BaseFaceCropper {
         };
     }
 
-    generateFilename(imageData: Partial<ImageData>, index: number, template?: string): string {
+    generateFilename(imageData: Partial<ProcessorImageData>, index: number, template?: string): string {
         const settings = this.getSettings();
         const filenameTemplate = template || this.namingTemplate?.value || 'face_{original}_{index}';
         const originalName = imageData.file ? imageData.file.name.replace(/\.[^/.]+$/, '') : 'image';
@@ -633,7 +633,7 @@ export class BaseFaceCropper {
         logElement.scrollTop = logElement.scrollHeight;
     }
 
-    createGalleryItem(imageData: ImageData): HTMLDivElement {
+    createGalleryItem(imageData: ProcessorImageData): HTMLDivElement {
         const item = document.createElement('div');
         item.className = 'gallery-item';
         item.dataset.imageId = imageData.id;
@@ -1026,7 +1026,7 @@ export class BaseFaceCropper {
     }
 
     // Display image with face overlays
-    displayImageWithFaceOverlays(imageData: ImageData): void {
+    displayImageWithFaceOverlays(imageData: ProcessorImageData): void {
         if (!this.inputCanvas || !this.faceOverlays) return;
 
         const maxWidth = 800;
@@ -1122,7 +1122,7 @@ export class BaseFaceCropper {
     // toggleFaceSelection and updateFaceCounter are implemented later in file with proper method signatures
 
     // Crop faces from image data
-    async cropFacesFromImageData(imageData: ImageData): Promise<CropResult[]> {
+    async cropFacesFromImageData(imageData: ProcessorImageData): Promise<CropResult[]> {
         if (!imageData.faces || imageData.faces.length === 0) return [];
 
         // Only crop selected faces

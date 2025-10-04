@@ -1,16 +1,11 @@
 import { BaseFaceCropper } from './base-face-cropper.js';
 import type {
-    ImageData,
+    ProcessorImageData,
     FaceData,
-    CropResult,
-    Statistics,
-    BoundingBox
+    CropResult
 } from './types.js';
 
-interface CSVImageData extends ImageData {
-    csvOutputName: string;
-}
-
+// CSV-specific extended interfaces
 interface MatchedFile {
     file: File;
     outputName: string;
@@ -34,8 +29,8 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
     private csvHeaders: string[] = [];
     private csvMapping: Map<string, string> = new Map();
 
-    // Image storage
-    protected images: Map<string, CSVImageData> = new Map();
+    // Image storage (uses ProcessorImageData with csvOutputName property)
+    protected images: Map<string, ProcessorImageData> = new Map();
     private imageResults: Map<string, StreamedResult> = new Map();
 
     // Processing state
@@ -713,7 +708,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         this.updateSelectionCount();
     }
 
-    createGalleryItem(imageData: CSVImageData): HTMLDivElement {
+    createGalleryItem(imageData: ProcessorImageData): HTMLDivElement {
         const item = super.createGalleryItem(imageData);
         item.addEventListener('click', () => this.toggleSelection(imageData.id));
         return item;
@@ -736,7 +731,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         this.canvasContainer.classList.remove('hidden');
     }
 
-    private displayImageInCanvas(imageData: CSVImageData): void {
+    private displayImageInCanvas(imageData: ProcessorImageData): void {
         const canvas = this.inputCanvas;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
@@ -810,7 +805,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         await this.processImages(selectedImages);
     }
 
-    private async processImagesAndFiles(loadedImages: CSVImageData[], queuedFiles: MatchedFile[]): Promise<void> {
+    private async processImagesAndFiles(loadedImages: ProcessorImageData[], queuedFiles: MatchedFile[]): Promise<void> {
         if (!this.detector) {
             this.updateStatus('Face detection model not loaded. Please wait and try again.');
             return;
@@ -853,7 +848,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
                 try {
                     // Load and process the queued file
                     const image = await this.loadImageFile(file);
-                    const tempImageData: CSVImageData = {
+                    const tempImageData: ProcessorImageData = {
                         file: file,
                         image: image,
                         faces: [],
@@ -904,7 +899,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         }
     }
 
-    private async processImages(imageDataArray: CSVImageData[]): Promise<void> {
+    private async processImages(imageDataArray: ProcessorImageData[]): Promise<void> {
         if (!this.detector) {
             this.updateStatus('Face detection model not loaded. Please wait and try again.');
             return;
@@ -963,7 +958,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         }
     }
 
-    private async processImage(imageId: string, imageData: CSVImageData): Promise<boolean> {
+    private async processImage(imageId: string, imageData: ProcessorImageData): Promise<boolean> {
         try {
             // Detect faces if not already done
             if (imageData.faces.length === 0) {
@@ -1033,7 +1028,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
 
     async downloadAllResults(): Promise<void> {
         // Collect results from both loaded images and streamed processing (like batch-processing.html)
-        const allResults: Array<{ result: CropResult; imageData: CSVImageData | { csvOutputName: string; file: { name: string } }; faceIndex: number }> = [];
+        const allResults: Array<{ result: CropResult; imageData: ProcessorImageData | { csvOutputName?: string; file: { name: string } }; faceIndex: number }> = [];
 
         // Collect results from loaded images
         for (const imageData of this.images.values()) {
@@ -1073,7 +1068,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         const settings = this.getSettings();
 
         for (const { result, imageData, faceIndex } of allResults) {
-            const filename = this.generateFilename(imageData as CSVImageData, faceIndex);
+            const filename = this.generateFilename(imageData as ProcessorImageData, faceIndex);
 
             const blob = await new Promise<Blob>((resolve) => {
                 result.canvas?.toBlob((b) => resolve(b!), `image/${settings.format}`, settings.quality);
@@ -1093,7 +1088,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         this.addToProcessingLog(`Downloaded ${allResults.length} processed face crops as ZIP`);
     }
 
-    generateFilename(imageData: CSVImageData | { csvOutputName?: string; file?: { name: string } }, faceIndex: number): string {
+    generateFilename(imageData: ProcessorImageData | { csvOutputName?: string; file?: { name: string } }, faceIndex: number): string {
         const settings = this.getSettings();
         const template = this.namingTemplate.value || '{csv_name}';
         const extension = settings.outputFormat === 'jpeg' ? 'jpg' : settings.outputFormat;
@@ -1198,7 +1193,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
     }
 
     // Face overlay methods (simplified versions)
-    private updateFaceOverlays(imageData: CSVImageData): void {
+    private updateFaceOverlays(imageData: ProcessorImageData): void {
         // This would be implemented similar to other files
         // For brevity, keeping it simple here
     }
