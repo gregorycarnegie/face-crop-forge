@@ -1862,49 +1862,43 @@ export class BaseFaceCropper {
     }
 
     async detectFacesWithWorker(image: HTMLImageElement, imageId: string): Promise<any[]> {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             if (!this.workerInitialized) {
                 reject(new Error('Worker not initialized'));
                 return;
             }
 
-            // Create canvas to get image data
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            canvas.width = image.width;
-            canvas.height = image.height;
-            ctx!.drawImage(image, 0, 0);
+            try {
+                // Create ImageBitmap for zero-copy transfer
+                const bitmap = await createImageBitmap(image);
 
-            const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
+                // Store callback for this request
+                const requestId = `${imageId}_${Date.now()}`;
+                if (!this.workerCallbacks) {
+                    this.workerCallbacks = new Map();
+                }
+                this.workerCallbacks.set(requestId, { resolve, reject });
 
-            // Store callback for this request
-            const requestId = `${imageId}_${Date.now()}`;
-            if (!this.workerCallbacks) {
-                this.workerCallbacks = new Map();
+                // Send to worker using transferable ImageBitmap
+                this.faceDetectionWorker!.postMessage({
+                    type: 'detectFaces',
+                    id: requestId,
+                    data: {
+                        imageBitmap: bitmap,
+                        options: { includeQuality: true }
+                    }
+                }, [bitmap]);  // Transfer ownership to worker
+
+                // Set timeout
+                setTimeout(() => {
+                    if (this.workerCallbacks!.has(requestId)) {
+                        this.workerCallbacks!.delete(requestId);
+                        reject(new Error('Worker detection timeout'));
+                    }
+                }, 30000); // 30 second timeout
+            } catch (error) {
+                reject(error);
             }
-            this.workerCallbacks.set(requestId, { resolve, reject });
-
-            // Send to worker
-            this.faceDetectionWorker!.postMessage({
-                type: 'detectFaces',
-                id: requestId,
-                data: {
-                    imageData: {
-                        data: imageData.data,
-                        width: imageData.width,
-                        height: imageData.height
-                    },
-                    options: { includeQuality: true }
-                }
-            });
-
-            // Set timeout
-            setTimeout(() => {
-                if (this.workerCallbacks!.has(requestId)) {
-                    this.workerCallbacks!.delete(requestId);
-                    reject(new Error('Worker detection timeout'));
-                }
-            }, 30000); // 30 second timeout
         });
     }
 

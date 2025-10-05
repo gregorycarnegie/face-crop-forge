@@ -44,10 +44,18 @@ const server = http.createServer((req: http.IncomingMessage, res: http.ServerRes
                 res.end('Sorry, check with the site admin for error: ' + error.code + ' ..\n');
             }
         } else {
+            // Set COOP/COEP headers for WASM SIMD + threads support
+            // These enable SharedArrayBuffer for 1.5-3× performance boost in modern Chromium
             res.writeHead(200, {
                 'Content-Type': contentType,
                 'Cross-Origin-Embedder-Policy': 'require-corp',
-                'Cross-Origin-Opener-Policy': 'same-origin'
+                'Cross-Origin-Opener-Policy': 'same-origin',
+                // Additional security headers
+                'Cross-Origin-Resource-Policy': 'cross-origin',
+                // Cache control for WASM files
+                ...(extname === '.wasm' && {
+                    'Cache-Control': 'public, max-age=31536000, immutable'
+                })
             });
             res.end(content, 'utf-8');
         }

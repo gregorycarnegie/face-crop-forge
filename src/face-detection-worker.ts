@@ -28,10 +28,16 @@ interface ImageDataMessage {
     height: number;
 }
 
+interface ImageBitmapMessage {
+    bitmap: ImageBitmap;
+    options?: DetectionOptions;
+}
+
 interface WorkerMessage {
     type: string;
     data?: {
-        imageData: ImageDataMessage;
+        imageData?: ImageDataMessage;
+        imageBitmap?: ImageBitmap;
         options?: DetectionOptions;
     };
     id?: string;
@@ -129,27 +135,44 @@ async function initializeDetector(): Promise<void> {
     }
 }
 
-async function detectFaces(imageData: ImageDataMessage, options: DetectionOptions = {}): Promise<DetectedFace[]> {
+async function detectFaces(input: ImageDataMessage | ImageBitmap, options: DetectionOptions = {}): Promise<DetectedFace[]> {
     if (!isInitialized || !detector) {
         throw new Error('Detector not initialized');
     }
 
     try {
-        // Create canvas from image data
-        const canvas = new OffscreenCanvas(imageData.width, imageData.height);
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        let canvas: OffscreenCanvas;
+        let ctx: OffscreenCanvasRenderingContext2D | null;
 
-        if (!ctx) {
-            throw new Error('Failed to get canvas context');
+        // Handle ImageBitmap input (transferable, zero-copy)
+        if (input instanceof ImageBitmap) {
+            canvas = new OffscreenCanvas(input.width, input.height);
+            ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+            if (!ctx) {
+                throw new Error('Failed to get canvas context');
+            }
+
+            ctx.drawImage(input, 0, 0);
+            // Close the bitmap to free memory
+            input.close();
+        } else {
+            // Handle legacy ImageData input
+            canvas = new OffscreenCanvas(input.width, input.height);
+            ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+            if (!ctx) {
+                throw new Error('Failed to get canvas context');
+            }
+
+            // Create ImageData and put it on canvas
+            const imgData = new ImageData(
+                new Uint8ClampedArray(input.data),
+                input.width,
+                input.height
+            );
+            ctx.putImageData(imgData, 0, 0);
         }
-
-        // Create ImageData and put it on canvas
-        const imgData = new ImageData(
-            new Uint8ClampedArray(imageData.data),
-            imageData.width,
-            imageData.height
-        );
-        ctx.putImageData(imgData, 0, 0);
 
         // Detect faces using MediaPipe Tasks Vision
         const detectionResult = await detector.detect(canvas);
@@ -259,6 +282,68 @@ function calculateLaplacianVariance(data: Uint8ClampedArray, width: number, heig
     return count > 0 ? variance / count : 0;
 }
 
+// Process image transformations in worker thread using OffscreenCanvas
+async function processImageInWorker(
+    bitmap: ImageBitmap,
+    options: any = {}
+): Promise<ImageBitmap> {
+    const { width, height, rotation, flipH, flipV, quality } = options;
+
+    // Use OffscreenCanvas for all transformations
+    const canvas = new OffscreenCanvas(
+        width || bitmap.width,
+        height || bitmap.height
+    );
+    const ctx = canvas.getContext('2d', {
+        willReadFrequently: false,
+        alpha: true
+    });
+
+    if (!ctx) {
+        throw new Error('Failed to get OffscreenCanvas context');
+    }
+
+    // Apply transformations
+    ctx.save();
+
+    // Handle rotation if specified
+    if (rotation) {
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
+    }
+
+    // Handle flipping
+    const scaleX = flipH ? -1 : 1;
+    const scaleY = flipV ? -1 : 1;
+    const translateX = flipH ? canvas.width : 0;
+    const translateY = flipV ? canvas.height : 0;
+
+    if (flipH || flipV) {
+        ctx.translate(translateX, translateY);
+        ctx.scale(scaleX, scaleY);
+    }
+
+    // Draw with high-quality settings
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // Draw the bitmap
+    ctx.drawImage(
+        bitmap,
+        0, 0, bitmap.width, bitmap.height,
+        0, 0, canvas.width, canvas.height
+    );
+
+    ctx.restore();
+
+    // Close original bitmap to free memory
+    bitmap.close();
+
+    // Convert back to ImageBitmap for transfer
+    return await createImageBitmap(canvas);
+}
+
 // Message handler
 self.onmessage = async function(e: MessageEvent<WorkerMessage>): Promise<void> {
     const { type, data, id } = e.data;
@@ -278,13 +363,43 @@ self.onmessage = async function(e: MessageEvent<WorkerMessage>): Promise<void> {
                     throw new Error('No data provided');
                 }
 
-                const faces = await detectFaces(data.imageData, data.options || {});
+                // Prefer ImageBitmap if available, fallback to ImageData
+                const input = data.imageBitmap || data.imageData;
+                if (!input) {
+                    throw new Error('No image data provided');
+                }
+
+                const faces = await detectFaces(input, data.options || {});
                 self.postMessage({
                     type: 'faceDetectionResult',
                     id: id,
                     success: true,
                     faces: faces
                 } as WorkerResponse);
+                break;
+
+            case 'processImage':
+                if (!isInitialized) {
+                    throw new Error('Worker not initialized');
+                }
+
+                if (!data || !data.imageBitmap) {
+                    throw new Error('No ImageBitmap provided');
+                }
+
+                // Process image transformations on worker thread using OffscreenCanvas
+                const processedBitmap = await processImageInWorker(
+                    data.imageBitmap,
+                    data.options || {}
+                );
+
+                // Use structured clone with transfer for zero-copy
+                self.postMessage({
+                    type: 'imageProcessed',
+                    id: id,
+                    success: true,
+                    bitmap: processedBitmap
+                }, { transfer: [processedBitmap] } as any);
                 break;
 
             default:
