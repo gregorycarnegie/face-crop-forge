@@ -797,6 +797,78 @@ button:disabled {
     z-index: 20;
 }
 
+/* Vertical centerline for alignment */
+.face-box::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-left: 2px dashed rgba(255, 255, 255, 0.8);
+    transform: translateX(-1px);
+    pointer-events: none;
+    z-index: 10;
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8))
+            drop-shadow(0 0 1px rgba(0, 0, 0, 1));
+}
+
+/* Horizontal centerline for alignment */
+.face-box::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 0;
+    border-top: 2px dashed rgba(255, 255, 255, 0.8);
+    transform: translateY(-1px);
+    pointer-events: none;
+    z-index: 10;
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8))
+            drop-shadow(0 0 1px rgba(0, 0, 0, 1));
+}
+
+/* Make centerlines more visible when box is selected */
+.face-box.selected::before,
+.face-box.selected::after {
+    border-color: rgba(255, 255, 255, 0.95);
+    border-width: 2px;
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.9))
+            drop-shadow(0 0 2px rgba(0, 0, 0, 1));
+}
+
+/* Subtle centerlines for unselected faces */
+.face-box.unselected::before,
+.face-box.unselected::after {
+    border-color: rgba(255, 255, 255, 0.5);
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+}
+
+/* Extra visible centerlines when keyboard selected */
+.face-box.keyboard-selected::before,
+.face-box.keyboard-selected::after {
+    border-color: rgba(255, 200, 87, 1);
+    border-width: 2px;
+    filter: drop-shadow(0 0 4px rgba(255, 200, 87, 0.8))
+            drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+}
+
+/* Dark mode adjustments for centerlines */
+[data-theme="dark"] .face-box::before,
+[data-theme="dark"] .face-box::after {
+    border-color: rgba(255, 255, 255, 0.9);
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9))
+            drop-shadow(0 0 1px rgba(255, 255, 255, 0.3));
+}
+
+[data-theme="dark"] .face-box.selected::before,
+[data-theme="dark"] .face-box.selected::after {
+    border-color: rgba(255, 255, 255, 1);
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 1))
+            drop-shadow(0 0 2px rgba(255, 255, 255, 0.5));
+}
+
 .face-checkbox {
     position: absolute;
     top: -12px;
