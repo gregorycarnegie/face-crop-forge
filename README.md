@@ -301,7 +301,9 @@ npm run build
 
 ## 📄 License
 
-This project is open source. See the repository for license details.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See the [LICENSE](LICENSE) file for details.
+
+This project uses [MediaPipe](https://github.com/google/mediapipe) (Apache-2.0) by Google. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for details.
 
 ## 🤝 Contributing
 
