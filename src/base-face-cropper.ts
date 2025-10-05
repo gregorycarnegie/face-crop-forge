@@ -67,6 +67,7 @@ export class BaseFaceCropper {
     protected sharpnessControl?: HTMLInputElement;
     protected skinSmoothing?: HTMLInputElement;
     protected backgroundBlur?: HTMLInputElement;
+    protected redEyeRemoval?: HTMLInputElement;
     protected processingLogElement?: HTMLElement;
     protected loadingLogElement?: HTMLElement;
     protected errorLogElement?: HTMLElement;
@@ -460,10 +461,61 @@ export class BaseFaceCropper {
     }
 
     async applyEnhancements(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): Promise<void> {
+        // Get image data
+        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Apply auto color correction
         if (this.autoColorCorrection?.checked) {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            ctx.putImageData(imageData, 0, 0);
+            imageData = this.applyAutoColorCorrection(imageData);
         }
+
+        // Apply exposure adjustment
+        if (this.exposureAdjustment) {
+            const exposure = parseFloat(this.exposureAdjustment.value);
+            if (exposure !== 0) {
+                imageData = this.applyExposureAdjustment(imageData, exposure);
+            }
+        }
+
+        // Apply contrast adjustment
+        if (this.contrastAdjustment) {
+            const contrast = parseFloat(this.contrastAdjustment.value);
+            if (contrast !== 1) {
+                imageData = this.applyContrastAdjustment(imageData, contrast);
+            }
+        }
+
+        // Apply sharpness
+        if (this.sharpnessControl) {
+            const sharpness = parseFloat(this.sharpnessControl.value);
+            if (sharpness > 0) {
+                imageData = this.applySharpness(imageData, sharpness);
+            }
+        }
+
+        // Apply skin smoothing
+        if (this.skinSmoothing) {
+            const skinSmoothingAmount = parseFloat(this.skinSmoothing.value);
+            if (skinSmoothingAmount > 0) {
+                imageData = await this.applySkinSmoothing(imageData, skinSmoothingAmount);
+            }
+        }
+
+        // Apply red-eye removal
+        if (this.redEyeRemoval?.checked) {
+            imageData = await this.applyRedEyeRemoval(imageData);
+        }
+
+        // Apply background blur
+        if (this.backgroundBlur) {
+            const blurAmount = parseFloat(this.backgroundBlur.value);
+            if (blurAmount > 0) {
+                imageData = await this.applyBackgroundBlur(imageData, blurAmount);
+            }
+        }
+
+        // Put enhanced data back to canvas
+        ctx.putImageData(imageData, 0, 0);
     }
 
     getSettings(): CropSettings {
@@ -2403,5 +2455,268 @@ export class BaseFaceCropper {
                 fileInputCallback(imageFiles);
             }
         });
+    }
+
+    // ============================================================================
+    // IMAGE ENHANCEMENT METHODS
+    // ============================================================================
+
+    /**
+     * Apply image enhancements to an entire image (for batch processing)
+     */
+    async applyImageEnhancements(image: HTMLImageElement): Promise<HTMLImageElement> {
+        // Create canvas for processing
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        canvas.width = image.width;
+        canvas.height = image.height;
+        ctx!.drawImage(image, 0, 0);
+
+        // Apply all enhancements
+        await this.applyEnhancements(ctx!, canvas);
+
+        // Return enhanced image
+        return new Promise((resolve) => {
+            const enhancedImg = new Image();
+            enhancedImg.onload = () => resolve(enhancedImg);
+            enhancedImg.src = canvas.toDataURL();
+        });
+    }
+
+    /**
+     * Apply auto color correction using histogram stretching
+     */
+    applyAutoColorCorrection(imageData: ImageData): ImageData {
+        const data = imageData.data;
+        const length = data.length;
+
+        // Calculate histogram for each channel
+        const rHist = new Array(256).fill(0);
+        const gHist = new Array(256).fill(0);
+        const bHist = new Array(256).fill(0);
+
+        for (let i = 0; i < length; i += 4) {
+            rHist[data[i]]++;
+            gHist[data[i + 1]]++;
+            bHist[data[i + 2]]++;
+        }
+
+        // Calculate cumulative distribution
+        const totalPixels = length / 4;
+        const getCumulativeValue = (hist: number[], targetPercentile: number) => {
+            let cumulative = 0;
+            for (let i = 0; i < 256; i++) {
+                cumulative += hist[i];
+                if (cumulative / totalPixels >= targetPercentile) {
+                    return i;
+                }
+            }
+            return 255;
+        };
+
+        // Get 1% and 99% percentiles for each channel
+        const rMin = getCumulativeValue(rHist, 0.01);
+        const rMax = getCumulativeValue(rHist, 0.99);
+        const gMin = getCumulativeValue(gHist, 0.01);
+        const gMax = getCumulativeValue(gHist, 0.99);
+        const bMin = getCumulativeValue(bHist, 0.01);
+        const bMax = getCumulativeValue(bHist, 0.99);
+
+        // Apply histogram stretching
+        for (let i = 0; i < length; i += 4) {
+            data[i] = Math.min(255, Math.max(0, ((data[i] - rMin) / (rMax - rMin)) * 255));
+            data[i + 1] = Math.min(255, Math.max(0, ((data[i + 1] - gMin) / (gMax - gMin)) * 255));
+            data[i + 2] = Math.min(255, Math.max(0, ((data[i + 2] - bMin) / (bMax - bMin)) * 255));
+        }
+
+        return imageData;
+    }
+
+    /**
+     * Apply exposure adjustment
+     */
+    applyExposureAdjustment(imageData: ImageData, exposure: number): ImageData {
+        const data = imageData.data;
+        const exposureFactor = Math.pow(2, exposure);
+
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, data[i] * exposureFactor);
+            data[i + 1] = Math.min(255, data[i + 1] * exposureFactor);
+            data[i + 2] = Math.min(255, data[i + 2] * exposureFactor);
+        }
+
+        return imageData;
+    }
+
+    /**
+     * Apply contrast adjustment
+     */
+    applyContrastAdjustment(imageData: ImageData, contrast: number): ImageData {
+        const data = imageData.data;
+        const contrastFactor = contrast;
+
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor) + 128));
+            data[i + 1] = Math.min(255, Math.max(0, ((data[i + 1] - 128) * contrastFactor) + 128));
+            data[i + 2] = Math.min(255, Math.max(0, ((data[i + 2] - 128) * contrastFactor) + 128));
+        }
+
+        return imageData;
+    }
+
+    /**
+     * Apply sharpness using unsharp mask
+     */
+    applySharpness(imageData: ImageData, amount: number): ImageData {
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+        const outputData = new Uint8ClampedArray(data);
+
+        // Unsharp mask kernel
+        const kernel = [
+            0, -amount, 0,
+            -amount, 1 + 4 * amount, -amount,
+            0, -amount, 0
+        ];
+
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                for (let c = 0; c < 3; c++) {
+                    let sum = 0;
+                    for (let ky = -1; ky <= 1; ky++) {
+                        for (let kx = -1; kx <= 1; kx++) {
+                            const idx = ((y + ky) * width + (x + kx)) * 4 + c;
+                            sum += data[idx] * kernel[(ky + 1) * 3 + (kx + 1)];
+                        }
+                    }
+                    const outputIdx = (y * width + x) * 4 + c;
+                    outputData[outputIdx] = Math.min(255, Math.max(0, sum));
+                }
+            }
+        }
+
+        return new ImageData(outputData, width, height);
+    }
+
+    /**
+     * Apply skin smoothing using selective blur on skin tone regions
+     */
+    async applySkinSmoothing(imageData: ImageData, amount: number): Promise<ImageData> {
+        // Simple gaussian blur on skin tone regions
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+
+        // Create skin mask based on color range
+        const skinMask = new Uint8Array(width * height);
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Simple skin tone detection
+            const isSkin = (r > 60 && g > 40 && b > 20 && r > b && r > g * 0.8 && (r - g) > 15);
+            skinMask[Math.floor(i / 4)] = isSkin ? 1 : 0;
+        }
+
+        // Apply blur only to skin regions
+        const blurRadius = Math.round(amount);
+        if (blurRadius > 0) {
+            return this.applySelectiveBlur(imageData, skinMask, blurRadius);
+        }
+
+        return imageData;
+    }
+
+    /**
+     * Apply selective blur based on mask
+     */
+    applySelectiveBlur(imageData: ImageData, mask: Uint8Array, radius: number): ImageData {
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+        const outputData = new Uint8ClampedArray(data);
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = y * width + x;
+                if (mask[idx]) {
+                    let r = 0, g = 0, b = 0, count = 0;
+
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const ny = y + dy;
+                            const nx = x + dx;
+                            if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+                                const nidx = (ny * width + nx) * 4;
+                                r += data[nidx];
+                                g += data[nidx + 1];
+                                b += data[nidx + 2];
+                                count++;
+                            }
+                        }
+                    }
+
+                    const pixelIdx = idx * 4;
+                    outputData[pixelIdx] = r / count;
+                    outputData[pixelIdx + 1] = g / count;
+                    outputData[pixelIdx + 2] = b / count;
+                }
+            }
+        }
+
+        return new ImageData(outputData, width, height);
+    }
+
+    /**
+     * Apply red-eye removal
+     */
+    async applyRedEyeRemoval(imageData: ImageData): Promise<ImageData> {
+        // Simple red-eye detection and correction
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Detect red-eye: high red, low green/blue
+            if (r > 150 && r > g * 2 && r > b * 2) {
+                // Replace with more natural color
+                data[i] = Math.min(r * 0.7, g * 1.2);
+                data[i + 1] = g;
+                data[i + 2] = Math.max(b, g * 0.8);
+            }
+        }
+
+        return imageData;
+    }
+
+    /**
+     * Apply background blur (simplified implementation)
+     */
+    async applyBackgroundBlur(imageData: ImageData, blurAmount: number): Promise<ImageData> {
+        // This is a simplified background blur - in a real application,
+        // you'd want to use proper segmentation
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+
+        // Create a simple edge-based mask (assuming faces are in center)
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
+
+        const backgroundMask = new Uint8Array(width * height);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+                const isBackground = distance > maxDistance * 0.4;
+                backgroundMask[y * width + x] = isBackground ? 1 : 0;
+            }
+        }
+
+        return this.applySelectiveBlur(imageData, backgroundMask, Math.round(blurAmount));
     }
 }

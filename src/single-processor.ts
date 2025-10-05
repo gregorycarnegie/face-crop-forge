@@ -61,7 +61,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     protected contrastAdjustment!: HTMLInputElement;
     protected sharpnessControl!: HTMLInputElement;
     protected skinSmoothing!: HTMLInputElement;
-    private redEyeRemoval!: HTMLInputElement;
+    protected redEyeRemoval!: HTMLInputElement;
     protected backgroundBlur!: HTMLInputElement;
 
     constructor() {
