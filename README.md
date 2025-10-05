@@ -198,19 +198,22 @@ This runs TypeScript in watch mode alongside the Node.js server, automatically r
 ├── csv-processing.html             # CSV-driven batch operations
 ├── package.json                    # NPM dependencies and scripts
 ├── tsconfig.json                   # TypeScript configuration
-├── server.js                       # Development server
 ├── README.md                       # Project documentation
+├── .gitignore                      # Git ignore rules
 ├── assets/
 │   └── favicon.svg                 # Application favicon
 ├── css/
-│   └── styles.css                  # Global styles and responsive design
+│   ├── styles.css                  # Global styles and responsive design
+│   └── index.css                   # Landing page styles
 ├── src/                            # TypeScript source files
 │   ├── types.ts                    # TypeScript type definitions
 │   ├── base-face-cropper.ts        # Base class for face processing
 │   ├── single-processor.ts         # Single image processing
-│   ├── batch-processor.ts          # Batch processing
+│   ├── batch-processor.ts          # Multiple images batch processing
 │   ├── csv-processor.ts            # CSV batch processing
-│   └── face-detection-worker.ts    # Web Worker for face detection
+│   ├── face-detection-worker.ts    # Web Worker for face detection
+│   ├── index.ts                    # Landing page logic
+│   └── server.ts                   # Development server
 └── dist/                           # Compiled JavaScript (git-ignored)
     └── *.js                        # Auto-generated from TypeScript
 ```
