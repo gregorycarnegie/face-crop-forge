@@ -2059,6 +2059,13 @@ button:disabled {
 }
 
 /* Single Processing Page Specific Styles */
+.cropped-faces-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
 .side-by-side-container {
     display: flex;
     gap: 1rem;
