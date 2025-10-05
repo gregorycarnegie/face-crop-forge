@@ -344,6 +344,148 @@ async function processImageInWorker(
     return await createImageBitmap(canvas);
 }
 
+// Crop a face from an ImageBitmap in worker thread
+async function cropFaceInWorker(
+    bitmap: ImageBitmap,
+    cropParams: {
+        cropX: number;
+        cropY: number;
+        cropWidth: number;
+        cropHeight: number;
+        outputWidth: number;
+        outputHeight: number;
+    }
+): Promise<ImageBitmap> {
+    const { cropX, cropY, cropWidth, cropHeight, outputWidth, outputHeight } = cropParams;
+
+    // Create OffscreenCanvas for cropping
+    const canvas = new OffscreenCanvas(outputWidth, outputHeight);
+    const ctx = canvas.getContext('2d', {
+        willReadFrequently: false,
+        alpha: true
+    });
+
+    if (!ctx) {
+        throw new Error('Failed to get OffscreenCanvas context');
+    }
+
+    // High-quality rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // Crop and resize in one operation
+    ctx.drawImage(
+        bitmap,
+        cropX, cropY, cropWidth, cropHeight,
+        0, 0, outputWidth, outputHeight
+    );
+
+    // Close original bitmap to free memory
+    bitmap.close();
+
+    // Convert to ImageBitmap for transfer
+    return await createImageBitmap(canvas);
+}
+
+// Apply image enhancements in worker thread
+async function enhanceImageInWorker(
+    bitmap: ImageBitmap,
+    enhancements: {
+        autoColorCorrection?: boolean;
+        exposure?: number;
+        contrast?: number;
+        sharpness?: number;
+        skinSmoothing?: number;
+        backgroundBlur?: number;
+    }
+): Promise<ImageBitmap> {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    if (!ctx) {
+        throw new Error('Failed to get OffscreenCanvas context');
+    }
+
+    // Draw original image
+    ctx.drawImage(bitmap, 0, 0);
+
+    // Get image data for pixel manipulation
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    // Apply auto color correction
+    if (enhancements.autoColorCorrection) {
+        applyAutoColorCorrection(data);
+    }
+
+    // Apply exposure adjustment
+    if (enhancements.exposure && enhancements.exposure !== 0) {
+        const exposureFactor = Math.pow(2, enhancements.exposure);
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.min(255, data[i] * exposureFactor);
+            data[i + 1] = Math.min(255, data[i + 1] * exposureFactor);
+            data[i + 2] = Math.min(255, data[i + 2] * exposureFactor);
+        }
+    }
+
+    // Apply contrast adjustment
+    if (enhancements.contrast && enhancements.contrast !== 1) {
+        const factor = enhancements.contrast;
+        const intercept = 128 * (1 - factor);
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.max(0, Math.min(255, data[i] * factor + intercept));
+            data[i + 1] = Math.max(0, Math.min(255, data[i + 1] * factor + intercept));
+            data[i + 2] = Math.max(0, Math.min(255, data[i + 2] * factor + intercept));
+        }
+    }
+
+    // Put enhanced data back
+    ctx.putImageData(imageData, 0, 0);
+
+    // Apply sharpness if needed (using canvas filter for performance)
+    if (enhancements.sharpness && enhancements.sharpness > 0) {
+        ctx.filter = `contrast(${1 + enhancements.sharpness * 0.1})`;
+        ctx.drawImage(canvas, 0, 0);
+        ctx.filter = 'none';
+    }
+
+    // Close original bitmap
+    bitmap.close();
+
+    // Return enhanced ImageBitmap
+    return await createImageBitmap(canvas);
+}
+
+// Auto color correction helper
+function applyAutoColorCorrection(data: Uint8ClampedArray): void {
+    let rSum = 0, gSum = 0, bSum = 0;
+    const pixelCount = data.length / 4;
+
+    // Calculate averages
+    for (let i = 0; i < data.length; i += 4) {
+        rSum += data[i];
+        gSum += data[i + 1];
+        bSum += data[i + 2];
+    }
+
+    const rAvg = rSum / pixelCount;
+    const gAvg = gSum / pixelCount;
+    const bAvg = bSum / pixelCount;
+    const overallAvg = (rAvg + gAvg + bAvg) / 3;
+
+    // Calculate correction factors
+    const rFactor = overallAvg / rAvg;
+    const gFactor = overallAvg / gAvg;
+    const bFactor = overallAvg / bAvg;
+
+    // Apply correction
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.min(255, data[i] * rFactor);
+        data[i + 1] = Math.min(255, data[i + 1] * gFactor);
+        data[i + 2] = Math.min(255, data[i + 2] * bFactor);
+    }
+}
+
 // Message handler
 self.onmessage = async function(e: MessageEvent<WorkerMessage>): Promise<void> {
     const { type, data, id } = e.data;
@@ -400,6 +542,51 @@ self.onmessage = async function(e: MessageEvent<WorkerMessage>): Promise<void> {
                     success: true,
                     bitmap: processedBitmap
                 }, { transfer: [processedBitmap] } as any);
+                break;
+
+            case 'cropFace':
+                if (!data || !data.imageBitmap) {
+                    throw new Error('No ImageBitmap provided for cropping');
+                }
+
+                const cropParams = data.options as any;
+                if (!cropParams) {
+                    throw new Error('No crop parameters provided');
+                }
+
+                // Crop face in worker thread using OffscreenCanvas
+                const croppedBitmap = await cropFaceInWorker(
+                    data.imageBitmap,
+                    cropParams
+                );
+
+                self.postMessage({
+                    type: 'faceCropped',
+                    id: id,
+                    success: true,
+                    bitmap: croppedBitmap
+                }, { transfer: [croppedBitmap] } as any);
+                break;
+
+            case 'enhanceImage':
+                if (!data || !data.imageBitmap) {
+                    throw new Error('No ImageBitmap provided for enhancement');
+                }
+
+                const enhancements = (data.options || {}) as any;
+
+                // Enhance image in worker thread
+                const enhancedBitmap = await enhanceImageInWorker(
+                    data.imageBitmap,
+                    enhancements
+                );
+
+                self.postMessage({
+                    type: 'imageEnhanced',
+                    id: id,
+                    success: true,
+                    bitmap: enhancedBitmap
+                }, { transfer: [enhancedBitmap] } as any);
                 break;
 
             default:

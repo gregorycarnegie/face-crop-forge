@@ -1810,7 +1810,7 @@ export class BaseFaceCropper {
             this.faceDetectionWorker = new Worker('dist/face-detection-worker.js');
 
             this.faceDetectionWorker.onmessage = (e) => {
-                const { type, data, id, success, faces, error } = e.data;
+                const { type, data, id, success, faces, error, bitmap } = e.data;
 
                 switch (type) {
                     case 'initialized':
@@ -1827,8 +1827,33 @@ export class BaseFaceCropper {
                         this.handleWorkerDetectionResult(id, faces);
                         break;
 
+                    case 'faceCropped':
+                    case 'imageEnhanced':
+                    case 'imageProcessed':
+                        // Handle ImageBitmap responses
+                        if (this.workerCallbacks && this.workerCallbacks.has(id)) {
+                            const callback = this.workerCallbacks.get(id);
+                            if (callback) {
+                                this.workerCallbacks.delete(id);
+                                if (success && bitmap) {
+                                    callback.resolve(bitmap);
+                                } else {
+                                    callback.reject(new Error(error || 'Worker operation failed'));
+                                }
+                            }
+                        }
+                        break;
+
                     case 'error':
                         this.addToDetailedErrorLog(`Worker error for task ${id}`, (error as Error).message, 'critical');
+                        // Reject any pending callback
+                        if (this.workerCallbacks && this.workerCallbacks.has(id)) {
+                            const callback = this.workerCallbacks.get(id);
+                            if (callback) {
+                                this.workerCallbacks.delete(id);
+                                callback.reject(new Error(error || 'Worker error'));
+                            }
+                        }
                         break;
                 }
             };
@@ -1911,6 +1936,120 @@ export class BaseFaceCropper {
                 resolve(faces);
             }
         }
+    }
+
+    // Crop face using worker thread with ImageBitmap
+    async cropFaceWithWorker(
+        image: HTMLImageElement,
+        cropParams: {
+            cropX: number;
+            cropY: number;
+            cropWidth: number;
+            cropHeight: number;
+            outputWidth: number;
+            outputHeight: number;
+        }
+    ): Promise<ImageBitmap> {
+        return new Promise(async (resolve, reject) => {
+            if (!this.workerInitialized || !this.faceDetectionWorker) {
+                reject(new Error('Worker not initialized'));
+                return;
+            }
+
+            try {
+                // Create ImageBitmap from image
+                const bitmap = await createImageBitmap(image);
+
+                const requestId = `crop_${Date.now()}_${Math.random()}`;
+
+                // Store callback
+                if (!this.workerCallbacks) {
+                    this.workerCallbacks = new Map();
+                }
+
+                this.workerCallbacks.set(requestId, {
+                    resolve: resolve as any,
+                    reject
+                });
+
+                // Send to worker
+                this.faceDetectionWorker.postMessage({
+                    type: 'cropFace',
+                    id: requestId,
+                    data: {
+                        imageBitmap: bitmap,
+                        options: cropParams
+                    }
+                }, [bitmap]);
+
+                // Timeout
+                setTimeout(() => {
+                    if (this.workerCallbacks!.has(requestId)) {
+                        this.workerCallbacks!.delete(requestId);
+                        reject(new Error('Worker crop timeout'));
+                    }
+                }, 30000);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    // Enhance image using worker thread with ImageBitmap
+    async enhanceImageWithWorker(
+        image: HTMLImageElement,
+        enhancements: {
+            autoColorCorrection?: boolean;
+            exposure?: number;
+            contrast?: number;
+            sharpness?: number;
+            skinSmoothing?: number;
+            backgroundBlur?: number;
+        }
+    ): Promise<ImageBitmap> {
+        return new Promise(async (resolve, reject) => {
+            if (!this.workerInitialized || !this.faceDetectionWorker) {
+                reject(new Error('Worker not initialized'));
+                return;
+            }
+
+            try {
+                // Create ImageBitmap from image
+                const bitmap = await createImageBitmap(image);
+
+                const requestId = `enhance_${Date.now()}_${Math.random()}`;
+
+                // Store callback
+                if (!this.workerCallbacks) {
+                    this.workerCallbacks = new Map();
+                }
+
+                this.workerCallbacks.set(requestId, {
+                    resolve: resolve as any,
+                    reject
+                });
+
+                // Send to worker
+                this.faceDetectionWorker.postMessage({
+                    type: 'enhanceImage',
+                    id: requestId,
+                    data: {
+                        imageBitmap: bitmap,
+                        options: enhancements
+                    }
+                }, [bitmap]);
+
+                // Timeout
+                setTimeout(() => {
+                    if (this.workerCallbacks!.has(requestId)) {
+                        this.workerCallbacks!.delete(requestId);
+                        reject(new Error('Worker enhancement timeout'));
+                    }
+                }, 30000);
+            } catch (error) {
+                reject(error);
+            }
+        });
     }
 
     // Enhanced Face Detection with Retry Logic

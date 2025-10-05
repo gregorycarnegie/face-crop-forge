@@ -2140,70 +2140,186 @@ class FaceCropper extends BaseFaceCropper {
             sourceImage = imageData.enhancedImage;
         }
 
-        // Create temporary canvas for processing
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCanvas.width = sourceImage.width;
-        tempCanvas.height = sourceImage.height;
-        tempCtx!.drawImage(sourceImage, 0, 0);
+        // Use worker-based cropping if available
+        const useWorker = this.enableWebWorkers?.checked && this.workerInitialized;
 
-        // Create crop canvas
-        const cropCanvas = document.createElement('canvas');
-        const cropCtx = cropCanvas.getContext('2d');
-        cropCanvas.width = outputWidth;
-        cropCanvas.height = outputHeight;
+        if (useWorker) {
+            // Worker-based cropping (fast, off main thread)
+            for (let i = 0; i < selectedFaces.length; i++) {
+                const face = selectedFaces[i];
 
-        for (let i = 0; i < selectedFaces.length; i++) {
-            const face = selectedFaces[i];
+                // Calculate target face height and scale
+                const targetFaceHeight = outputHeight * faceHeightPct;
+                const scale = targetFaceHeight / face.height;
 
-            // Calculate target face height and scale
-            const targetFaceHeight = outputHeight * faceHeightPct;
-            const scale = targetFaceHeight / face.height;
+                // Calculate crop dimensions
+                const cropWidthSrc = outputWidth / scale;
+                const cropHeightSrc = outputHeight / scale;
 
-            // Calculate crop dimensions
-            const cropWidthSrc = outputWidth / scale;
-            const cropHeightSrc = outputHeight / scale;
+                // Calculate face position based on positioning mode
+                const { cropX, cropY } = this.calculateSmartCropPosition(
+                    face, cropWidthSrc, cropHeightSrc, sourceImage.width, sourceImage.height
+                );
 
-            // Calculate face position based on positioning mode
-            const { cropX, cropY } = this.calculateSmartCropPosition(
-                face, cropWidthSrc, cropHeightSrc, sourceImage.width, sourceImage.height
-            );
+                const finalCropWidth = Math.min(cropWidthSrc, sourceImage.width - cropX);
+                const finalCropHeight = Math.min(cropHeightSrc, sourceImage.height - cropY);
 
-            const finalCropWidth = Math.min(cropWidthSrc, sourceImage.width - cropX);
-            const finalCropHeight = Math.min(cropHeightSrc, sourceImage.height - cropY);
+                try {
+                    // Crop in worker thread using ImageBitmap
+                    const croppedBitmap = await this.cropFaceWithWorker(sourceImage, {
+                        cropX,
+                        cropY,
+                        cropWidth: finalCropWidth,
+                        cropHeight: finalCropHeight,
+                        outputWidth,
+                        outputHeight
+                    });
 
-            // Crop and resize
-            cropCtx!.drawImage(
-                tempCanvas,
-                cropX, cropY, finalCropWidth, finalCropHeight,
-                0, 0, outputWidth, outputHeight
-            );
+                    // Convert ImageBitmap to DataURL for compatibility
+                    const canvas = document.createElement('canvas');
+                    canvas.width = outputWidth;
+                    canvas.height = outputHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx!.drawImage(croppedBitmap, 0, 0);
+                    croppedBitmap.close(); // Free memory
 
-            // Generate image with selected format and quality
-            const format = this.outputFormat.value;
-            const quality = format === 'jpeg' ? parseInt(this.jpegQuality.value) / 100 : 1.0;
+                    const format = this.outputFormat.value;
+                    const quality = format === 'jpeg' ? parseInt(this.jpegQuality.value) / 100 : 1.0;
 
-            let mimeType = 'image/png';
-            if (format === 'jpeg') mimeType = 'image/jpeg';
-            if (format === 'webp') mimeType = 'image/webp';
+                    let mimeType = 'image/png';
+                    if (format === 'jpeg') mimeType = 'image/jpeg';
+                    if (format === 'webp') mimeType = 'image/webp';
 
-            const croppedDataUrl = cropCanvas.toDataURL(mimeType, quality);
+                    const croppedDataUrl = canvas.toDataURL(mimeType, quality);
+                    const filename = this.generateBatchFilename(imageData.file.name, face.index, outputWidth, outputHeight);
 
-            // Generate filename using template
-            const filename = this.generateBatchFilename(imageData.file.name, face.index, outputWidth, outputHeight);
+                    results.push({
+                        dataUrl: croppedDataUrl,
+                        faceIndex: face.index,
+                        faceId: face.id,
+                        sourceImage: imageData.file.name,
+                        filename: filename,
+                        format: format,
+                        quality: format === 'jpeg' ? parseInt(this.jpegQuality.value) : 100
+                    });
+                } catch (error) {
+                    console.error('Worker cropping failed, falling back to main thread:', error);
+                    // Fall back to main thread cropping for this face
+                    const result = await this.cropFaceOnMainThread(sourceImage, face, imageData.file.name, outputWidth, outputHeight, faceHeightPct);
+                    results.push(result);
+                }
+            }
+        } else {
+            // Main thread cropping (fallback)
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = sourceImage.width;
+            tempCanvas.height = sourceImage.height;
+            tempCtx!.drawImage(sourceImage, 0, 0);
 
-            results.push({
-                dataUrl: croppedDataUrl,
-                faceIndex: face.index,
-                faceId: face.id,
-                sourceImage: imageData.file.name,
-                filename: filename,
-                format: format,
-                quality: format === 'jpeg' ? parseInt(this.jpegQuality.value) : 100
-            });
+            const cropCanvas = document.createElement('canvas');
+            const cropCtx = cropCanvas.getContext('2d');
+            cropCanvas.width = outputWidth;
+            cropCanvas.height = outputHeight;
+
+            for (let i = 0; i < selectedFaces.length; i++) {
+                const face = selectedFaces[i];
+
+                // Calculate target face height and scale
+                const targetFaceHeight = outputHeight * faceHeightPct;
+                const scale = targetFaceHeight / face.height;
+
+                // Calculate crop dimensions
+                const cropWidthSrc = outputWidth / scale;
+                const cropHeightSrc = outputHeight / scale;
+
+                // Calculate face position based on positioning mode
+                const { cropX, cropY } = this.calculateSmartCropPosition(
+                    face, cropWidthSrc, cropHeightSrc, sourceImage.width, sourceImage.height
+                );
+
+                const finalCropWidth = Math.min(cropWidthSrc, sourceImage.width - cropX);
+                const finalCropHeight = Math.min(cropHeightSrc, sourceImage.height - cropY);
+
+                // Crop and resize
+                cropCtx!.drawImage(
+                    tempCanvas,
+                    cropX, cropY, finalCropWidth, finalCropHeight,
+                    0, 0, outputWidth, outputHeight
+                );
+
+                // Generate image with selected format and quality
+                const format = this.outputFormat.value;
+                const quality = format === 'jpeg' ? parseInt(this.jpegQuality.value) / 100 : 1.0;
+
+                let mimeType = 'image/png';
+                if (format === 'jpeg') mimeType = 'image/jpeg';
+                if (format === 'webp') mimeType = 'image/webp';
+
+                const croppedDataUrl = cropCanvas.toDataURL(mimeType, quality);
+
+                // Generate filename using template
+                const filename = this.generateBatchFilename(imageData.file.name, face.index, outputWidth, outputHeight);
+
+                results.push({
+                    dataUrl: croppedDataUrl,
+                    faceIndex: face.index,
+                    faceId: face.id,
+                    sourceImage: imageData.file.name,
+                    filename: filename,
+                    format: format,
+                    quality: format === 'jpeg' ? parseInt(this.jpegQuality.value) : 100
+                });
+            }
         }
 
         return results;
+    }
+
+    // Helper method for main thread cropping fallback
+    private async cropFaceOnMainThread(sourceImage: HTMLImageElement, face: any, fileName: string, outputWidth: number, outputHeight: number, faceHeightPct: number) {
+        const targetFaceHeight = outputHeight * faceHeightPct;
+        const scale = targetFaceHeight / face.height;
+        const cropWidthSrc = outputWidth / scale;
+        const cropHeightSrc = outputHeight / scale;
+
+        const { cropX, cropY } = this.calculateSmartCropPosition(
+            face, cropWidthSrc, cropHeightSrc, sourceImage.width, sourceImage.height
+        );
+
+        const finalCropWidth = Math.min(cropWidthSrc, sourceImage.width - cropX);
+        const finalCropHeight = Math.min(cropHeightSrc, sourceImage.height - cropY);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = outputWidth;
+        canvas.height = outputHeight;
+        const ctx = canvas.getContext('2d');
+
+        ctx!.drawImage(
+            sourceImage,
+            cropX, cropY, finalCropWidth, finalCropHeight,
+            0, 0, outputWidth, outputHeight
+        );
+
+        const format = this.outputFormat.value;
+        const quality = format === 'jpeg' ? parseInt(this.jpegQuality.value) / 100 : 1.0;
+
+        let mimeType = 'image/png';
+        if (format === 'jpeg') mimeType = 'image/jpeg';
+        if (format === 'webp') mimeType = 'image/webp';
+
+        const croppedDataUrl = canvas.toDataURL(mimeType, quality);
+        const filename = this.generateBatchFilename(fileName, face.index, outputWidth, outputHeight);
+
+        return {
+            dataUrl: croppedDataUrl,
+            faceIndex: face.index,
+            faceId: face.id,
+            sourceImage: fileName,
+            filename: filename,
+            format: format,
+            quality: format === 'jpeg' ? parseInt(this.jpegQuality.value) : 100
+        };
     }
 
     override async downloadAllResults() {

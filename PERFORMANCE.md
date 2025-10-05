@@ -6,22 +6,40 @@ This document describes the performance optimizations implemented in Face Crop F
 
 ### 1. OffscreenCanvas in Web Worker
 
-All image rotation and resizing operations are now performed inside the Web Worker using OffscreenCanvas:
+All image operations including rotation, resizing, **cropping**, and **enhancement** are now performed inside the Web Worker using OffscreenCanvas:
 
-- **Zero main thread blocking** - Heavy image transformations happen entirely off the main thread
-- **Batch processing** - Process multiple images without UI jank
+- **Zero main thread blocking** - ALL heavy image operations happen off the main thread
+- **Batch processing** - Process hundreds of crops without UI jank
 - **GPU acceleration** - OffscreenCanvas can leverage GPU when available
 
-**Implementation**: See `src/face-detection-worker.ts` → `processImageInWorker()`
+**Implementation**: See `src/face-detection-worker.ts` → `processImageInWorker()`, `cropFaceInWorker()`, `enhanceImageInWorker()`
 
 ```typescript
-// Worker handles rotation, flipping, and resizing using OffscreenCanvas
+// Worker handles rotation, flipping, and resizing
 const processedBitmap = await processImageInWorker(imageBitmap, {
     width: 512,
     height: 512,
     rotation: 90,
     flipH: false,
     flipV: false
+});
+
+// Worker handles face cropping (NEW!)
+const croppedBitmap = await cropFaceInWorker(imageBitmap, {
+    cropX: 100,
+    cropY: 150,
+    cropWidth: 200,
+    cropHeight: 200,
+    outputWidth: 512,
+    outputHeight: 512
+});
+
+// Worker handles image enhancements (NEW!)
+const enhancedBitmap = await enhanceImageInWorker(imageBitmap, {
+    autoColorCorrection: true,
+    exposure: 0.5,
+    contrast: 1.2,
+    sharpness: 0.8
 });
 ```
 
@@ -129,6 +147,8 @@ All transformations happen in the worker:
 - Rotation
 - Flipping (horizontal/vertical)
 - Resizing
+- **Face cropping** (NEW!)
+- **Image enhancement** (auto color, exposure, contrast, sharpness) (NEW!)
 - Quality adjustments
 
 The main thread only receives the final processed ImageBitmap.
@@ -139,8 +159,9 @@ Potential improvements for consideration:
 
 1. **Batch ImageBitmap creation** - Create multiple bitmaps in parallel
 2. **Worker pool** - Multiple workers for CPU parallelism
-3. **Offscreen face cropping** - Move cropping operations to worker
-4. **WebGPU integration** - GPU compute for image processing (experimental)
+3. ~~**Offscreen face cropping**~~ ✅ **DONE!**
+4. ~~**Offscreen enhancement**~~ ✅ **DONE!**
+5. **WebGPU integration** - GPU compute for image processing (experimental)
 
 ## Monitoring Performance
 
