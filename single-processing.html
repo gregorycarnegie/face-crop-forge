@@ -54,11 +54,6 @@
                 </label>
             </div>
 
-            <div class="batch-controls">
-                <button id="processImageBtn" disabled>Process Image</button>
-                <button id="clearImageBtn" disabled>Clear Image</button>
-                <button id="downloadResultsBtn" disabled>Download Results</button>
-            </div>
         </header>
 
         <div class="app-body">
@@ -341,15 +336,20 @@
                                     <span>Selected: <span id="selectedFaceCount">0</span></span>
                                 </div>
                                 <div class="face-selection-controls">
-                                    <button id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
-                                    <button id="selectNoneFacesBtn" class="small-btn">Select None</button>
                                     <button id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
+                                    <button id="selectAllFacesBtn" class="small-btn">Select All</button>
+                                    <button id="selectNoneFacesBtn" class="small-btn">Select None</button>
+                                    <button id="processImageBtn" class="small-btn primary" disabled>Process Selected</button>
+                                    <button id="clearImageBtn" class="small-btn" disabled>Clear Image</button>
                                 </div>
                             </div>
                         </div>
 
                         <div class="cropped-faces workspace-card" id="croppedFaces">
-                            <h3>Cropped Faces:</h3>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3>Cropped Faces:</h3>
+                                <button id="downloadResultsBtn" class="small-btn primary" disabled>Download Results</button>
+                            </div>
                             <div id="croppedContainer"></div>
                         </div>
                     </div>

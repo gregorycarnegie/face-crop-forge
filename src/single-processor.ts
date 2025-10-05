@@ -307,22 +307,123 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         if (!this.faces.length || !this.currentImage) return;
 
         const canvas = this.inputCanvas;
-        const scaleX = canvas.width / this.currentImage.width;
-        const scaleY = canvas.height / this.currentImage.height;
+        // Use uniform scale like the display image does
+        const scale = canvas.width / this.currentImage.width;
 
         this.faces.forEach((face) => {
             const box = face.box!;
             const overlay = document.createElement('div');
-            overlay.className = `face-overlay ${this.selectedFaces.has(face.id) ? 'selected' : ''}`;
-            overlay.style.left = (box.xMin * scaleX) + 'px';
-            overlay.style.top = (box.yMin * scaleY) + 'px';
-            overlay.style.width = (box.width * scaleX) + 'px';
-            overlay.style.height = (box.height * scaleY) + 'px';
+            overlay.className = 'face-box';
+            overlay.style.left = (box.xMin * scale) + 'px';
+            overlay.style.top = (box.yMin * scale) + 'px';
+            overlay.style.width = (box.width * scale) + 'px';
+            overlay.style.height = (box.height * scale) + 'px';
+
+            if (this.selectedFaces.has(face.id)) {
+                overlay.classList.add('selected');
+            } else {
+                overlay.classList.add('unselected');
+            }
 
             overlay.addEventListener('click', () => this.toggleFaceSelection(face.id));
 
+            // Add resize handles for interactive manipulation
+            const handles = ['nw', 'ne', 'sw', 'se'].map(pos => {
+                const handle = document.createElement('div');
+                handle.className = `resize-handle ${pos}`;
+                handle.dataset.position = pos;
+                handle.addEventListener('mousedown', (e) => this.startResize(e, face.id));
+                return handle;
+            });
+
+            handles.forEach(handle => overlay.appendChild(handle));
+
             this.faceOverlays.appendChild(overlay);
         });
+    }
+
+    private startResize(e: MouseEvent, faceId: string | number): void {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const target = e.target as HTMLElement;
+        const overlay = target.parentElement;
+        if (!overlay) return;
+
+        const face = this.faces.find(f => f.id === faceId);
+        if (!face || !face.box) return;
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startLeft = overlay.offsetLeft;
+        const startTop = overlay.offsetTop;
+        const startWidth = overlay.offsetWidth;
+        const startHeight = overlay.offsetHeight;
+        const position = target.dataset.position;
+
+        const canvas = this.inputCanvas;
+        // Use uniform scale like the display image does
+        const scale = canvas.width / this.currentImage!.width;
+
+        const handleResize = (moveEvent: MouseEvent) => {
+            const dx = moveEvent.clientX - startX;
+            const dy = moveEvent.clientY - startY;
+
+            let newLeft = startLeft;
+            let newTop = startTop;
+            let newWidth = startWidth;
+            let newHeight = startHeight;
+
+            switch (position) {
+                case 'nw':
+                    newLeft = startLeft + dx;
+                    newTop = startTop + dy;
+                    newWidth = startWidth - dx;
+                    newHeight = startHeight - dy;
+                    break;
+                case 'ne':
+                    newTop = startTop + dy;
+                    newWidth = startWidth + dx;
+                    newHeight = startHeight - dy;
+                    break;
+                case 'sw':
+                    newLeft = startLeft + dx;
+                    newWidth = startWidth - dx;
+                    newHeight = startHeight + dy;
+                    break;
+                case 'se':
+                    newWidth = startWidth + dx;
+                    newHeight = startHeight + dy;
+                    break;
+            }
+
+            // Enforce minimum size
+            const minSize = 20;
+            if (newWidth >= minSize && newHeight >= minSize) {
+                overlay.style.left = newLeft + 'px';
+                overlay.style.top = newTop + 'px';
+                overlay.style.width = newWidth + 'px';
+                overlay.style.height = newHeight + 'px';
+
+                // Update the face box coordinates using uniform scale
+                face.box!.xMin = newLeft / scale;
+                face.box!.yMin = newTop / scale;
+                face.box!.width = newWidth / scale;
+                face.box!.height = newHeight / scale;
+                face.x = face.box!.xMin;
+                face.y = face.box!.yMin;
+                face.width = face.box!.width;
+                face.height = face.box!.height;
+            }
+        };
+
+        const stopResize = () => {
+            document.removeEventListener('mousemove', handleResize);
+            document.removeEventListener('mouseup', stopResize);
+        };
+
+        document.addEventListener('mousemove', handleResize);
+        document.addEventListener('mouseup', stopResize);
     }
 
     private clearFaceOverlays(): void {
@@ -398,7 +499,46 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     }
 
     private async cropCurrentFace(face: FaceData): Promise<HTMLCanvasElement> {
-        return super.cropFace(this.currentImage!, face as any);
+        const settings = this.getSettings();
+        const box = face.box!;
+
+        // Calculate how much to scale based on face height percentage
+        const faceHeight = settings.outputHeight * (settings.faceHeightPct / 100);
+        const scale = faceHeight / box.height;
+
+        // Calculate crop dimensions maintaining aspect ratio
+        let cropWidth = settings.outputWidth / scale;
+        let cropHeight = settings.outputHeight / scale;
+
+        // Center the crop on the face box (no extra positioning logic for manual adjustments)
+        let centerX = box.xMin + (box.width / 2);
+        let centerY = box.yMin + (box.height / 2);
+
+        let cropX = centerX - (cropWidth / 2);
+        let cropY = centerY - (cropHeight / 2);
+
+        // Clamp to image boundaries
+        cropX = Math.max(0, Math.min(cropX, this.currentImage!.width - cropWidth));
+        cropY = Math.max(0, Math.min(cropY, this.currentImage!.height - cropHeight));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = settings.outputWidth;
+        canvas.height = settings.outputHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        if (!ctx) {
+            throw new Error('Failed to get canvas 2d context');
+        }
+
+        ctx.drawImage(
+            this.currentImage!,
+            cropX, cropY, cropWidth, cropHeight,
+            0, 0, settings.outputWidth, settings.outputHeight
+        );
+
+        await this.applyEnhancements(ctx, canvas);
+
+        return canvas;
     }
 
     private displayResults(results: CroppedResult[]): void {

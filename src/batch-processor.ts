@@ -576,10 +576,6 @@ class FaceCropper extends BaseFaceCropper {
         }
     }
 
-    // undo(), redo(), saveState(), and saveCurrentStateToRedo() inherited from BaseFaceCropper
-
-
-
     // Override updateDarkModeButton for batch-specific implementation
     protected updateDarkModeButton(): void {
         const icon = this.isDarkMode ? '☀️' : '🌙';
@@ -595,7 +591,6 @@ class FaceCropper extends BaseFaceCropper {
         super.loadThemePreference();
         this.updateDarkModeButton();
     }
-
 
     setupDragAndDrop() {
         const uploadCard = document.querySelector('.upload-card');
@@ -1630,8 +1625,6 @@ class FaceCropper extends BaseFaceCropper {
         }
     }
 
-    // Memory management methods inherited from BaseFaceCropper
-
     async handleMultipleImageUploadProduction(event: Event) {
         const target = event.target as HTMLInputElement;
         const files = Array.from(target?.files || []) as File[];
@@ -1646,8 +1639,6 @@ class FaceCropper extends BaseFaceCropper {
             await this.handleStandardImageBatch(files);
         }
     }
-
-    // Lazy loading methods inherited from BaseFaceCropper
 
     async handleStandardImageBatch(files: File[]) {
         await this.loadImagePage(files, 0);
@@ -1877,9 +1868,6 @@ class FaceCropper extends BaseFaceCropper {
         this.status!.className = `status ${type}`;
     }
 
-
-    // updateAspectRatioDisplay inherited from BaseFaceCropper
-
     updateFormatControls() {
         const format = this.outputFormat.value;
         if (format === 'jpeg') {
@@ -1922,7 +1910,6 @@ class FaceCropper extends BaseFaceCropper {
         }
     }
 
-
     handleDimensionChange(changedDimension: string) {
         if (this.aspectRatioLocked) {
             if (changedDimension === 'width') {
@@ -1946,8 +1933,6 @@ class FaceCropper extends BaseFaceCropper {
         this.updatePreview();
     }
 
-    // findMatchingPreset inherited from BaseFaceCropper
-
     updatePositioningControls() {
         const mode = this.positioningMode.value;
         if (mode === 'custom' || mode === 'rule-of-thirds') {
@@ -1957,8 +1942,6 @@ class FaceCropper extends BaseFaceCropper {
         }
         this.updatePreview();
     }
-
-    // updateOffsetDisplay and updateOffsetDisplays inherited from BaseFaceCropper
 
     applySettingsToAll() {
         // Get current settings
@@ -2273,7 +2256,6 @@ class FaceCropper extends BaseFaceCropper {
 
     }
 
-
     // Face selection and overlay methods
     async detectCurrentImageFaces() {
         // For now, we'll work with a selected image from gallery
@@ -2298,7 +2280,7 @@ class FaceCropper extends BaseFaceCropper {
         }
     }
 
-    // Override base createFaceOverlay to add resize handles and individual download
+    // Override base createFaceOverlay to add individual download
     createFaceOverlay(face: any, scale: number) {
         const faceBox = document.createElement('div');
         faceBox.className = 'face-box';
@@ -2340,15 +2322,6 @@ class FaceCropper extends BaseFaceCropper {
         quality.className = `face-quality ${face.quality.level}`;
         quality.textContent = face.quality.level.toUpperCase();
 
-        // Create resize handles
-        const handles = ['nw', 'ne', 'sw', 'se'].map(pos => {
-            const handle = document.createElement('div');
-            handle.className = `resize-handle ${pos}`;
-            handle.dataset.position = pos;
-            handle.addEventListener('mousedown', (e) => this.startResize(e, face.id));
-            return handle;
-        });
-
         // Add click to select
         faceBox.addEventListener('click', () => this.toggleFaceSelection(face.id));
 
@@ -2370,7 +2343,6 @@ class FaceCropper extends BaseFaceCropper {
         faceBox.appendChild(index);
         faceBox.appendChild(confidence);
         faceBox.appendChild(quality);
-        handles.forEach(handle => faceBox.appendChild(handle));
 
         this.faceOverlays.appendChild(faceBox);
     }
@@ -2428,14 +2400,6 @@ class FaceCropper extends BaseFaceCropper {
         if (imageData) {
             this.displayImageWithFaceOverlays(imageData);
         }
-    }
-
-    startResize(e: MouseEvent, faceId: string) {
-        e.preventDefault();
-        e.stopPropagation();
-        // Basic resize functionality - can be expanded
-        const target = e.target as HTMLElement;
-        console.log('Resize started for face:', faceId, 'handle:', target?.dataset?.position);
     }
 
     async cropFacesFromImageData(imageData: any) {
@@ -2565,8 +2529,6 @@ class FaceCropper extends BaseFaceCropper {
         // Call the base class method with the current image
         await super.downloadIndividualFace(faceId, currentImage);
     }
-
-    // cropSingleFace inherited from BaseFaceCropper
 
     clearAll() {
         // Clean up object URLs
