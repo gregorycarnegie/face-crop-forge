@@ -1,5 +1,5 @@
 {
-  "name": "opencv-face-crop",
+  "name": "face-crop-forge",
   "version": "1.2.0",
   "description": "Face detection and cropping tool using MediaPipe",
   "type": "module",

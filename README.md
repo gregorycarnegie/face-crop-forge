@@ -1,4 +1,4 @@
-# Face Cropping Tool
+# Face Crop Forge
 
 A powerful, client-side face detection and cropping application built with MediaPipe Tasks Vision. This tool provides multiple processing modes to handle everything from single images to large batch operations, all running entirely in your browser for maximum privacy and performance.
 
@@ -43,7 +43,7 @@ A powerful, client-side face detection and cropping application built with Media
 
    ```bash
    git clone <repository-url>
-   cd opencv-face-crop
+   cd face-crop-forge
    ```
 
 2. **Install dependencies**
