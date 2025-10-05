@@ -310,12 +310,17 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         // Use uniform scale like the display image does
         const scale = canvas.width / this.currentImage.width;
 
+        const panelContent = this.inputCanvas.parentElement!;
+        const style = getComputedStyle(panelContent);
+        const paddingLeft = parseFloat(style.paddingLeft);
+        const paddingTop = parseFloat(style.paddingTop);
+
         this.faces.forEach((face) => {
             const box = face.box!;
             const overlay = document.createElement('div');
             overlay.className = 'face-box';
-            overlay.style.left = (box.xMin * scale) + 'px';
-            overlay.style.top = (box.yMin * scale) + 'px';
+            overlay.style.left = ((box.xMin * scale) + paddingLeft) + 'px';
+            overlay.style.top = ((box.yMin * scale) + paddingTop) + 'px';
             overlay.style.width = (box.width * scale) + 'px';
             overlay.style.height = (box.height * scale) + 'px';
 
@@ -365,6 +370,11 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         // Use uniform scale like the display image does
         const scale = canvas.width / this.currentImage!.width;
 
+        const panelContent = this.inputCanvas.parentElement!;
+        const style = getComputedStyle(panelContent);
+        const paddingLeft = parseFloat(style.paddingLeft);
+        const paddingTop = parseFloat(style.paddingTop);
+
         const handleResize = (moveEvent: MouseEvent) => {
             const dx = moveEvent.clientX - startX;
             const dy = moveEvent.clientY - startY;
@@ -406,8 +416,8 @@ class SingleImageFaceCropper extends BaseFaceCropper {
                 overlay.style.height = newHeight + 'px';
 
                 // Update the face box coordinates using uniform scale
-                face.box!.xMin = newLeft / scale;
-                face.box!.yMin = newTop / scale;
+                face.box!.xMin = (newLeft - paddingLeft) / scale;
+                face.box!.yMin = (newTop - paddingTop) / scale;
                 face.box!.width = newWidth / scale;
                 face.box!.height = newHeight / scale;
                 face.x = face.box!.xMin;
