@@ -1950,6 +1950,137 @@ button:disabled {
     animation: pulse 1s ease-in-out infinite;
 }
 
+/* CSV Processing Page Specific Styles */
+.file-selection-area {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.file-selection-area.drag-over {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.file-label.secondary {
+    background-color: #6c757d;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.file-label.secondary:hover {
+    background-color: #5a6268;
+}
+
+.file-matching-info {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.csv-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.csv-preview-table th,
+.csv-preview-table td {
+    border: 1px solid #ddd;
+    padding: 0.5rem;
+    text-align: left;
+}
+
+.csv-preview-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+.mapping-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: end;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+}
+
+.mapping-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 200px;
+}
+
+.mapping-group label {
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.mapping-group select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.gallery-lazy-loading {
+    grid-column: 1 / -1;
+    padding: 2rem;
+    text-align: center;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    margin: 1rem 0;
+    background-color: #f8f9fa;
+}
+
+.lazy-loading-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.lazy-loading-content span {
+    font-size: 1.1rem;
+    color: #6c757d;
+}
+
+.lazy-loading-stats {
+    font-size: 0.9rem;
+    color: #adb5bd;
+}
+
+.gallery-lazy-loading:hover {
+    border-color: #007bff;
+    background-color: #e3f2fd;
+}
+
+/* Single Processing Page Specific Styles */
+.side-by-side-container {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.side-by-side-container .canvas-container {
+    flex: 1;
+    min-width: 0;
+}
+
+.side-by-side-container .cropped-faces {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (max-width: 1200px) {
+    .side-by-side-container {
+        flex-direction: column;
+    }
+}
+
 /* Utility classes */
 .hidden {
     display: none;

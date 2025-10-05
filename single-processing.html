@@ -6,29 +6,6 @@
     <title>Single Image Face Cropping</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <link rel="stylesheet" href="css/styles.css">
-    <style>
-        .side-by-side-container {
-            display: flex;
-            gap: 1rem;
-            align-items: flex-start;
-        }
-
-        .side-by-side-container .canvas-container {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .side-by-side-container .cropped-faces {
-            flex: 1;
-            min-width: 0;
-        }
-
-        @media (max-width: 1200px) {
-            .side-by-side-container {
-                flex-direction: column;
-            }
-        }
-    </style>
 </head>
 <body>
     <div class="app-shell">
@@ -36,13 +13,13 @@
             <div class="title-row">
                 <h1><a href="index.html">Single Image Face Cropping</a></h1>
                 <div class="header-actions">
-                    <button id="backToMultipleBtn" class="ghost-btn" title="Switch to multiple image mode">
+                    <button type="button" id="backToMultipleBtn" class="ghost-btn" title="Switch to multiple image mode">
                         <span>Multiple Images</span>
                     </button>
-                    <button id="csvBatchModeBtn" class="ghost-btn" title="Switch to CSV batch mode">
+                    <button type="button" id="csvBatchModeBtn" class="ghost-btn" title="Switch to CSV batch mode">
                         <span>CSV Batch</span>
                     </button>
-                    <button id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
+                    <button type="button" id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
                 </div>
             </div>
 
@@ -336,11 +313,11 @@
                                     <span>Selected: <span id="selectedFaceCount">0</span></span>
                                 </div>
                                 <div class="face-selection-controls">
-                                    <button id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
-                                    <button id="selectAllFacesBtn" class="small-btn">Select All</button>
-                                    <button id="selectNoneFacesBtn" class="small-btn">Select None</button>
-                                    <button id="processImageBtn" class="small-btn primary" disabled>Process Selected</button>
-                                    <button id="clearImageBtn" class="small-btn" disabled>Clear Image</button>
+                                    <button type="button" id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
+                                    <button type="button" id="selectAllFacesBtn" class="small-btn">Select All</button>
+                                    <button type="button" id="selectNoneFacesBtn" class="small-btn">Select None</button>
+                                    <button type="button" id="processImageBtn" class="small-btn primary" disabled>Process Selected</button>
+                                    <button type="button" id="clearImageBtn" class="small-btn" disabled>Clear Image</button>
                                 </div>
                             </div>
                         </div>
@@ -348,7 +325,7 @@
                         <div class="cropped-faces workspace-card" id="croppedFaces">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                 <h3>Cropped Faces:</h3>
-                                <button id="downloadResultsBtn" class="small-btn primary" disabled>Download Results</button>
+                                <button type="button" id="downloadResultsBtn" class="small-btn primary" disabled>Download Results</button>
                             </div>
                             <div id="croppedContainer"></div>
                         </div>

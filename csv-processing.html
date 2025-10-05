@@ -6,114 +6,6 @@
     <title>CSV Batch Face Cropping</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <link rel="stylesheet" href="css/styles.css">
-    <style>
-        .file-selection-area {
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 1rem 0;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .file-selection-area.drag-over {
-            border-color: #007bff;
-            background-color: #f8f9fa;
-        }
-
-        .file-label.secondary {
-            background-color: #6c757d;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        .file-label.secondary:hover {
-            background-color: #5a6268;
-        }
-
-        .file-matching-info {
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-            color: #6c757d;
-        }
-
-        .csv-preview-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .csv-preview-table th,
-        .csv-preview-table td {
-            border: 1px solid #ddd;
-            padding: 0.5rem;
-            text-align: left;
-        }
-
-        .csv-preview-table th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-
-        .mapping-controls {
-            display: flex;
-            gap: 1rem;
-            align-items: end;
-            flex-wrap: wrap;
-            margin: 1rem 0;
-        }
-
-        .mapping-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            min-width: 200px;
-        }
-
-        .mapping-group label {
-            font-weight: bold;
-            font-size: 0.9rem;
-        }
-
-        .mapping-group select {
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .gallery-lazy-loading {
-            grid-column: 1 / -1;
-            padding: 2rem;
-            text-align: center;
-            border: 2px dashed #ddd;
-            border-radius: 8px;
-            margin: 1rem 0;
-            background-color: #f8f9fa;
-        }
-
-        .lazy-loading-content {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            align-items: center;
-        }
-
-        .lazy-loading-content span {
-            font-size: 1.1rem;
-            color: #6c757d;
-        }
-
-        .lazy-loading-stats {
-            font-size: 0.9rem;
-            color: #adb5bd;
-        }
-
-        .gallery-lazy-loading:hover {
-            border-color: #007bff;
-            background-color: #e3f2fd;
-        }
-    </style>
 </head>
 <body>
     <div class="app-shell">
@@ -121,13 +13,13 @@
             <div class="title-row">
                 <h1><a href="index.html">CSV Batch Face Cropping</a></h1>
                 <div class="header-actions">
-                    <button id="multipleImageModeBtn" class="ghost-btn" title="Switch to multiple image mode">
+                    <button type="button" id="multipleImageModeBtn" class="ghost-btn" title="Switch to multiple image mode">
                         <span>Multiple Images</span>
                     </button>
-                    <button id="singleImageModeBtn" class="ghost-btn" title="Switch to single image mode">
+                    <button type="button" id="singleImageModeBtn" class="ghost-btn" title="Switch to single image mode">
                         <span>Single Image</span>
                     </button>
-                    <button id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
+                    <button type="button" id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
                 </div>
             </div>
 
@@ -154,7 +46,7 @@
                             <option value="">Select column...</option>
                         </select>
                     </div>
-                    <button id="confirmMappingBtn" class="primary-btn" disabled>Confirm Mapping</button>
+                    <button type="button" id="confirmMappingBtn" class="primary-btn" disabled>Confirm Mapping</button>
                 </div>
                 <div class="csv-preview">
                     <h4>CSV Preview (First 5 rows):</h4>
@@ -171,10 +63,10 @@
             </div>
 
             <div class="batch-controls">
-                <button id="processAllBtn" disabled>Process All</button>
-                <button id="processSelectedBtn" disabled>Process Selected</button>
-                <button id="clearAllBtn" disabled>Clear All</button>
-                <button id="downloadAllBtn" disabled>Download All Results</button>
+                <button type="button" id="processAllBtn" disabled>Process All</button>
+                <button type="button" id="processSelectedBtn" disabled>Process Selected</button>
+                <button type="button" id="clearAllBtn" disabled>Clear All</button>
+                <button type="button" id="downloadAllBtn" disabled>Download All Results</button>
             </div>
         </header>
 
@@ -486,8 +378,8 @@
                     <div class="image-gallery hidden workspace-card" id="imageGallery">
                         <h3>Image Gallery</h3>
                         <div class="gallery-controls">
-                            <button id="selectAllBtn">Select All</button>
-                            <button id="selectNoneBtn">Select None</button>
+                            <button type="button" id="selectAllBtn">Select All</button>
+                            <button type="button" id="selectNoneBtn">Select None</button>
                             <span class="selection-counter">Selected: <span id="selectedCount">0</span> of <span id="totalCount">0</span></span>
                         </div>
                         <div class="gallery-grid" id="galleryGrid"></div>
@@ -517,9 +409,9 @@
                                 <span>Selected: <span id="selectedFaceCount">0</span></span>
                             </div>
                             <div class="face-selection-controls">
-                                <button id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
-                                <button id="selectNoneFacesBtn" class="small-btn">Select None</button>
-                                <button id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
+                                <button type="button" id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
+                                <button type="button" id="selectNoneFacesBtn" class="small-btn">Select None</button>
+                                <button type="button" id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
                             </div>
                         </div>
                     </div>

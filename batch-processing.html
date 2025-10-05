@@ -13,13 +13,13 @@
             <div class="title-row">
                 <h1><a href="index.html">Face Cropping Tool</a></h1>
                 <div class="header-actions">
-                    <button id="singleImageModeBtn" class="ghost-btn" title="Switch to single image mode">
+                    <button type="button" id="singleImageModeBtn" class="ghost-btn" title="Switch to single image mode">
                         <span>Single Image</span>
                     </button>
-                    <button id="csvBatchModeBtn" class="ghost-btn" title="Switch to CSV batch mode">
+                    <button type="button" id="csvBatchModeBtn" class="ghost-btn" title="Switch to CSV batch mode">
                         <span>CSV Batch</span>
                     </button>
-                    <button id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
+                    <button type="button" id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
                 </div>
             </div>
 
@@ -32,10 +32,10 @@
             </div>
 
             <div class="batch-controls">
-                <button id="processAllBtn" disabled>Process All</button>
-                <button id="processSelectedBtn" disabled>Process Selected</button>
-                <button id="clearAllBtn" disabled>Clear All</button>
-                <button id="downloadAllBtn" disabled>Download All Results</button>
+                <button type="button" id="processAllBtn" disabled>Process All</button>
+                <button type="button" id="processSelectedBtn" disabled>Process Selected</button>
+                <button type="button" id="clearAllBtn" disabled>Clear All</button>
+                <button type="button" id="downloadAllBtn" disabled>Download All Results</button>
             </div>
         </header>
 
@@ -396,8 +396,8 @@
                     <div class="image-gallery hidden workspace-card" id="imageGallery">
                         <h3>Image Gallery</h3>
                         <div class="gallery-controls">
-                            <button id="selectAllBtn">Select All</button>
-                            <button id="selectNoneBtn">Select None</button>
+                            <button type="button" id="selectAllBtn">Select All</button>
+                            <button type="button" id="selectNoneBtn">Select None</button>
                             <span class="selection-counter">Selected: <span id="selectedCount">0</span> of <span id="totalCount">0</span></span>
                         </div>
                         <div class="gallery-grid" id="galleryGrid"></div>
@@ -427,9 +427,9 @@
                                 <span>Selected: <span id="selectedFaceCount">0</span></span>
                             </div>
                             <div class="face-selection-controls">
-                                <button id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
-                                <button id="selectNoneFacesBtn" class="small-btn">Select None</button>
-                                <button id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
+                                <button type="button" id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
+                                <button type="button" id="selectNoneFacesBtn" class="small-btn">Select None</button>
+                                <button type="button" id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
                             </div>
                         </div>
                     </div>

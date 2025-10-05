@@ -1,13 +1,13 @@
 {
   "name": "opencv-face-crop",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Face detection and cropping tool using MediaPipe",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "dev": "concurrently \"tsc --watch\" \"node server.js\"",
-    "start": "node server.js",
+    "dev": "concurrently \"tsc --watch\" \"node dist/server.js\"",
+    "start": "node dist/server.js",
     "clean": "rimraf dist"
   },
   "devDependencies": {
