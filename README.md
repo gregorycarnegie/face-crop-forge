@@ -1,5 +1,11 @@
 # Face Crop Forge
 
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D16-brightgreen.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-Tasks%20Vision-orange.svg)
+![Client-Side](https://img.shields.io/badge/processing-100%25%20client--side-success.svg)
+
 A powerful, client-side face detection and cropping application built with MediaPipe Tasks Vision. This tool provides multiple processing modes to handle everything from single images to large batch operations, all running entirely in your browser for maximum privacy and performance.
 
 ## ✨ Features
