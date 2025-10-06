@@ -332,6 +332,14 @@ class SingleImageFaceCropper extends BaseFaceCropper {
 
             overlay.addEventListener('click', () => this.toggleFaceSelection(face.id));
 
+            // Add mousedown for dragging the face box
+            overlay.addEventListener('mousedown', (e) => {
+                // Only start drag if clicking on the box itself, not on resize handles
+                if ((e.target as HTMLElement).classList.contains('face-box')) {
+                    this.startDrag(e, face.id);
+                }
+            });
+
             // Add resize handles for interactive manipulation
             const handles = ['nw', 'ne', 'sw', 'se'].map(pos => {
                 const handle = document.createElement('div');
@@ -345,6 +353,59 @@ class SingleImageFaceCropper extends BaseFaceCropper {
 
             this.faceOverlays.appendChild(overlay);
         });
+    }
+
+    private startDrag(e: MouseEvent, faceId: string | number): void {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const overlay = e.currentTarget as HTMLElement;
+        const face = this.faces.find(f => f.id === faceId);
+        if (!face || !face.box) return;
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startLeft = overlay.offsetLeft;
+        const startTop = overlay.offsetTop;
+
+        const canvas = this.inputCanvas;
+        const scale = canvas.width / this.currentImage!.width;
+
+        const panelContent = this.inputCanvas.parentElement!;
+        const style = getComputedStyle(panelContent);
+        const paddingLeft = parseFloat(style.paddingLeft);
+        const paddingTop = parseFloat(style.paddingTop);
+
+        // Change cursor to grabbing
+        overlay.style.cursor = 'grabbing';
+
+        const handleDrag = (moveEvent: MouseEvent) => {
+            const dx = moveEvent.clientX - startX;
+            const dy = moveEvent.clientY - startY;
+
+            const newLeft = startLeft + dx;
+            const newTop = startTop + dy;
+
+            // Update overlay position
+            overlay.style.left = newLeft + 'px';
+            overlay.style.top = newTop + 'px';
+
+            // Update face data
+            if (face.box) {
+                face.box.xMin = (newLeft - paddingLeft) / scale;
+                face.box.yMin = (newTop - paddingTop) / scale;
+            }
+        };
+
+        const stopDrag = () => {
+            document.removeEventListener('mousemove', handleDrag);
+            document.removeEventListener('mouseup', stopDrag);
+            // Restore cursor
+            overlay.style.cursor = 'move';
+        };
+
+        document.addEventListener('mousemove', handleDrag);
+        document.addEventListener('mouseup', stopDrag);
     }
 
     private startResize(e: MouseEvent, faceId: string | number): void {

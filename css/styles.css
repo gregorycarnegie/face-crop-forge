@@ -2164,3 +2164,27 @@ button:disabled {
 .hidden {
     display: none;
 }
+
+/* Face box dragging cursor */
+.face-box {
+    cursor: move;
+}
+
+.face-box:active {
+    cursor: grabbing;
+}
+
+/* Resize handles should override the move cursor */
+.resize-handle {
+    cursor: nwse-resize !important;
+}
+
+.resize-handle.ne,
+.resize-handle.sw {
+    cursor: nesw-resize !important;
+}
+
+.resize-handle.nw,
+.resize-handle.se {
+    cursor: nwse-resize !important;
+}
