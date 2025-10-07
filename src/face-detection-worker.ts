@@ -181,7 +181,7 @@ async function detectFaces(input: ImageDataMessage | ImageBitmap, options: Detec
         if (detectionResult.detections && detectionResult.detections.length > 0) {
             for (let i = 0; i < detectionResult.detections.length; i++) {
                 const detection = detectionResult.detections[i];
-                const boundingBox = detection.boundingBox;
+                const {boundingBox} = detection;
 
                 // Calculate face quality if requested
                 let quality: FaceQuality | null = null;
@@ -244,7 +244,7 @@ async function calculateFaceQuality(
         );
 
         const imageData = qualityCtx.getImageData(0, 0, safeWidth, safeHeight);
-        const data = imageData.data;
+        const {data} = imageData;
 
         // Calculate Laplacian variance for blur detection
         const laplacianVariance = calculateLaplacianVariance(data, safeWidth, safeHeight);
@@ -411,7 +411,7 @@ async function enhanceImageInWorker(
 
     // Get image data for pixel manipulation
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
+    const {data} = imageData;
 
     // Apply auto color correction
     if (enhancements.autoColorCorrection) {

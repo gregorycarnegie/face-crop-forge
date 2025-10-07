@@ -425,7 +425,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         const startTop = overlay.offsetTop;
         const startWidth = overlay.offsetWidth;
         const startHeight = overlay.offsetHeight;
-        const position = target.dataset.position;
+        const {position} = target.dataset;
 
         const canvas = this.inputCanvas;
         // Use uniform scale like the display image does

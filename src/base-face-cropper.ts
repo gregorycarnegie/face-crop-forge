@@ -281,7 +281,7 @@ export class BaseFaceCropper {
             settings = this.getSettings();
         }
 
-        const box = face.box;
+        const {box} = face;
 
         const faceHeight = settings.outputHeight * (settings.faceHeightPct / 100);
         const scale = faceHeight / box.height;
@@ -742,7 +742,7 @@ export class BaseFaceCropper {
 
         const config = sliderMap[type];
         if (config && config.element) {
-            const value = config.element.value;
+            const {value} = config.element;
             const displayElement = document.getElementById(config.display);
             if (displayElement) {
                 if (type === 'backgroundBlur') {
@@ -758,7 +758,7 @@ export class BaseFaceCropper {
 
     async downloadAsZip(canvases: HTMLCanvasElement[], filename: string = 'cropped_faces.zip'): Promise<void> {
         // JSZip is loaded globally
-        const JSZip = (window as any).JSZip;
+        const {JSZip} = window as any;
         const zip = new JSZip();
         const settings = this.getSettings();
 
@@ -1061,7 +1061,7 @@ export class BaseFaceCropper {
             return { score: 0, level: 'unknown' };
         }
 
-        const data = imageData.data;
+        const {data} = imageData;
 
         // Calculate Laplacian variance for blur detection
         const laplacianVariance = this.calculateLaplacianVariance(data, targetWidth, targetHeight);
@@ -1730,7 +1730,7 @@ export class BaseFaceCropper {
             const imageId = this.generateImageId();
             // Handle both File objects and wrapped objects like { file: File, outputName: string }
             const file = fileOrWrapper.file || fileOrWrapper;
-            const outputName = fileOrWrapper.outputName;
+            const {outputName} = fileOrWrapper;
 
             try {
                 const image = await this.loadImageFromFileWithErrorHandling(file);
@@ -1875,15 +1875,14 @@ export class BaseFaceCropper {
 
     toggleWebWorkers(): void {
         if (this.enableWebWorkers?.checked) {
-            this.initializeWebWorker();
-        } else {
-            if (this.faceDetectionWorker) {
-                this.faceDetectionWorker.terminate();
-                this.faceDetectionWorker = null;
-                this.workerInitialized = false;
-                this.addToProcessingLog('Web Worker disabled', 'info');
-            }
-        }
+                    this.initializeWebWorker();
+                }
+        else if (this.faceDetectionWorker) {
+                        this.faceDetectionWorker.terminate();
+                        this.faceDetectionWorker = null;
+                        this.workerInitialized = false;
+                        this.addToProcessingLog('Web Worker disabled', 'info');
+                    }
     }
 
     async detectFacesWithWorker(image: HTMLImageElement, imageId: string): Promise<any[]> {
@@ -2620,8 +2619,8 @@ export class BaseFaceCropper {
      * Apply auto color correction using histogram stretching
      */
     applyAutoColorCorrection(imageData: ImageData): ImageData {
-        const data = imageData.data;
-        const length = data.length;
+        const {data} = imageData;
+        const {length} = data;
 
         // Calculate histogram for each channel
         const rHist = new Array(256).fill(0);
@@ -2669,7 +2668,7 @@ export class BaseFaceCropper {
      * Apply exposure adjustment
      */
     applyExposureAdjustment(imageData: ImageData, exposure: number): ImageData {
-        const data = imageData.data;
+        const {data} = imageData;
         const exposureFactor = Math.pow(2, exposure);
 
         for (let i = 0; i < data.length; i += 4) {
@@ -2685,7 +2684,7 @@ export class BaseFaceCropper {
      * Apply contrast adjustment
      */
     applyContrastAdjustment(imageData: ImageData, contrast: number): ImageData {
-        const data = imageData.data;
+        const {data} = imageData;
         const contrastFactor = contrast;
 
         for (let i = 0; i < data.length; i += 4) {
@@ -2701,9 +2700,7 @@ export class BaseFaceCropper {
      * Apply sharpness using unsharp mask
      */
     applySharpness(imageData: ImageData, amount: number): ImageData {
-        const data = imageData.data;
-        const width = imageData.width;
-        const height = imageData.height;
+        const {data, width, height} = imageData;
         const outputData = new Uint8ClampedArray(data);
 
         // Unsharp mask kernel
@@ -2737,9 +2734,7 @@ export class BaseFaceCropper {
      */
     async applySkinSmoothing(imageData: ImageData, amount: number): Promise<ImageData> {
         // Simple gaussian blur on skin tone regions
-        const data = imageData.data;
-        const width = imageData.width;
-        const height = imageData.height;
+        const {data, width, height} = imageData;
 
         // Create skin mask based on color range
         const skinMask = new Uint8Array(width * height);
@@ -2766,9 +2761,7 @@ export class BaseFaceCropper {
      * Apply selective blur based on mask
      */
     applySelectiveBlur(imageData: ImageData, mask: Uint8Array, radius: number): ImageData {
-        const data = imageData.data;
-        const width = imageData.width;
-        const height = imageData.height;
+        const {data, width, height} = imageData;
         const outputData = new Uint8ClampedArray(data);
 
         for (let y = 0; y < height; y++) {
@@ -2807,7 +2800,7 @@ export class BaseFaceCropper {
      */
     async applyRedEyeRemoval(imageData: ImageData): Promise<ImageData> {
         // Simple red-eye detection and correction
-        const data = imageData.data;
+        const {data} = imageData;
 
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
@@ -2832,9 +2825,7 @@ export class BaseFaceCropper {
     async applyBackgroundBlur(imageData: ImageData, blurAmount: number): Promise<ImageData> {
         // This is a simplified background blur - in a real application,
         // you'd want to use proper segmentation
-        const data = imageData.data;
-        const width = imageData.width;
-        const height = imageData.height;
+        const {data, width, height} = imageData;
 
         // Create a simple edge-based mask (assuming faces are in center)
         const centerX = width / 2;
