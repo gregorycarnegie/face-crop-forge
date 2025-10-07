@@ -16,6 +16,7 @@ const server = http.createServer((req: http.IncomingMessage, res: http.ServerRes
     const mimeTypes: MimeTypes = {
         '.html': 'text/html',
         '.js': 'text/javascript',
+        '.mjs': 'text/javascript',
         '.css': 'text/css',
         '.json': 'application/json',
         '.png': 'image/png',

@@ -100,21 +100,21 @@ async function initializeDetector(): Promise<void> {
     try {
         // Dynamic import of MediaPipe Tasks Vision
         if (!vision) {
-            // @ts-ignore - CDN module without type declarations
-            vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs') as VisionModule;
+            // @ts-ignore - Local module without type declarations
+            vision = await import('/public/models/vision_bundle.mjs') as VisionModule;
         }
 
         console.log('Initializing MediaPipe Tasks Vision in worker...');
 
         // Initialize the MediaPipe Vision tasks
         const visionFileset = await vision.FilesetResolver.forVisionTasks(
-            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+            "/public/models/wasm"
         );
 
         // Create face detector with WebAssembly runtime
         detector = await vision.FaceDetector.createFromOptions(visionFileset, {
             baseOptions: {
-                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
+                modelAssetPath: `/models/blaze_face_short_range.tflite`,
                 delegate: "GPU"
             },
             runningMode: "IMAGE"

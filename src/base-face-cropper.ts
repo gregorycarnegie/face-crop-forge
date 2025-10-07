@@ -229,13 +229,13 @@ export class BaseFaceCropper {
             }
 
             const visionFileset = await window.vision.FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+                "/public/models/wasm"
             );
 
             // Load Face Detector (for bounding boxes)
             this.detector = await window.vision.FaceDetector.createFromOptions(visionFileset, {
                 baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
+                    modelAssetPath: `/models/blaze_face_short_range.tflite`,
                     delegate: "GPU"
                 },
                 runningMode: "IMAGE"
@@ -246,7 +246,7 @@ export class BaseFaceCropper {
                 try {
                     this.faceLandmarker = await window.vision.FaceLandmarker.createFromOptions(visionFileset, {
                         baseOptions: {
-                            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                            modelAssetPath: `/models/face_landmarker.task`,
                             delegate: "GPU"
                         },
                         runningMode: "IMAGE",

@@ -1738,13 +1738,13 @@ class FaceCropper extends BaseFaceCropper {
 
             // Initialize the MediaPipe Vision tasks
             const visionFileset = await window.vision.FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+                "/public/models/wasm"
             );
 
             // Create face detector with WebAssembly runtime
             this.detector = await window.vision.FaceDetector.createFromOptions(visionFileset, {
                 baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
+                    modelAssetPath: `/models/blaze_face_short_range.tflite`,
                     delegate: "GPU"
                 },
                 runningMode: "IMAGE"
