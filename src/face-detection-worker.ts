@@ -101,14 +101,14 @@ async function initializeDetector(): Promise<void> {
         // Dynamic import of MediaPipe Tasks Vision
         if (!vision) {
             // @ts-ignore - Local module without type declarations
-            vision = await import('/public/models/vision_bundle.mjs') as VisionModule;
+            vision = await import('/models/vision_bundle.mjs') as VisionModule;
         }
 
         console.log('Initializing MediaPipe Tasks Vision in worker...');
 
         // Initialize the MediaPipe Vision tasks
         const visionFileset = await vision.FilesetResolver.forVisionTasks(
-            "/public/models/wasm"
+            "/models/wasm"
         );
 
         // Create face detector with WebAssembly runtime

@@ -1738,7 +1738,7 @@ class FaceCropper extends BaseFaceCropper {
 
             // Initialize the MediaPipe Vision tasks
             const visionFileset = await window.vision.FilesetResolver.forVisionTasks(
-                "/public/models/wasm"
+                "/models/wasm"
             );
 
             // Create face detector with WebAssembly runtime

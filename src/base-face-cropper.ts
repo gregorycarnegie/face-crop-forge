@@ -229,7 +229,7 @@ export class BaseFaceCropper {
             }
 
             const visionFileset = await window.vision.FilesetResolver.forVisionTasks(
-                "/public/models/wasm"
+                "/models/wasm"
             );
 
             // Load Face Detector (for bounding boxes)
