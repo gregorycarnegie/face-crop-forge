@@ -1722,47 +1722,6 @@ class FaceCropper extends BaseFaceCropper {
         throw new Error('MediaPipe Tasks Vision library failed to load within timeout');
     }
 
-    async loadModel() {
-        try {
-            this.updateStatus('Loading MediaPipe face detection model...', 'loading');
-
-            // Wait for MediaPipe Tasks Vision library to load
-            await this.waitForMediaPipe();
-
-            // Check if MediaPipe Tasks Vision is available
-            if (!window.vision || !window.vision.FilesetResolver || !window.vision.FaceDetector) {
-                throw new Error('MediaPipe Tasks Vision library not loaded');
-            }
-
-            console.log('Initializing MediaPipe Tasks Vision...');
-
-            // Initialize the MediaPipe Vision tasks
-            const visionFileset = await window.vision.FilesetResolver.forVisionTasks(
-                "/models/wasm"
-            );
-
-            // Create face detector with WebAssembly runtime
-            this.detector = await window.vision.FaceDetector.createFromOptions(visionFileset, {
-                baseOptions: {
-                    modelAssetPath: `/models/blaze_face_short_range.tflite`,
-                    delegate: "GPU"
-                },
-                runningMode: "IMAGE"
-            });
-
-            console.log('MediaPipe face detector created successfully');
-            this.updateStatus('MediaPipe model loaded successfully. Ready to process images!', 'success');
-        } catch (error: unknown) {
-            console.error('Error loading MediaPipe model:', (error as Error));
-            this.updateStatus(`Error loading model: ${(error as Error).message}. Please refresh the page.`, 'error');
-
-            // Try to provide helpful error information
-            if (!window.vision || !window.vision.FilesetResolver || !window.vision.FaceDetector) {
-                this.updateStatus('MediaPipe Tasks Vision library not loaded. Please refresh the page.', 'error');
-            }
-        }
-    }
-
     async handleMultipleImageUpload(event: Event) {
         const target = event.target as HTMLInputElement;
         const files = Array.from(target?.files || []) as File[];
