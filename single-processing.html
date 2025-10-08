@@ -6,6 +6,7 @@
     <title>Single Image Face Cropping</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <link rel="stylesheet" href="css/styles.css">
+    <script src="/components/component-loader.js"></script>
 </head>
 <body>
     <div class="app-shell">
@@ -73,210 +74,11 @@
                         </div>
                     </div>
 
-                    <div class="crop-settings">
-                        <h3 class="collapsible-header">
-                            Smart Cropping Settings
-                            <span class="collapse-icon">▼</span>
-                        </h3>
-                        <div class="collapsible-content">
-                            <div class="preset-controls">
-                                <div class="setting-group full-width">
-                                    <label for="sizePreset">Size Presets</label>
-                                    <select id="sizePreset">
-                                        <option value="custom">Custom</option>
-                                        <option value="linkedin">LinkedIn Profile (400×400)</option>
-                                        <option value="passport">Passport Photo (413×531)</option>
-                                        <option value="instagram">Instagram Square (1080×1080)</option>
-                                        <option value="idcard">ID Card (332×498)</option>
-                                        <option value="avatar">Avatar (512×512)</option>
-                                        <option value="headshot">Professional Headshot (600×800)</option>
-                                    </select>
-                                </div>
-                            </div>
+                    <div id="crop-settings-container"></div>
 
-                            <div class="settings-grid">
-                                <div class="setting-group size-controls">
-                                    <div class="size-inputs">
-                                        <div class="input-group">
-                                            <label for="outputWidth">Output Width (px)</label>
-                                            <div class="input-with-lock">
-                                                <input type="number" id="outputWidth" value="256" min="64" max="2048" step="32">
-                                                <button type="button" id="aspectRatioLock" class="lock-button" title="Lock aspect ratio">🔓</button>
-                                            </div>
-                                        </div>
-                                        <div class="input-group">
-                                            <label for="outputHeight">Output Height (px)</label>
-                                            <input type="number" id="outputHeight" value="256" min="64" max="2048" step="32">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="setting-group">
-                                    <label for="faceHeightPct">Face Height %</label>
-                                    <input type="number" id="faceHeightPct" value="70" min="10" max="100" step="5">
-                                </div>
-                                <div class="setting-group">
-                                    <label for="positioningMode">Positioning Mode</label>
-                                    <select id="positioningMode">
-                                        <option value="center">Center Face</option>
-                                        <option value="rule-of-thirds">Rule of Thirds</option>
-                                        <option value="custom">Custom Position</option>
-                                    </select>
-                                </div>
-                            </div>
+                    <div id="preprocessing-settings-container"></div>
 
-                            <div class="advanced-positioning" id="advancedPositioning">
-                                <div class="setting-group">
-                                    <label for="verticalOffset">Vertical Offset</label>
-                                    <div class="offset-slider-container">
-                                        <input type="range" id="verticalOffset" min="-50" max="50" value="0">
-                                        <span class="offset-value" id="verticalOffsetValue">0%</span>
-                                    </div>
-                                    <div class="offset-help">Negative: up, Positive: down</div>
-                                </div>
-                                <div class="setting-group">
-                                    <label for="horizontalOffset">Horizontal Offset</label>
-                                    <div class="offset-slider-container">
-                                        <input type="range" id="horizontalOffset" min="-50" max="50" value="0">
-                                        <span class="offset-value" id="horizontalOffsetValue">0%</span>
-                                    </div>
-                                    <div class="offset-help">Negative: left, Positive: right</div>
-                                </div>
-                            </div>
-
-                            <div class="preset-actions">
-                                <button type="button" id="resetSettingsBtn" class="reset-button">Reset to Defaults</button>
-                            </div>
-
-                            <div class="setting-preview">
-                                <span>Preview: <span id="previewText">256×256px, face at 70% height, PNG format</span></span>
-                                <span class="aspect-ratio" id="aspectRatioText">1:1 ratio</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="preprocessing-settings">
-                        <h3 class="collapsible-header">
-                            Image Preprocessing
-                            <span class="collapse-icon">▼</span>
-                        </h3>
-                        <div class="collapsible-content">
-                            <div class="preprocessing-controls">
-                                <div class="setting-group">
-                                    <label>
-                                        <input type="checkbox" id="autoColorCorrection" checked>
-                                        Auto Color Correction
-                                    </label>
-                                    <div class="setting-help">Automatic brightness/contrast normalization</div>
-                                </div>
-
-                                <div class="setting-group">
-                                    <label for="exposureAdjustment">Exposure</label>
-                                    <div class="slider-container">
-                                        <input type="range" id="exposureAdjustment" min="-2" max="2" step="0.1" value="0">
-                                        <span class="slider-value" id="exposureValue">0</span>
-                                    </div>
-                                    <div class="setting-help">Adjust image brightness (-2 to +2)</div>
-                                </div>
-
-                                <div class="setting-group">
-                                    <label for="contrastAdjustment">Contrast</label>
-                                    <div class="slider-container">
-                                        <input type="range" id="contrastAdjustment" min="0.5" max="2" step="0.1" value="1">
-                                        <span class="slider-value" id="contrastValue">1.0</span>
-                                    </div>
-                                    <div class="setting-help">Adjust image contrast (0.5 to 2.0)</div>
-                                </div>
-
-                                <div class="setting-group">
-                                    <label for="sharpnessControl">Sharpness</label>
-                                    <div class="slider-container">
-                                        <input type="range" id="sharpnessControl" min="0" max="2" step="0.1" value="0">
-                                        <span class="slider-value" id="sharpnessValue">0</span>
-                                    </div>
-                                    <div class="setting-help">Apply unsharp mask filter (0 to 2)</div>
-                                </div>
-
-                                <div class="setting-group">
-                                    <label for="skinSmoothing">Skin Smoothing</label>
-                                    <div class="slider-container">
-                                        <input type="range" id="skinSmoothing" min="0" max="5" step="0.5" value="0">
-                                        <span class="slider-value" id="skinSmoothingValue">0</span>
-                                    </div>
-                                    <div class="setting-help">Smooth skin tones (0 to 5)</div>
-                                </div>
-
-                                <div class="setting-group">
-                                    <label>
-                                        <input type="checkbox" id="redEyeRemoval">
-                                        Red-eye Removal
-                                    </label>
-                                    <div class="setting-help">Detect and correct red-eye effect</div>
-                                </div>
-
-                                <div class="setting-group">
-                                    <label for="backgroundBlur">Background Blur</label>
-                                    <div class="slider-container">
-                                        <input type="range" id="backgroundBlur" min="0" max="10" step="0.5" value="0">
-                                        <span class="slider-value" id="backgroundBlurValue">0px</span>
-                                    </div>
-                                    <div class="setting-help">Blur background around faces (0-10px)</div>
-                                </div>
-                            </div>
-
-                            <div class="preprocessing-actions">
-                                <button type="button" id="previewEnhancementsBtn" class="preview-button">Preview Enhancements</button>
-                                <button type="button" id="resetEnhancementsBtn" class="reset-button">Reset All</button>
-                            </div>
-
-                            <div class="enhancement-preview">
-                                <span>Preview: </span>
-                                <span id="enhancementSummary">No enhancements applied</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="output-settings">
-                        <h3 class="collapsible-header">
-                            Output Settings
-                            <span class="collapse-icon">▼</span>
-                        </h3>
-                        <div class="collapsible-content">
-                            <div class="settings-grid">
-                                <div class="setting-group">
-                                    <label for="outputFormat">Output Format</label>
-                                    <select id="outputFormat">
-                                        <option value="png">PNG (Lossless)</option>
-                                        <option value="jpeg">JPEG (Compressed)</option>
-                                        <option value="webp">WebP (Modern)</option>
-                                    </select>
-                                </div>
-                                <div class="setting-group hidden" id="jpegQualityGroup">
-                                    <label for="jpegQuality">JPEG Quality</label>
-                                    <div class="quality-slider-container">
-                                        <input type="range" id="jpegQuality" min="1" max="100" value="85">
-                                        <span class="quality-value" id="qualityValue">85%</span>
-                                    </div>
-                                </div>
-                                <div class="setting-group full-width">
-                                    <label for="namingTemplate">Filename Template</label>
-                                    <input type="text" id="namingTemplate" value="face_{original}_{index}" placeholder="face_{original}_{index}">
-                                    <div class="template-help">
-                                        Available variables: {original}, {index}, {timestamp}, {width}, {height}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="download-options">
-                                <div class="download-option">
-                                    <input type="checkbox" id="zipDownload" checked>
-                                    <label for="zipDownload">Download as ZIP archive</label>
-                                </div>
-                                <div class="download-option">
-                                    <input type="checkbox" id="individualDownload" checked>
-                                    <label for="individualDownload">Show individual download buttons</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <div id="output-settings-container"></div>
                 </div>
             </aside>
             <main class="workspace">
@@ -339,6 +141,18 @@
         </div>
     </div>
 
+    <!-- Load control panel components -->
+    <script>
+        loadControlPanels({
+            cropSettings: true,
+            preprocessingSettings: true,
+            outputSettings: 'batch'
+        }).then(() => {
+            // Components loaded, now load the main app
+            import('./dist/single-processor.js');
+        });
+    </script>
+
     <!-- MediaPipe Tasks Vision -->
     <script type="module">
         import * as vision from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs';
@@ -346,6 +160,5 @@
     </script>
     <!-- JSZip for batch downloads -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script type="module" src="dist/single-processor.js"></script>
 </body>
 </html>

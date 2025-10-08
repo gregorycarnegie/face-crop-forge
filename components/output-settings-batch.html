@@ -1,0 +1,42 @@
+<div class="output-settings">
+    <h3 class="collapsible-header">
+        Output Settings
+        <span class="collapse-icon">▼</span>
+    </h3>
+    <div class="collapsible-content">
+        <div class="settings-grid">
+            <div class="setting-group">
+                <label for="outputFormat">Output Format</label>
+                <select id="outputFormat">
+                    <option value="png">PNG (Lossless)</option>
+                    <option value="jpeg">JPEG (Compressed)</option>
+                    <option value="webp">WebP (Modern)</option>
+                </select>
+            </div>
+            <div class="setting-group hidden" id="jpegQualityGroup">
+                <label for="jpegQuality">JPEG Quality</label>
+                <div class="quality-slider-container">
+                    <input type="range" id="jpegQuality" min="1" max="100" value="85">
+                    <span class="quality-value" id="qualityValue">85%</span>
+                </div>
+            </div>
+            <div class="setting-group full-width">
+                <label for="namingTemplate">Filename Template</label>
+                <input type="text" id="namingTemplate" value="face_{original}_{index}" placeholder="face_{original}_{index}">
+                <div class="template-help">
+                    Available variables: {original}, {index}, {timestamp}, {width}, {height}
+                </div>
+            </div>
+        </div>
+        <div class="download-options">
+            <div class="download-option">
+                <input type="checkbox" id="zipDownload" checked>
+                <label for="zipDownload">Download as ZIP archive</label>
+            </div>
+            <div class="download-option">
+                <input type="checkbox" id="individualDownload">
+                <label for="individualDownload">Show individual download buttons</label>
+            </div>
+        </div>
+    </div>
+</div>
