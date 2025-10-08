@@ -184,6 +184,7 @@ This runs TypeScript in watch mode alongside the Node.js server, automatically r
 - **Memory Management**: Efficient handling of large image batches
 
 **Performance Gains**:
+
 - 2.7× faster batch processing with OffscreenCanvas
 - <1ms image transfer vs ~45ms with legacy ImageData
 - 2.5× faster face detection with WASM optimizations (Chrome/Edge)
@@ -237,6 +238,15 @@ See [PERFORMANCE.md](PERFORMANCE.md) for detailed benchmarks and technical detai
 ├── css/
 │   ├── styles.css                  # Global styles and responsive design
 │   └── index.css                   # Landing page styles
+├── models/  
+│   ├── wasm/
+│   │   ├── vision_wasm_internal.js
+│   │   ├── vision_wasm_internal.wasm # WASM binary for MediaPipe Tasks Vision
+│   │   ├── vision_wasm_nosimd_internal.js
+│   │   └── vision_wasm_nosimd_internal.wasm # WASM binary for MediaPipe Tasks Vision without SIMD optimizations
+│   ├── blaze_face_short_range.tflite # Face detection model
+│   ├── face_landmarker.task           # Face landmark model
+│   └── vision_bundle.mjs              # MediaPipe Tasks Vision bundle for TypeScript
 ├── src/                            # TypeScript source files
 │   ├── types.ts                    # TypeScript type definitions
 │   ├── base-face-cropper.ts        # Base class for face processing
