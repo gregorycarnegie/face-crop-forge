@@ -62,7 +62,6 @@ class FaceCropper extends BaseFaceCropper {
     verticalOffsetValue!: HTMLElement;
     horizontalOffsetValue!: HTMLElement;
     advancedPositioning!: HTMLElement;
-    applyToAllBtn!: HTMLButtonElement;
     resetSettingsBtn!: HTMLButtonElement;
     aspectRatioText!: HTMLElement;
     aspectRatioLocked!: boolean;
@@ -91,7 +90,6 @@ class FaceCropper extends BaseFaceCropper {
     backgroundBlurValue!: HTMLElement;
     previewEnhancementsBtn!: HTMLButtonElement;
     resetEnhancementsBtn!: HTMLButtonElement;
-    applyToAllImagesBtn!: HTMLButtonElement;
     enhancementSummary!: HTMLElement;
     totalFacesDetected!: HTMLElement;
     successRate!: HTMLElement;
@@ -198,7 +196,6 @@ class FaceCropper extends BaseFaceCropper {
         this.verticalOffsetValue = document.getElementById('verticalOffsetValue')!;
         this.horizontalOffsetValue = document.getElementById('horizontalOffsetValue')!;
         this.advancedPositioning = document.getElementById('advancedPositioning')!;
-        this.applyToAllBtn = document.getElementById('applyToAllBtn')! as HTMLButtonElement;
         this.resetSettingsBtn = document.getElementById('resetSettingsBtn')! as HTMLButtonElement;
         this.aspectRatioText = document.getElementById('aspectRatioText')!;
 
@@ -232,7 +229,6 @@ class FaceCropper extends BaseFaceCropper {
         this.backgroundBlurValue = document.getElementById('backgroundBlurValue')!;
         this.previewEnhancementsBtn = document.getElementById('previewEnhancementsBtn')! as HTMLButtonElement;
         this.resetEnhancementsBtn = document.getElementById('resetEnhancementsBtn')! as HTMLButtonElement;
-        this.applyToAllImagesBtn = document.getElementById('applyToAllImagesBtn')! as HTMLButtonElement;
         this.enhancementSummary = document.getElementById('enhancementSummary')!;
 
         // Workflow tools elements
@@ -298,7 +294,6 @@ class FaceCropper extends BaseFaceCropper {
         this.positioningMode.addEventListener('change', () => this.updatePositioningControls());
         this.verticalOffset.addEventListener('input', () => this.updateOffsetDisplay('vertical'));
         this.horizontalOffset.addEventListener('input', () => this.updateOffsetDisplay('horizontal'));
-        this.applyToAllBtn.addEventListener('click', () => this.applySettingsToAll());
         this.resetSettingsBtn.addEventListener('click', () => this.resetToDefaults());
 
         // UI enhancement listeners
@@ -329,7 +324,6 @@ class FaceCropper extends BaseFaceCropper {
         this.backgroundBlur.addEventListener('input', () => this.updateSliderValue('backgroundBlur'));
         this.previewEnhancementsBtn.addEventListener('click', () => this.previewEnhancements());
         this.resetEnhancementsBtn.addEventListener('click', () => this.resetEnhancements());
-        this.applyToAllImagesBtn.addEventListener('click', () => this.applyEnhancementsToAll());
 
         // Workflow tools listeners
         this.loadRecentBtn.addEventListener('click', () => this.loadRecentSettings());
@@ -701,7 +695,6 @@ class FaceCropper extends BaseFaceCropper {
             'backgroundBlur': 'Blur background around faces (0-10px)',
             'previewEnhancementsBtn': 'Preview enhancements on selected image',
             'resetEnhancementsBtn': 'Reset all enhancements to defaults',
-            'applyToAllImagesBtn': 'Apply current enhancement settings to all images',
             'recentSettingsDropdown': 'Load previously saved configurations',
             'loadRecentBtn': 'Load the selected configuration',
             'settingsName': 'Enter a name for this configuration',
@@ -900,26 +893,6 @@ class FaceCropper extends BaseFaceCropper {
         }
     }
 
-    async applyEnhancementsToAll() {
-        const allImages = Array.from(this.images!.values());
-        if (allImages.length === 0) {
-            this.updateStatus('No images to enhance', 'error');
-            return;
-        }
-
-        this.updateStatus('Applying enhancements to all images...', 'loading');
-
-        try {
-            for (const imageData of allImages) {
-                const imgEntry = imageData as unknown as ProcessorImageData;
-                imgEntry.enhancedImage = await this.applyImageEnhancements(imgEntry.image);
-            }
-            this.updateStatus(`Applied enhancements to ${allImages.length} images!`, 'success');
-        } catch (error: unknown) {
-            console.error('Error applying enhancements to all images:', (error as Error));
-            this.updateStatus(`Error applying enhancements: ${(error as Error).message}`, 'error');
-        }
-    }
 
     displayEnhancedPreview(enhancedImage: HTMLCanvasElement | HTMLImageElement, originalImageData: any) {
         // Store the enhanced image in the image data
@@ -1663,26 +1636,6 @@ class FaceCropper extends BaseFaceCropper {
         this.updatePreview();
     }
 
-    applySettingsToAll() {
-        // Get current settings
-        const settings = {
-            width: parseInt(this.outputWidth.value),
-            height: parseInt(this.outputHeight.value),
-            faceHeightPct: parseInt(this.faceHeightPct.value),
-            positioningMode: this.positioningMode.value,
-            verticalOffset: parseInt(this.verticalOffset.value),
-            horizontalOffset: parseInt(this.horizontalOffset.value),
-            format: this.outputFormat.value,
-            jpegQuality: parseInt(this.jpegQuality.value),
-            preset: this.sizePreset.value
-        };
-
-        // Apply to all image processing settings
-        // This will be used during batch processing
-        this.globalSettings = settings;
-
-        this.updateStatus(`Applied settings to all images: ${settings.width}×${settings.height}px, ${settings.positioningMode} positioning`, 'success');
-    }
 
     resetToDefaults() {
         this.outputWidth.value = String(256);
