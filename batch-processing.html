@@ -24,13 +24,7 @@
                 </div>
             </div>
 
-            <div class="upload-card">
-                <input type="file" id="imageInput" accept="image/*" multiple>
-                <label for="imageInput" class="file-label">
-                    <span class="upload-title">Drop images or click to upload</span>
-                    <span class="upload-subtitle">You can add multiple images at once</span>
-                </label>
-            </div>
+            <div id="upload-card-container"></div>
 
             <div class="batch-controls">
                 <button type="button" id="processAllBtn" disabled>Process All</button>
@@ -243,7 +237,18 @@
             cropSettings: true,
             preprocessingSettings: true,
             outputSettings: 'batch',
-            imageGallery: true
+            imageGallery: true,
+            uploadCard: {
+                containerId: 'upload-card-container',
+                inputId: 'imageInput',
+                config: {
+                    title: 'Select files',
+                    subtitle: 'or drag and drop them here',
+                    buttonText: 'Choose Images',
+                    accept: 'image/*',
+                    multiple: true
+                }
+            }
         }).then(() => {
             // Components loaded, now load the main app
             import('./dist/batch-processor.js');

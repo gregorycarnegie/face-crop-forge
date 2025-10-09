@@ -1,0 +1,209 @@
+<!-- Upload card template - will be customized per instance -->
+<div class="upload-card-component">
+    <div class="upload-dropzone" data-upload-dropzone>
+        <div class="upload-content">
+            <div class="upload-icon-wrapper">
+                <svg class="upload-icon" viewBox="0 0 112 112" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M56 14L56 70M56 14L35 35M56 14L77 35" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M14 70V91C14 95.4183 17.5817 99 22 99H90C94.4183 99 98 95.4183 98 91V70" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div class="upload-text">
+                <h2 class="upload-title" data-upload-title>Select a file</h2>
+                <p class="upload-subtitle" data-upload-subtitle>or drag and drop it here</p>
+            </div>
+            <div class="upload-cta-wrapper">
+                <button type="button" class="upload-cta" data-upload-trigger>Select File</button>
+            </div>
+        </div>
+        <!-- File input will be injected here with the proper ID -->
+    </div>
+</div>
+
+<style>
+.upload-card-component {
+    width: 100%;
+    margin-bottom: 1.5rem;
+}
+
+.upload-dropzone {
+    position: relative;
+    pointer-events: auto;
+    width: 100%;
+    min-height: 320px;
+    background: var(--card-bg, #ffffff);
+    border: 3px dashed var(--border-color, #e1e1e1);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    padding: 2rem 1.5rem;
+}
+
+.upload-dropzone:hover {
+    border-color: var(--accent-color, #0265dc);
+    background: var(--hover-bg, #f8f9fa);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(2, 101, 220, 0.1);
+}
+
+.upload-dropzone.drag-over {
+    border-color: var(--accent-color, #0265dc);
+    background: var(--drag-bg, #e8f2ff);
+    border-style: solid;
+    transform: scale(1.02);
+}
+
+.upload-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+    pointer-events: none;
+}
+
+.upload-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 112px;
+    height: 112px;
+    margin-bottom: 1.5rem;
+}
+
+.upload-icon {
+    width: 112px;
+    height: 112px;
+    color: var(--icon-color, #686868);
+    transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.upload-dropzone:hover .upload-icon {
+    color: var(--accent-color, #0265dc);
+    transform: translateY(-4px);
+}
+
+.upload-text {
+    margin-bottom: 1.5rem;
+}
+
+.upload-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color, #2c2c2c);
+}
+
+.upload-subtitle {
+    font-size: 1.125rem;
+    line-height: 1.5;
+    margin: 0;
+    color: var(--text-secondary, #686868);
+}
+
+.upload-cta-wrapper {
+    margin-top: 0.5rem;
+}
+
+.upload-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 2rem;
+    min-height: 48px;
+    background-color: var(--accent-color, #0265dc);
+    color: #ffffff;
+    border: none;
+    border-radius: 24px;
+    font-size: 1.125rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    pointer-events: auto;
+    box-shadow: 0 2px 8px rgba(2, 101, 220, 0.2);
+}
+
+.upload-cta:hover {
+    background-color: var(--accent-hover, #0056b3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(2, 101, 220, 0.3);
+}
+
+.upload-cta:active {
+    background-color: var(--accent-active, #004491);
+    transform: translateY(0);
+}
+
+.upload-input {
+    position: absolute;
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    z-index: -1;
+}
+
+/* Dark mode support */
+[data-theme="dark"] .upload-dropzone {
+    --card-bg: #2c2c2c;
+    --border-color: #444444;
+    --hover-bg: #333333;
+    --drag-bg: #1a3a5c;
+    --text-color: #ffffff;
+    --text-secondary: #b6b6b6;
+    --icon-color: #b6b6b6;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .upload-dropzone {
+        min-height: 280px;
+        padding: 1.5rem 1rem;
+    }
+
+    .upload-icon-wrapper {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 1rem;
+    }
+
+    .upload-icon {
+        width: 80px;
+        height: 80px;
+    }
+
+    .upload-title {
+        font-size: 1.5rem;
+    }
+
+    .upload-subtitle {
+        font-size: 1rem;
+    }
+
+    .upload-cta {
+        padding: 0.625rem 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .upload-dropzone {
+        min-height: 240px;
+    }
+
+    .upload-title {
+        font-size: 1.25rem;
+    }
+
+    .upload-subtitle {
+        font-size: 0.875rem;
+    }
+}
+</style>
+
+<!-- No inline script needed - initialization handled by component-loader.ts -->

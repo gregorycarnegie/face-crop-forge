@@ -24,13 +24,7 @@
                 </div>
             </div>
 
-            <div class="upload-card">
-                <input type="file" id="imageInput" accept="image/*">
-                <label for="imageInput" class="file-label">
-                    <span class="upload-title">Drop image or click to upload</span>
-                    <span class="upload-subtitle">Single image processing mode</span>
-                </label>
-            </div>
+            <div id="upload-card-container"></div>
 
         </header>
 
@@ -146,7 +140,18 @@
         loadControlPanels({
             cropSettings: true,
             preprocessingSettings: true,
-            outputSettings: 'batch'
+            outputSettings: 'batch',
+            uploadCard: {
+                containerId: 'upload-card-container',
+                inputId: 'imageInput',
+                config: {
+                    title: 'Select a file',
+                    subtitle: 'or drag and drop it here',
+                    buttonText: 'Choose Image',
+                    accept: 'image/*',
+                    multiple: false
+                }
+            }
         }).then(() => {
             // Components loaded, now load the main app
             import('./dist/single-processor.js');

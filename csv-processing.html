@@ -24,13 +24,7 @@
                 </div>
             </div>
 
-            <div class="upload-card">
-                <input type="file" id="csvInput" accept=".csv">
-                <label for="csvInput" class="file-label">
-                    <span class="upload-title">Drop CSV file or click to upload</span>
-                    <span class="upload-subtitle">CSV should contain file paths and output names</span>
-                </label>
-            </div>
+            <div id="upload-card-container"></div>
 
             <div class="csv-mapping hidden" id="csvMapping">
                 <h3>Column Mapping</h3>
@@ -55,13 +49,7 @@
                 </div>
             </div>
 
-            <div class="upload-card hidden" id="imageUploadCard">
-                <input type="file" id="imageInput" accept="image/*" multiple>
-                <label for="imageInput" class="file-label">
-                    <span class="upload-title">Drop images or click to upload</span>
-                    <span class="upload-subtitle">Only images matching CSV filenames will be kept</span>
-                </label>
-            </div>
+            <div id="image-upload-card-container" class="hidden"></div>
 
             <div class="batch-controls">
                 <button type="button" id="processAllBtn" disabled>Process All</button>
@@ -225,7 +213,29 @@
             cropSettings: true,
             preprocessingSettings: true,
             outputSettings: 'csv',
-            imageGallery: true
+            imageGallery: true,
+            uploadCard: {
+                containerId: 'upload-card-container',
+                inputId: 'csvInput',
+                config: {
+                    title: 'Select CSV file',
+                    subtitle: 'or drag and drop it here',
+                    buttonText: 'Choose CSV',
+                    accept: '.csv',
+                    multiple: false
+                }
+            },
+            imageUploadCard: {
+                containerId: 'image-upload-card-container',
+                inputId: 'imageInput',
+                config: {
+                    title: 'Select images',
+                    subtitle: 'Only images matching CSV filenames will be kept',
+                    buttonText: 'Choose Images',
+                    accept: 'image/*',
+                    multiple: true
+                }
+            }
         }).then(() => {
             // Components loaded, now load the main app
             import('./dist/csv-processor.js');
