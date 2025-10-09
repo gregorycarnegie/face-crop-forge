@@ -151,6 +151,11 @@ class FaceCropper extends BaseFaceCropper {
 
     initializeElements() {
         this.imageInput = document.getElementById('imageInput')! as HTMLInputElement;
+        if (!this.imageInput) {
+            console.error('BATCH PROCESSOR: imageInput element not found!');
+        } else {
+            console.log('BATCH PROCESSOR: imageInput found:', this.imageInput);
+        }
         this.processAllBtn = document.getElementById('processAllBtn')! as HTMLButtonElement;
         this.processSelectedBtn = document.getElementById('processSelectedBtn')! as HTMLButtonElement;
         this.clearAllBtn = document.getElementById('clearAllBtn')! as HTMLButtonElement;
@@ -262,7 +267,11 @@ class FaceCropper extends BaseFaceCropper {
     }
 
     setupEventListeners() {
-        this.imageInput.addEventListener('change', (e) => this.handleMultipleImageUploadProduction(e));
+        console.log('BATCH PROCESSOR: Setting up event listeners, imageInput:', this.imageInput);
+        this.imageInput.addEventListener('change', (e) => {
+            console.log('BATCH PROCESSOR: Image input change event fired!', e);
+            this.handleMultipleImageUploadProduction(e);
+        });
         this.processAllBtn.addEventListener('click', () => this.processAll());
         this.processSelectedBtn.addEventListener('click', () => this.processSelected());
         this.clearAllBtn.addEventListener('click', () => this.clearAll());
@@ -302,16 +311,24 @@ class FaceCropper extends BaseFaceCropper {
         // Navigation listeners
         const singleImageModeBtn = document.getElementById('singleImageModeBtn');
         if (singleImageModeBtn) {
+            console.log('BATCH PROCESSOR: Single image mode button found, adding listener');
             singleImageModeBtn.addEventListener('click', () => {
+                console.log('BATCH PROCESSOR: Navigating to single-processing.html');
                 window.location.href = 'single-processing.html';
             });
+        } else {
+            console.warn('BATCH PROCESSOR: Single image mode button not found');
         }
 
         const csvBatchModeBtn = document.getElementById('csvBatchModeBtn');
         if (csvBatchModeBtn) {
+            console.log('BATCH PROCESSOR: CSV batch mode button found, adding listener');
             csvBatchModeBtn.addEventListener('click', () => {
+                console.log('BATCH PROCESSOR: Navigating to csv-processing.html');
                 window.location.href = 'csv-processing.html';
             });
+        } else {
+            console.warn('BATCH PROCESSOR: CSV batch mode button not found');
         }
 
         // Preprocessing listeners
@@ -2306,6 +2323,5 @@ class FaceCropper extends BaseFaceCropper {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    new FaceCropper();
-});
+// Instantiate immediately - module is loaded dynamically after DOMContentLoaded
+new FaceCropper();

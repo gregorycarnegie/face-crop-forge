@@ -724,9 +724,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     }
 }
 
-// Initialize the application when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-    new SingleImageFaceCropper();
-});
+// Instantiate immediately - module is loaded dynamically after DOMContentLoaded
+new SingleImageFaceCropper();
 
 export default SingleImageFaceCropper;

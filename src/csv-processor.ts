@@ -1174,9 +1174,7 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
     }
 }
 
-// Initialize the application when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-    new CSVBatchFaceCropper();
-});
+// Instantiate immediately - module is loaded dynamically after DOMContentLoaded
+new CSVBatchFaceCropper();
 
 export { CSVBatchFaceCropper };
