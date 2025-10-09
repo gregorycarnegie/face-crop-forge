@@ -1,5 +1,13 @@
 // Simple component loader for control panels
-async function loadComponent(elementId, componentPath) {
+
+interface ControlPanelConfig {
+    cropSettings?: boolean;
+    preprocessingSettings?: boolean;
+    outputSettings?: 'csv' | 'batch' | boolean;
+    imageGallery?: boolean;
+}
+
+async function loadComponent(elementId: string, componentPath: string): Promise<void> {
     try {
         const response = await fetch(componentPath);
         if (!response.ok) {
@@ -18,8 +26,8 @@ async function loadComponent(elementId, componentPath) {
 }
 
 // Load all control panel components for a page
-async function loadControlPanels(config) {
-    const promises = [];
+async function loadControlPanels(config: ControlPanelConfig): Promise<void> {
+    const promises: Promise<void>[] = [];
 
     if (config.cropSettings) {
         promises.push(loadComponent('crop-settings-container', '/components/crop-settings.html'));
@@ -34,6 +42,10 @@ async function loadControlPanels(config) {
             ? '/components/output-settings-csv.html'
             : '/components/output-settings-batch.html';
         promises.push(loadComponent('output-settings-container', outputFile));
+    }
+
+    if (config.imageGallery) {
+        promises.push(loadComponent('image-gallery-container', '/components/image-gallery.html'));
     }
 
     await Promise.all(promises);

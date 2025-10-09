@@ -6,7 +6,7 @@
     <title>Face Cropping Tool</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <link rel="stylesheet" href="css/styles.css">
-    <script src="/components/component-loader.js"></script>
+    <script src="/dist/component-loader.js"></script>
 </head>
 <body>
     <div class="app-shell">
@@ -191,15 +191,7 @@
                         <div class="progress-text" id="progressText">Processing...</div>
                     </div>
 
-                    <div class="image-gallery hidden workspace-card" id="imageGallery">
-                        <h3>Image Gallery</h3>
-                        <div class="gallery-controls">
-                            <button type="button" id="selectAllBtn">Select All</button>
-                            <button type="button" id="selectNoneBtn">Select None</button>
-                            <span class="selection-counter">Selected: <span id="selectedCount">0</span> of <span id="totalCount">0</span></span>
-                        </div>
-                        <div class="gallery-grid" id="galleryGrid"></div>
-                    </div>
+                    <div id="image-gallery-container"></div>
 
                     <div class="canvas-container hidden workspace-card" id="canvasContainer">
                         <h3 id="canvasTitle">Current Image Preview</h3>
@@ -250,7 +242,8 @@
         loadControlPanels({
             cropSettings: true,
             preprocessingSettings: true,
-            outputSettings: 'batch'
+            outputSettings: 'batch',
+            imageGallery: true
         }).then(() => {
             // Components loaded, now load the main app
             import('./dist/batch-processor.js');
