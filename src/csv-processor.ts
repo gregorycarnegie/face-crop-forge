@@ -139,8 +139,14 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         this.fileNameColumn = document.getElementById('fileNameColumn') as HTMLSelectElement;
         this.confirmMappingBtn = document.getElementById('confirmMappingBtn') as HTMLButtonElement;
         this.csvPreviewTable = document.getElementById('csvPreviewTable') as HTMLElement;
-        this.imageUploadCard = document.getElementById('imageUploadCard') as HTMLElement;
+        this.imageUploadCard = document.getElementById('image-upload-card-container') as HTMLElement;
         this.imageInput = document.getElementById('imageInput') as HTMLInputElement;
+
+        if (!this.imageUploadCard) {
+            console.error('CSV PROCESSOR: image-upload-card-container not found!');
+        } else {
+            console.log('CSV PROCESSOR: image-upload-card-container found');
+        }
 
         // Control elements
         this.processAllBtn = document.getElementById('processAllBtn') as HTMLButtonElement;
@@ -482,7 +488,13 @@ class CSVBatchFaceCropper extends BaseFaceCropper {
         // Build filename to output name mapping
         this.buildCSVMapping();
 
-        this.imageUploadCard.classList.remove('hidden');
+        console.log('CSV PROCESSOR: Showing image upload card...');
+        if (this.imageUploadCard) {
+            this.imageUploadCard.classList.remove('hidden');
+            console.log('CSV PROCESSOR: Image upload card should now be visible');
+        } else {
+            console.error('CSV PROCESSOR: Cannot show upload card - element not found!');
+        }
         this.addToLoadingLog(`Column mapping confirmed: File paths from "${this.csvHeaders[parseInt(this.filePathColumn.value)]}", Names from "${this.csvHeaders[parseInt(this.fileNameColumn.value)]}"`);
         this.updateStatus('Column mapping confirmed. Upload images to process.');
     }
