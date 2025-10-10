@@ -13,6 +13,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     private currentFile: File | null;
     private faces: FaceData[];
     private selectedFaces: Set<number | string>;
+    private rotationAngle: number = 0; // Track rotation in degrees (0, 90, 180, 270)
 
     // UI Elements
     private imageInput!: HTMLInputElement;
@@ -34,6 +35,8 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     private selectAllFacesBtn!: HTMLButtonElement;
     private selectNoneFacesBtn!: HTMLButtonElement;
     private detectFacesBtn!: HTMLButtonElement;
+    private rotateClockwiseBtn!: HTMLButtonElement;
+    private rotateCounterClockwiseBtn!: HTMLButtonElement;
 
     // Settings elements
     protected outputWidth!: HTMLInputElement;
@@ -96,6 +99,8 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         this.selectAllFacesBtn = document.getElementById('selectAllFacesBtn') as HTMLButtonElement;
         this.selectNoneFacesBtn = document.getElementById('selectNoneFacesBtn') as HTMLButtonElement;
         this.detectFacesBtn = document.getElementById('detectFacesBtn') as HTMLButtonElement;
+        this.rotateClockwiseBtn = document.getElementById('rotateClockwiseBtn') as HTMLButtonElement;
+        this.rotateCounterClockwiseBtn = document.getElementById('rotateCounterClockwiseBtn') as HTMLButtonElement;
 
         // Settings elements
         this.outputWidth = document.getElementById('outputWidth') as HTMLInputElement;
@@ -139,6 +144,10 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         this.selectAllFacesBtn.addEventListener('click', () => this.selectAllFaces());
         this.selectNoneFacesBtn.addEventListener('click', () => this.selectNoneFaces());
         this.detectFacesBtn.addEventListener('click', () => this.detectFaces());
+
+        // Rotation listeners
+        this.rotateClockwiseBtn.addEventListener('click', () => this.rotateImage(90));
+        this.rotateCounterClockwiseBtn.addEventListener('click', () => this.rotateImage(-90));
 
         // Settings listeners
         this.outputWidth.addEventListener('input', () => this.updatePreview());
@@ -251,19 +260,97 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Set canvas size
+        // Set canvas size based on rotation
         const maxWidth = 600;
         const maxHeight = 400;
-        const scale = Math.min(maxWidth / this.currentImage.width, maxHeight / this.currentImage.height);
 
-        canvas.width = this.currentImage.width * scale;
-        canvas.height = this.currentImage.height * scale;
+        let displayWidth = this.currentImage.width;
+        let displayHeight = this.currentImage.height;
 
-        // Draw image
-        ctx.drawImage(this.currentImage, 0, 0, canvas.width, canvas.height);
+        // Swap dimensions for 90 or 270 degree rotations
+        if (this.rotationAngle === 90 || this.rotationAngle === 270) {
+            displayWidth = this.currentImage.height;
+            displayHeight = this.currentImage.width;
+        }
+
+        const scale = Math.min(maxWidth / displayWidth, maxHeight / displayHeight);
+        canvas.width = displayWidth * scale;
+        canvas.height = displayHeight * scale;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Save context and apply rotation
+        ctx.save();
+
+        // Move to center of canvas
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+
+        // Rotate
+        ctx.rotate((this.rotationAngle * Math.PI) / 180);
+
+        // Draw image centered at origin
+        ctx.drawImage(
+            this.currentImage,
+            -this.currentImage.width * scale / 2,
+            -this.currentImage.height * scale / 2,
+            this.currentImage.width * scale,
+            this.currentImage.height * scale
+        );
+
+        ctx.restore();
 
         this.canvasContainer.classList.remove('hidden');
         this.clearFaceOverlays();
+    }
+
+    private rotateImage(degrees: number): void {
+        if (!this.currentImage) return;
+
+        // Update rotation angle (keep it in range 0-359)
+        this.rotationAngle = (this.rotationAngle + degrees + 360) % 360;
+
+        // Clear any detected faces as they're no longer valid
+        this.faces = [];
+        this.selectedFaces.clear();
+        this.updateFaceCount();
+
+        // Create a new rotated image
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        if (!tempCtx) return;
+
+        // Set temp canvas size based on rotation
+        if (this.rotationAngle === 90 || this.rotationAngle === 270) {
+            tempCanvas.width = this.currentImage.height;
+            tempCanvas.height = this.currentImage.width;
+        } else {
+            tempCanvas.width = this.currentImage.width;
+            tempCanvas.height = this.currentImage.height;
+        }
+
+        // Apply rotation
+        tempCtx.save();
+        tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+        tempCtx.rotate((this.rotationAngle * Math.PI) / 180);
+        tempCtx.drawImage(
+            this.currentImage,
+            -this.currentImage.width / 2,
+            -this.currentImage.height / 2
+        );
+        tempCtx.restore();
+
+        // Create new image from rotated canvas
+        const newImage = new Image();
+        newImage.onload = () => {
+            this.currentImage = newImage;
+            this.rotationAngle = 0; // Reset rotation angle since we've created a new rotated image
+            this.displayImage();
+            this.updateStats();
+            this.updateStatus(`Image rotated ${degrees > 0 ? 'clockwise' : 'counter-clockwise'} by 90°`);
+            this.addToLog(`Image rotated ${degrees > 0 ? 'clockwise' : 'counter-clockwise'} by 90°`);
+        };
+        newImage.src = tempCanvas.toDataURL();
     }
 
     private async detectFaces(): Promise<void> {
@@ -684,6 +771,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         this.currentFile = null;
         this.faces = [];
         this.selectedFaces.clear();
+        this.rotationAngle = 0; // Reset rotation
         this.imageInput.value = '';
 
         this.canvasContainer.classList.add('hidden');
@@ -704,6 +792,8 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         this.processImageBtn.disabled = !hasFaces || !hasSelectedFaces;
         this.clearImageBtn.disabled = !hasImage;
         this.detectFacesBtn.disabled = !hasImage;
+        this.rotateClockwiseBtn.disabled = !hasImage;
+        this.rotateCounterClockwiseBtn.disabled = !hasImage;
         this.downloadResultsBtn.disabled = true;
     }
 
