@@ -996,24 +996,39 @@ button:disabled {
 
 .face-selection-controls {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     flex-wrap: wrap;
+    align-items: center;
+}
+
+.button-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 .small-btn {
-    padding: 6px 12px;
+    padding: 8px 16px;
     border: none;
-    border-radius: 20px;
-    font-size: 0.85rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     background: #6c757d;
     color: white;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
-.small-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+.small-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.small-btn:active:not(:disabled) {
+    transform: translateY(0);
 }
 
 .small-btn.primary {
@@ -1021,9 +1036,76 @@ button:disabled {
 }
 
 .small-btn:disabled {
-    background: #ccc;
+    background: #d1d5db;
+    color: #9ca3af;
     cursor: not-allowed;
     transform: none;
+    opacity: 0.6;
+}
+
+/* Rotation buttons - Blue theme */
+.rotation-btn {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    font-weight: 600;
+}
+
+.rotation-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+.rotation-btn .btn-icon {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+/* Detection button - Purple theme */
+.detect-btn {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: white;
+    font-weight: 600;
+    padding: 8px 20px;
+}
+
+.detect-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+}
+
+/* Selection buttons - Teal theme */
+.selection-btn {
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    color: white;
+}
+
+.selection-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #0d9488, #0f766e);
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
+}
+
+/* Process button - Green theme */
+.process-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    font-weight: 600;
+    padding: 8px 20px;
+}
+
+.process-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669, #047857);
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
+}
+
+/* Clear button - Red theme */
+.clear-btn {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.clear-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
 }
 
 #inputCanvas {

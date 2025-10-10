@@ -109,13 +109,25 @@
                                     <span>Selected: <span id="selectedFaceCount">0</span></span>
                                 </div>
                                 <div class="face-selection-controls">
-                                    <button type="button" id="rotateCounterClockwiseBtn" class="small-btn" disabled title="Rotate 90° counter-clockwise">↶ 90°</button>
-                                    <button type="button" id="rotateClockwiseBtn" class="small-btn" disabled title="Rotate 90° clockwise">90° ↷</button>
-                                    <button type="button" id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
-                                    <button type="button" id="selectAllFacesBtn" class="small-btn">Select All</button>
-                                    <button type="button" id="selectNoneFacesBtn" class="small-btn">Select None</button>
-                                    <button type="button" id="processImageBtn" class="small-btn primary" disabled>Process Selected</button>
-                                    <button type="button" id="clearImageBtn" class="small-btn" disabled>Clear Image</button>
+                                    <div class="button-group rotation-controls">
+                                        <button type="button" id="rotateCounterClockwiseBtn" class="small-btn rotation-btn" disabled title="Rotate 90° counter-clockwise">
+                                            <span class="btn-icon">↶</span> 90°
+                                        </button>
+                                        <button type="button" id="rotateClockwiseBtn" class="small-btn rotation-btn" disabled title="Rotate 90° clockwise">
+                                            90° <span class="btn-icon">↷</span>
+                                        </button>
+                                    </div>
+                                    <div class="button-group detection-controls">
+                                        <button type="button" id="detectFacesBtn" class="small-btn detect-btn">Detect Faces</button>
+                                    </div>
+                                    <div class="button-group selection-controls">
+                                        <button type="button" id="selectAllFacesBtn" class="small-btn selection-btn">Select All</button>
+                                        <button type="button" id="selectNoneFacesBtn" class="small-btn selection-btn">Select None</button>
+                                    </div>
+                                    <div class="button-group action-controls">
+                                        <button type="button" id="processImageBtn" class="small-btn process-btn" disabled>Process Selected</button>
+                                        <button type="button" id="clearImageBtn" class="small-btn clear-btn" disabled>Clear Image</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
