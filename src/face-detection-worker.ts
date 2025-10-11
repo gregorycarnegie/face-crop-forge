@@ -422,9 +422,9 @@ async function enhanceImageInWorker(
     if (enhancements.exposure && enhancements.exposure !== 0) {
         const exposureFactor = Math.pow(2, enhancements.exposure);
         for (let i = 0; i < data.length; i += 4) {
-            data[i] = Math.min(255, data[i] * exposureFactor);
-            data[i + 1] = Math.min(255, data[i + 1] * exposureFactor);
-            data[i + 2] = Math.min(255, data[i + 2] * exposureFactor);
+            data[i] *= exposureFactor;
+            data[i + 1] *= exposureFactor;
+            data[i + 2] *= exposureFactor;
         }
     }
 
@@ -433,9 +433,9 @@ async function enhanceImageInWorker(
         const factor = enhancements.contrast;
         const intercept = 128 * (1 - factor);
         for (let i = 0; i < data.length; i += 4) {
-            data[i] = Math.max(0, Math.min(255, data[i] * factor + intercept));
-            data[i + 1] = Math.max(0, Math.min(255, data[i + 1] * factor + intercept));
-            data[i + 2] = Math.max(0, Math.min(255, data[i + 2] * factor + intercept));
+            data[i] = data[i] * factor + intercept;
+            data[i + 1] = data[i + 1] * factor + intercept;
+            data[i + 2] = data[i + 2] * factor + intercept;
         }
     }
 
@@ -480,9 +480,9 @@ function applyAutoColorCorrection(data: Uint8ClampedArray): void {
 
     // Apply correction
     for (let i = 0; i < data.length; i += 4) {
-        data[i] = Math.min(255, data[i] * rFactor);
-        data[i + 1] = Math.min(255, data[i + 1] * gFactor);
-        data[i + 2] = Math.min(255, data[i + 2] * bFactor);
+        data[i] *= rFactor;
+        data[i + 1] *= gFactor;
+        data[i + 2] *= bFactor;
     }
 }
 
