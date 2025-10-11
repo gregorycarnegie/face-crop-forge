@@ -2656,9 +2656,9 @@ export class BaseFaceCropper {
 
         // Apply histogram stretching
         for (let i = 0; i < length; i += 4) {
-            data[i] = Math.min(255, Math.max(0, ((data[i] - rMin) / (rMax - rMin)) * 255));
-            data[i + 1] = Math.min(255, Math.max(0, ((data[i + 1] - gMin) / (gMax - gMin)) * 255));
-            data[i + 2] = Math.min(255, Math.max(0, ((data[i + 2] - bMin) / (bMax - bMin)) * 255));
+            data[i] = ((data[i] - rMin) / (rMax - rMin)) * 255;
+            data[i + 1] = ((data[i + 1] - gMin) / (gMax - gMin)) * 255;
+            data[i + 2] = ((data[i + 2] - bMin) / (bMax - bMin)) * 255;
         }
 
         return imageData;
@@ -2672,9 +2672,9 @@ export class BaseFaceCropper {
         const exposureFactor = Math.pow(2, exposure);
 
         for (let i = 0; i < data.length; i += 4) {
-            data[i] = Math.min(255, data[i] * exposureFactor);
-            data[i + 1] = Math.min(255, data[i + 1] * exposureFactor);
-            data[i + 2] = Math.min(255, data[i + 2] * exposureFactor);
+            data[i] *= exposureFactor;
+            data[i + 1] *= exposureFactor;
+            data[i + 2] *= exposureFactor;
         }
 
         return imageData;
@@ -2688,9 +2688,9 @@ export class BaseFaceCropper {
         const contrastFactor = contrast;
 
         for (let i = 0; i < data.length; i += 4) {
-            data[i] = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor) + 128));
-            data[i + 1] = Math.min(255, Math.max(0, ((data[i + 1] - 128) * contrastFactor) + 128));
-            data[i + 2] = Math.min(255, Math.max(0, ((data[i + 2] - 128) * contrastFactor) + 128));
+            data[i] = ((data[i] - 128) * contrastFactor) + 128;
+            data[i + 1] = ((data[i + 1] - 128) * contrastFactor) + 128;
+            data[i + 2] = ((data[i + 2] - 128) * contrastFactor) + 128;
         }
 
         return imageData;
@@ -2721,7 +2721,7 @@ export class BaseFaceCropper {
                         }
                     }
                     const outputIdx = (y * width + x) * 4 + c;
-                    outputData[outputIdx] = Math.min(255, Math.max(0, sum));
+                    outputData[outputIdx] = sum;
                 }
             }
         }
