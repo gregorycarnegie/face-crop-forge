@@ -98,7 +98,7 @@ A powerful, client-side face detection and cropping application built with Media
 
    Navigate to `http://localhost:3000`
 
-   ⚠️ **Note**: Options B and C don't set COOP/COEP headers, so WASM optimizations won't be available. Use the Node.js server for maximum performance.
+   ⚠️ **Note**: Options B and C don't set COOP/COEP headers, so WASM optimizations won't be available. Use the Bun.js server for maximum performance.
 
 ### Development Mode
 
@@ -216,7 +216,7 @@ See [PERFORMANCE.md](PERFORMANCE.md) for detailed benchmarks and technical detai
 | Firefox 85+ | ✅ | ✅ | ⚠️ | ⚠️ | ⚡⚡ Good |
 | Safari 14+ | ✅ | ✅ | ❌ | ❌ | ⚡ Fair |
 
-**Recommendation**: Use Chrome or Edge browsers with the Node.js server for the best performance (up to 3× faster).
+**Recommendation**: Use Chrome or Edge browsers with the Bun.js server for the best performance (up to 3× faster).
 
 ## 🔧 Development
 
