@@ -1,8 +1,8 @@
 # Face Crop Forge
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
-![Node](https://img.shields.io/badge/node-%3E%3D16-brightgreen.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)
+![Bun](https://img.shields.io/badge/bun-1.3+-f472b6.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-Tasks%20Vision-orange.svg)
 ![Client-Side](https://img.shields.io/badge/processing-100%25%20client--side-success.svg)
 
@@ -40,8 +40,9 @@ A powerful, client-side face detection and cropping application built with Media
 
 ### Prerequisites
 
-- **Node.js 16+** (for development and running the server)
-- **npm** (comes with Node.js)
+- **Bun 1.3+** (recommended - fastest runtime and build tool)
+  - Install from [bun.sh](https://bun.sh) or `powershell -c "irm bun.sh/install.ps1|iex"` (Windows)
+  - `curl -fsSL https://bun.sh/install | bash` (macOS/Linux)
 
 ### Installation & Setup
 
@@ -55,28 +56,27 @@ A powerful, client-side face detection and cropping application built with Media
 2. **Install dependencies**
 
    ```bash
-   npm install
+   bun install
    ```
 
-3. **Build the project**
+3. **Start the development server**
 
    ```bash
-   npm run build
-   ```
-
-   This compiles TypeScript files to JavaScript.
-
-4. **Start the server**
-
-   **Option A: Node.js Server (Recommended for Best Performance)**
-
-   ```bash
-   npm start
+   bun run dev
    ```
 
    Navigate to `http://localhost:3000`
 
-   ⚡ **Performance Note**: The Node.js server sets COOP/COEP headers that enable WASM SIMD + threading for **1.5-3× faster face detection** in Chrome/Edge browsers. This is the recommended option for production use.
+   ⚡ **Bun runs TypeScript directly** - No build step needed! Hot reload enabled for instant updates.
+
+4. **Production build (optional)**
+
+   ```bash
+   bun run build        # Builds minified bundle (45ms!)
+   bun run serve:prod   # Run production build
+   ```
+
+   ⚡ **Performance Note**: The server sets COOP/COEP headers that enable WASM SIMD + threading for **1.5-3× faster face detection** in Chrome/Edge browsers.
 
    **Option B: Python HTTP Server**
 
@@ -102,13 +102,11 @@ A powerful, client-side face detection and cropping application built with Media
 
 ### Development Mode
 
-For active development with automatic recompilation:
-
 ```bash
-npm run dev
+bun run dev
 ```
 
-This runs TypeScript in watch mode alongside the Node.js server, automatically recompiling on file changes.
+This runs TypeScript directly with **hot module reloading** - changes are reflected instantly without manual rebuilds!
 
 ## 📖 Usage Guide
 
@@ -275,24 +273,37 @@ See [PERFORMANCE.md](PERFORMANCE.md) for detailed benchmarks and technical detai
 - **ES2020 Target**: Modern JavaScript output for better performance
 - **Source Maps**: For debugging TypeScript in the browser
 
-### Available NPM Scripts
+### Available Scripts
 
 ```bash
-# Build TypeScript to JavaScript
-npm run build
+# Development - Run TypeScript directly with hot reload
+bun run dev
 
-# Watch mode - auto-rebuild on file changes
-npm run build:watch
+# Production start - Run TypeScript directly (no build needed)
+bun run start
 
-# Development mode - watch + server
-npm run dev
+# Build for production - Minified bundle with source maps
+bun run build
 
-# Start the server (requires built files)
-npm start
+# Type checking only - Verify types without building
+bun run type-check
+
+# Full production build - Bundle + type definitions
+bun run build:prod
+
+# Serve production build
+bun run serve:prod
 
 # Clean build artifacts
-npm run clean
+bun run clean
 ```
+
+**Why Bun?**
+
+- ⚡ **Instant startup** - No compilation wait
+- 🔥 **Hot reload** - See changes immediately
+- 📦 **45ms builds** - 10-100× faster than webpack/rollup
+- 🎯 **Native TypeScript** - Direct execution, no transpiling needed
 
 ### TypeScript Configuration
 
@@ -335,10 +346,10 @@ const detectionConfig = {
 };
 ```
 
-After making changes, rebuild the project:
+After making changes in development mode (`bun run dev`), changes are applied instantly with hot reload. For production, build with:
 
 ```bash
-npm run build
+bun run build
 ```
 
 ## 📄 License
@@ -355,21 +366,24 @@ Contributions are welcome! Please feel free to submit pull requests or open issu
 
 1. **Use TypeScript**: All new code should be written in TypeScript (`.ts` files)
 2. **Type Safety**: Maintain strict type checking - no `any` types without good reason
-3. **Build Before Commit**: Always run `npm run build` before committing
-4. **Test Thoroughly**: Test all three processing modes after changes
-5. **Source Control**: Only commit `.ts` files - `.js` files are auto-generated and git-ignored
+3. **Test with Hot Reload**: Use `bun run dev` for instant feedback during development
+4. **Type Check**: Run `bun run type-check` before committing
+5. **Test Thoroughly**: Test all three processing modes after changes
+6. **Source Control**: Commit `.ts` source files only
 
 ### Making Changes
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes in the TypeScript files
-4. Build and test (`npm run build && npm start`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+3. Start development server (`bun run dev`)
+4. Make your changes in the TypeScript files (hot reload applies them instantly)
+5. Type check (`bun run type-check`)
+6. Test thoroughly across all modes
+7. Commit your changes (`git commit -m 'Add amazing feature'`)
+8. Push to the branch (`git push origin feature/amazing-feature`)
+9. Open a Pull Request
 
-**Note**: Compiled JavaScript files (`.js`, `.js.map`, `.d.ts`) are automatically ignored by git and should not be committed.
+**Note**: Bun runs TypeScript directly in dev mode. Build artifacts in `dist/` are git-ignored and only needed for production deployments.
 
 ## 🔗 Links
 
