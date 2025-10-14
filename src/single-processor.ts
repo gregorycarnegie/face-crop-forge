@@ -14,10 +14,12 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     private faces: FaceData[];
     private selectedFaces: Set<number | string>;
     private rotationAngle: number = 0; // Track rotation in degrees (0, 90, 180, 270)
+    private autoReprocessTimer: number | null = null;
+    private readonly AUTO_REPROCESS_DELAY = 500; // ms delay for debouncing
 
     // UI Elements
     private imageInput!: HTMLInputElement;
-    private processImageBtn!: HTMLButtonElement;
+    private processImageBtn?: HTMLButtonElement; // Optional - may not exist in realtime mode
     private clearImageBtn!: HTMLButtonElement;
     private downloadResultsBtn!: HTMLButtonElement;
     protected progressSection!: HTMLElement;
@@ -34,7 +36,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     protected selectedFaceCount!: HTMLElement;
     private selectAllFacesBtn!: HTMLButtonElement;
     private selectNoneFacesBtn!: HTMLButtonElement;
-    private detectFacesBtn!: HTMLButtonElement;
+    private detectFacesBtn?: HTMLButtonElement; // Optional - may not exist in realtime mode
     private rotateClockwiseBtn!: HTMLButtonElement;
     private rotateCounterClockwiseBtn!: HTMLButtonElement;
 
@@ -81,7 +83,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
 
     private initializeElements(): void {
         this.imageInput = document.getElementById('imageInput') as HTMLInputElement;
-        this.processImageBtn = document.getElementById('processImageBtn') as HTMLButtonElement;
+        this.processImageBtn = document.getElementById('processImageBtn') as HTMLButtonElement | undefined;
         this.clearImageBtn = document.getElementById('clearImageBtn') as HTMLButtonElement;
         this.downloadResultsBtn = document.getElementById('downloadResultsBtn') as HTMLButtonElement;
         this.progressSection = document.getElementById('progressSection') as HTMLElement;
@@ -98,7 +100,7 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         this.selectedFaceCount = document.getElementById('selectedFaceCount') as HTMLElement;
         this.selectAllFacesBtn = document.getElementById('selectAllFacesBtn') as HTMLButtonElement;
         this.selectNoneFacesBtn = document.getElementById('selectNoneFacesBtn') as HTMLButtonElement;
-        this.detectFacesBtn = document.getElementById('detectFacesBtn') as HTMLButtonElement;
+        this.detectFacesBtn = document.getElementById('detectFacesBtn') as HTMLButtonElement | undefined;
         this.rotateClockwiseBtn = document.getElementById('rotateClockwiseBtn') as HTMLButtonElement;
         this.rotateCounterClockwiseBtn = document.getElementById('rotateCounterClockwiseBtn') as HTMLButtonElement;
 
@@ -136,28 +138,56 @@ class SingleImageFaceCropper extends BaseFaceCropper {
 
     private setupEventListeners(): void {
         this.imageInput.addEventListener('change', (e: Event) => this.handleImageUpload(e));
-        this.processImageBtn.addEventListener('click', () => this.processImage());
+        if (this.processImageBtn) {
+            this.processImageBtn.addEventListener('click', () => this.processImage());
+        }
         this.clearImageBtn.addEventListener('click', () => this.clearImage());
         this.downloadResultsBtn.addEventListener('click', () => this.downloadResults());
 
         // Face selection listeners
         this.selectAllFacesBtn.addEventListener('click', () => this.selectAllFaces());
         this.selectNoneFacesBtn.addEventListener('click', () => this.selectNoneFaces());
-        this.detectFacesBtn.addEventListener('click', () => this.detectFaces());
+        if (this.detectFacesBtn) {
+            this.detectFacesBtn.addEventListener('click', () => this.detectFaces());
+        }
 
         // Rotation listeners
         this.rotateClockwiseBtn.addEventListener('click', () => this.rotateImage(90));
         this.rotateCounterClockwiseBtn.addEventListener('click', () => this.rotateImage(-90));
 
-        // Settings listeners
-        this.outputWidth.addEventListener('input', () => this.updatePreview());
-        this.outputHeight.addEventListener('input', () => this.updatePreview());
-        this.faceHeightPct.addEventListener('input', () => this.updatePreview());
-        this.positioningMode.addEventListener('change', () => this.updateAdvancedPositioning());
-        this.verticalOffset.addEventListener('input', () => this.updateOffsetDisplay('vertical'));
-        this.horizontalOffset.addEventListener('input', () => this.updateOffsetDisplay('horizontal'));
-        this.aspectRatioLock.addEventListener('click', () => this.toggleAspectRatioLock());
-        this.sizePreset.addEventListener('change', () => this.applySizePreset());
+        // Settings listeners - trigger auto-reprocessing
+        this.outputWidth.addEventListener('input', () => {
+            this.updatePreview();
+            this.autoReprocess();
+        });
+        this.outputHeight.addEventListener('input', () => {
+            this.updatePreview();
+            this.autoReprocess();
+        });
+        this.faceHeightPct.addEventListener('input', () => {
+            this.updatePreview();
+            this.autoReprocess();
+        });
+        this.positioningMode.addEventListener('change', () => {
+            this.updateAdvancedPositioning();
+            this.autoReprocess();
+        });
+        this.verticalOffset.addEventListener('input', () => {
+            this.updateOffsetDisplay('vertical');
+            this.autoReprocess();
+        });
+        this.horizontalOffset.addEventListener('input', () => {
+            this.updateOffsetDisplay('horizontal');
+            this.autoReprocess();
+        });
+        this.aspectRatioLock.addEventListener('click', () => {
+            this.toggleAspectRatioLock();
+            this.autoReprocess();
+        });
+        this.sizePreset.addEventListener('change', () => {
+            this.applySizePreset();
+            this.autoReprocess();
+        });
         this.outputFormat.addEventListener('change', () => this.updateFormatSettings());
 
         // Navigation listeners
@@ -181,21 +211,42 @@ class SingleImageFaceCropper extends BaseFaceCropper {
             darkModeBtn.addEventListener('click', () => this.toggleDarkMode());
         }
 
-        // Enhancement listeners
+        // Enhancement listeners - trigger auto-reprocessing
         if (this.exposureAdjustment) {
-            this.exposureAdjustment.addEventListener('input', () => this.updateSliderValue('exposure'));
+            this.exposureAdjustment.addEventListener('input', () => {
+                this.updateSliderValue('exposure');
+                this.autoReprocess();
+            });
         }
         if (this.contrastAdjustment) {
-            this.contrastAdjustment.addEventListener('input', () => this.updateSliderValue('contrast'));
+            this.contrastAdjustment.addEventListener('input', () => {
+                this.updateSliderValue('contrast');
+                this.autoReprocess();
+            });
         }
         if (this.sharpnessControl) {
-            this.sharpnessControl.addEventListener('input', () => this.updateSliderValue('sharpness'));
+            this.sharpnessControl.addEventListener('input', () => {
+                this.updateSliderValue('sharpness');
+                this.autoReprocess();
+            });
         }
         if (this.skinSmoothing) {
-            this.skinSmoothing.addEventListener('input', () => this.updateSliderValue('skinSmoothing'));
+            this.skinSmoothing.addEventListener('input', () => {
+                this.updateSliderValue('skinSmoothing');
+                this.autoReprocess();
+            });
         }
         if (this.backgroundBlur) {
-            this.backgroundBlur.addEventListener('input', () => this.updateSliderValue('backgroundBlur'));
+            this.backgroundBlur.addEventListener('input', () => {
+                this.updateSliderValue('backgroundBlur');
+                this.autoReprocess();
+            });
+        }
+        if (this.autoColorCorrection) {
+            this.autoColorCorrection.addEventListener('change', () => this.autoReprocess());
+        }
+        if (this.redEyeRemoval) {
+            this.redEyeRemoval.addEventListener('change', () => this.autoReprocess());
         }
 
         // Drag and drop
@@ -237,13 +288,16 @@ class SingleImageFaceCropper extends BaseFaceCropper {
 
         try {
             const image = new Image();
-            image.onload = () => {
+            image.onload = async () => {
                 this.currentImage = image;
                 this.displayImage();
                 this.updateStats();
                 this.enableControls();
                 this.updateStatus(`Image loaded: ${file.name}`);
                 this.addToLog(`Image loaded: ${file.name} (${image.width}×${image.height})`);
+
+                // Automatically detect faces
+                await this.detectFaces();
             };
             image.src = URL.createObjectURL(file);
         } catch (error) {
@@ -342,13 +396,16 @@ class SingleImageFaceCropper extends BaseFaceCropper {
 
         // Create new image from rotated canvas
         const newImage = new Image();
-        newImage.onload = () => {
+        newImage.onload = async () => {
             this.currentImage = newImage;
             this.rotationAngle = 0; // Reset rotation angle since we've created a new rotated image
             this.displayImage();
             this.updateStats();
             this.updateStatus(`Image rotated ${degrees > 0 ? 'clockwise' : 'counter-clockwise'} by 90°`);
             this.addToLog(`Image rotated ${degrees > 0 ? 'clockwise' : 'counter-clockwise'} by 90°`);
+
+            // Automatically re-detect faces after rotation
+            await this.detectFaces();
         };
         newImage.src = tempCanvas.toDataURL();
     }
@@ -379,7 +436,11 @@ class SingleImageFaceCropper extends BaseFaceCropper {
             this.updateStats();
 
             if (this.faces.length > 0) {
-                this.processImageBtn.disabled = false;
+                if (this.processImageBtn) {
+                    this.processImageBtn.disabled = false;
+                }
+                // Automatically process the detected faces
+                await this.processImage();
             }
         } catch (error) {
             console.error('Error detecting faces:', error);
@@ -489,6 +550,8 @@ class SingleImageFaceCropper extends BaseFaceCropper {
             document.removeEventListener('mouseup', stopDrag);
             // Restore cursor
             overlay.style.cursor = 'move';
+            // Trigger auto-reprocess after drag ends
+            this.autoReprocess();
         };
 
         document.addEventListener('mousemove', handleDrag);
@@ -578,6 +641,8 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         const stopResize = () => {
             document.removeEventListener('mousemove', handleResize);
             document.removeEventListener('mouseup', stopResize);
+            // Trigger auto-reprocess after resize ends
+            this.autoReprocess();
         };
 
         document.addEventListener('mousemove', handleResize);
@@ -596,23 +661,48 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         }
         this.updateFaceOverlays();
         this.updateFaceCount();
+        this.autoReprocess();
     }
 
     selectAllFaces(): void {
         this.selectedFaces = new Set(this.faces.map(f => f.id));
         this.updateFaceOverlays();
         this.updateFaceCount();
+        this.autoReprocess();
     }
 
     selectNoneFaces(): void {
         this.selectedFaces.clear();
         this.updateFaceOverlays();
         this.updateFaceCount();
+        this.autoReprocess();
     }
 
     private updateFaceCount(): void {
         this.faceCount.textContent = this.faces.length.toString();
         this.selectedFaceCount.textContent = this.selectedFaces.size.toString();
+    }
+
+    /**
+     * Automatically reprocess the image with a debounce delay
+     * This is called when settings change or faces are selected/deselected
+     */
+    private autoReprocess(): void {
+        // Only auto-reprocess if we have faces and at least one is selected
+        if (!this.faces.length || !this.selectedFaces.size) {
+            return;
+        }
+
+        // Clear any pending auto-reprocess timer
+        if (this.autoReprocessTimer !== null) {
+            clearTimeout(this.autoReprocessTimer);
+        }
+
+        // Schedule a new auto-reprocess
+        this.autoReprocessTimer = window.setTimeout(() => {
+            this.processImage();
+            this.autoReprocessTimer = null;
+        }, this.AUTO_REPROCESS_DELAY);
     }
 
     private async processImage(): Promise<void> {
@@ -789,9 +879,13 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         const hasFaces = this.faces.length > 0;
         const hasSelectedFaces = this.selectedFaces.size > 0;
 
-        this.processImageBtn.disabled = !hasFaces || !hasSelectedFaces;
+        if (this.processImageBtn) {
+            this.processImageBtn.disabled = !hasFaces || !hasSelectedFaces;
+        }
         this.clearImageBtn.disabled = !hasImage;
-        this.detectFacesBtn.disabled = !hasImage;
+        if (this.detectFacesBtn) {
+            this.detectFacesBtn.disabled = !hasImage;
+        }
         this.rotateClockwiseBtn.disabled = !hasImage;
         this.rotateCounterClockwiseBtn.disabled = !hasImage;
         this.downloadResultsBtn.disabled = true;
