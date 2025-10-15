@@ -797,6 +797,20 @@ class SingleImageFaceCropper extends BaseFaceCropper {
             container.className = 'cropped-face-item';
 
             const canvas = result.image;
+
+            // Scale the canvas to fit the UI while maintaining aspect ratio
+            const maxDisplayWidth = 300;
+            const maxDisplayHeight = 300;
+            const scale = Math.min(
+                maxDisplayWidth / canvas.width,
+                maxDisplayHeight / canvas.height,
+                1 // Don't scale up, only scale down
+            );
+
+            canvas.style.width = (canvas.width * scale) + 'px';
+            canvas.style.height = (canvas.height * scale) + 'px';
+            canvas.style.display = 'block';
+            canvas.style.margin = '0 auto';
             canvas.className = 'cropped-face';
 
             const controls = document.createElement('div');

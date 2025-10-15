@@ -1,6 +1,6 @@
 {
   "name": "face-crop-forge",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Face detection and cropping tool using MediaPipe",
   "type": "module",
   "scripts": {
