@@ -389,7 +389,7 @@ Contributions are welcome! Please feel free to submit pull requests or open issu
 
 - [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/guide)
 - [Face Detection Documentation](https://developers.google.com/mediapipe/solutions/vision/face_detector)
-- [Project Repository](https://github.com) <!-- Update with actual repo URL -->
+- [Project Repository](https://github.com/gregorycarnegie/face-crop-forge) <!-- Update with actual repo URL -->
 
 ---
 
