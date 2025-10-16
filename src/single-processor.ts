@@ -40,6 +40,19 @@ class SingleImageFaceCropper extends BaseFaceCropper {
     private rotateClockwiseBtn!: HTMLButtonElement;
     private rotateCounterClockwiseBtn!: HTMLButtonElement;
 
+    // Webcam elements
+    private toggleWebcamBtn!: HTMLButtonElement;
+    private webcamModal!: HTMLElement;
+    private closeWebcamBtn!: HTMLButtonElement;
+    private webcamVideo!: HTMLVideoElement;
+    private webcamCanvas!: HTMLCanvasElement;
+    private webcamFaceOverlays!: HTMLElement;
+    private captureBtn!: HTMLButtonElement;
+    private switchCameraBtn!: HTMLButtonElement;
+    private webcamStream: MediaStream | null = null;
+    private webcamDevices: MediaDeviceInfo[] = [];
+    private currentDeviceIndex: number = 0;
+
     // Settings elements
     protected outputWidth!: HTMLInputElement;
     protected outputHeight!: HTMLInputElement;
@@ -104,6 +117,16 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         this.rotateClockwiseBtn = document.getElementById('rotateClockwiseBtn') as HTMLButtonElement;
         this.rotateCounterClockwiseBtn = document.getElementById('rotateCounterClockwiseBtn') as HTMLButtonElement;
 
+        // Webcam elements
+        this.toggleWebcamBtn = document.getElementById('toggleWebcamBtn') as HTMLButtonElement;
+        this.webcamModal = document.getElementById('webcamModal') as HTMLElement;
+        this.closeWebcamBtn = document.getElementById('closeWebcamBtn') as HTMLButtonElement;
+        this.webcamVideo = document.getElementById('webcamVideo') as HTMLVideoElement;
+        this.webcamCanvas = document.getElementById('webcamCanvas') as HTMLCanvasElement;
+        this.webcamFaceOverlays = document.getElementById('webcamFaceOverlays') as HTMLElement;
+        this.captureBtn = document.getElementById('captureBtn') as HTMLButtonElement;
+        this.switchCameraBtn = document.getElementById('switchCameraBtn') as HTMLButtonElement;
+
         // Settings elements
         this.outputWidth = document.getElementById('outputWidth') as HTMLInputElement;
         this.outputHeight = document.getElementById('outputHeight') as HTMLInputElement;
@@ -154,6 +177,12 @@ class SingleImageFaceCropper extends BaseFaceCropper {
         // Rotation listeners
         this.rotateClockwiseBtn.addEventListener('click', () => this.rotateImage(90));
         this.rotateCounterClockwiseBtn.addEventListener('click', () => this.rotateImage(-90));
+
+        // Webcam listeners
+        this.toggleWebcamBtn.addEventListener('click', () => this.openWebcam());
+        this.closeWebcamBtn.addEventListener('click', () => this.closeWebcam());
+        this.captureBtn.addEventListener('click', () => this.captureFromWebcam());
+        this.switchCameraBtn.addEventListener('click', () => this.switchCamera());
 
         // Settings listeners - trigger auto-reprocessing
         this.outputWidth.addEventListener('input', () => {
@@ -919,6 +948,94 @@ class SingleImageFaceCropper extends BaseFaceCropper {
             const time = Date.now() - this.processingStartTime;
             this.processingTime.textContent = time + 'ms';
         }
+    }
+
+    // Webcam functionality
+    private async openWebcam(): Promise<void> {
+        try {
+            // Get available video devices
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            this.webcamDevices = devices.filter(device => device.kind === 'videoinput');
+
+            if (this.webcamDevices.length === 0) {
+                this.updateStatus('No webcam devices found');
+                return;
+            }
+
+            // Start with the first device
+            await this.startWebcamStream(0);
+
+            // Show modal
+            this.webcamModal.classList.remove('hidden');
+            this.captureBtn.disabled = false;
+            this.switchCameraBtn.disabled = this.webcamDevices.length <= 1;
+
+        } catch (error) {
+            console.error('Error accessing webcam:', error);
+            this.updateStatus('Error accessing webcam: ' + (error as Error).message);
+        }
+    }
+
+    private async startWebcamStream(deviceIndex: number): Promise<void> {
+        // Stop existing stream if any
+        if (this.webcamStream) {
+            this.webcamStream.getTracks().forEach(track => track.stop());
+        }
+
+        const deviceId = this.webcamDevices[deviceIndex]?.deviceId;
+        const constraints: MediaStreamConstraints = {
+            video: deviceId ? { deviceId: { exact: deviceId } } : true
+        };
+
+        this.webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+        this.webcamVideo.srcObject = this.webcamStream;
+        this.currentDeviceIndex = deviceIndex;
+    }
+
+    private async switchCamera(): Promise<void> {
+        const nextIndex = (this.currentDeviceIndex + 1) % this.webcamDevices.length;
+        await this.startWebcamStream(nextIndex);
+    }
+
+    private async captureFromWebcam(): Promise<void> {
+        if (!this.webcamVideo || !this.webcamStream) return;
+
+        // Create a canvas to capture the current frame
+        const canvas = this.webcamCanvas;
+        canvas.width = this.webcamVideo.videoWidth;
+        canvas.height = this.webcamVideo.videoHeight;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Draw the current video frame to the canvas
+        ctx.drawImage(this.webcamVideo, 0, 0, canvas.width, canvas.height);
+
+        // Convert canvas to blob and then to File
+        canvas.toBlob(async (blob) => {
+            if (!blob) return;
+
+            const file = new File([blob], `webcam-${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+            // Close webcam modal
+            this.closeWebcam();
+
+            // Process the captured image
+            await this.handleFile(file);
+        }, 'image/jpeg', 0.95);
+    }
+
+    private closeWebcam(): void {
+        // Stop all webcam tracks
+        if (this.webcamStream) {
+            this.webcamStream.getTracks().forEach(track => track.stop());
+            this.webcamStream = null;
+        }
+
+        // Hide modal
+        this.webcamModal.classList.add('hidden');
+        this.captureBtn.disabled = true;
+        this.switchCameraBtn.disabled = true;
     }
 }
 

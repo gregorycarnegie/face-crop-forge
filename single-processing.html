@@ -26,6 +26,13 @@
 
             <div id="upload-card-container"></div>
 
+            <!-- Webcam Mode Button -->
+            <div class="webcam-toggle-container" style="text-align: center; margin-top: 10px;">
+                <button type="button" id="toggleWebcamBtn" class="ghost-btn" title="Use webcam">
+                    <span>📷 Use Webcam</span>
+                </button>
+            </div>
+
         </header>
 
         <div class="app-body">
@@ -175,5 +182,30 @@
     </script>
     <!-- JSZip for batch downloads -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+    <!-- Webcam Modal -->
+    <div id="webcamModal" class="modal hidden">
+        <div class="modal-content webcam-modal-content">
+            <div class="modal-header">
+                <h2>Webcam Capture</h2>
+                <button type="button" id="closeWebcamBtn" class="close-btn" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="webcam-container">
+                    <video id="webcamVideo" autoplay playsinline></video>
+                    <canvas id="webcamCanvas" style="display: none;"></canvas>
+                    <div id="webcamFaceOverlays" class="face-overlays"></div>
+                </div>
+                <div class="webcam-controls">
+                    <button type="button" id="captureBtn" class="primary-btn" disabled>
+                        <span>📸 Capture Photo</span>
+                    </button>
+                    <button type="button" id="switchCameraBtn" class="ghost-btn" disabled title="Switch camera">
+                        <span>🔄 Switch Camera</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
