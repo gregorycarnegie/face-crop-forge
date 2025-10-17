@@ -2421,3 +2421,14 @@ button:disabled {
     pointer-events: none;
     z-index: 10;
 }
+
+/* Webcam toggle container */
+.webcam-toggle-container {
+    text-align: center;
+    margin-top: 10px;
+}
+
+/* Webcam hidden canvas */
+.webcam-hidden-canvas {
+    display: none;
+}

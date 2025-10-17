@@ -27,7 +27,7 @@
             <div id="upload-card-container"></div>
 
             <!-- Webcam Mode Button -->
-            <div class="webcam-toggle-container" style="text-align: center; margin-top: 10px;">
+            <div class="webcam-toggle-container">
                 <button type="button" id="toggleWebcamBtn" class="ghost-btn" title="Use webcam">
                     <span>📷 Use Webcam</span>
                 </button>
@@ -193,7 +193,7 @@
             <div class="modal-body">
                 <div class="webcam-container">
                     <video id="webcamVideo" autoplay playsinline></video>
-                    <canvas id="webcamCanvas" style="display: none;"></canvas>
+                    <canvas id="webcamCanvas" class="webcam-hidden-canvas"></canvas>
                     <div id="webcamFaceOverlays" class="face-overlays"></div>
                 </div>
                 <div class="webcam-controls">
