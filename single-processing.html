@@ -1,26 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Single Image Face Cropping</title>
+    <title>Single Image Face Cropping - Face Crop Forge</title>
+    <meta name="description"
+        content="Process single images with real-time face detection. Adjust crops, rotate images, and download results instantly.">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://face-crop-forge.app/single-processing.html">
+    <meta property="og:title" content="Single Image Face Cropping - Face Crop Forge">
+    <meta property="og:description"
+        content="Process single images with real-time face detection. Adjust crops, rotate images, and download results instantly.">
+    <meta property="og:image" content="assets/og-image.jpg">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://face-crop-forge.app/single-processing.html">
+    <meta property="twitter:title" content="Single Image Face Cropping - Face Crop Forge">
+    <meta property="twitter:description"
+        content="Process single images with real-time face detection. Adjust crops, rotate images, and download results instantly.">
+    <meta property="twitter:image" content="assets/og-image.jpg">
+
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
     <script src="/dist/component-loader.js"></script>
 </head>
+
 <body>
     <div class="app-shell">
         <header class="app-header">
             <div class="title-row">
-                <h1><a href="index.html">Single Image Face Cropping</a></h1>
+                <h1><a href="index.html">Face Crop Forge</a></h1>
                 <div class="header-actions">
-                    <button type="button" id="backToMultipleBtn" class="ghost-btn" title="Switch to multiple image mode">
+                    <button type="button" id="backToMultipleBtn" class="ghost-btn"
+                        title="Switch to multiple image mode">
                         <span>Multiple Images</span>
                     </button>
                     <button type="button" id="csvBatchModeBtn" class="ghost-btn" title="Switch to CSV batch mode">
                         <span>CSV Batch</span>
                     </button>
-                    <button type="button" id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
+                    <button type="button" id="darkModeBtn" class="ghost-btn" title="Switch to dark mode"
+                        aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
                 </div>
             </div>
 
@@ -117,19 +145,25 @@
                                 </div>
                                 <div class="face-selection-controls">
                                     <div class="button-group rotation-controls">
-                                        <button type="button" id="rotateCounterClockwiseBtn" class="small-btn rotation-btn" disabled title="Rotate 90° counter-clockwise">
+                                        <button type="button" id="rotateCounterClockwiseBtn"
+                                            class="small-btn rotation-btn" disabled
+                                            title="Rotate 90° counter-clockwise">
                                             <span class="btn-icon">↶</span> 90°
                                         </button>
-                                        <button type="button" id="rotateClockwiseBtn" class="small-btn rotation-btn" disabled title="Rotate 90° clockwise">
+                                        <button type="button" id="rotateClockwiseBtn" class="small-btn rotation-btn"
+                                            disabled title="Rotate 90° clockwise">
                                             90° <span class="btn-icon">↷</span>
                                         </button>
                                     </div>
                                     <div class="button-group selection-controls">
-                                        <button type="button" id="selectAllFacesBtn" class="small-btn selection-btn">Select All</button>
-                                        <button type="button" id="selectNoneFacesBtn" class="small-btn selection-btn">Select None</button>
+                                        <button type="button" id="selectAllFacesBtn"
+                                            class="small-btn selection-btn">Select All</button>
+                                        <button type="button" id="selectNoneFacesBtn"
+                                            class="small-btn selection-btn">Select None</button>
                                     </div>
                                     <div class="button-group action-controls">
-                                        <button type="button" id="clearImageBtn" class="small-btn clear-btn" disabled>Clear Image</button>
+                                        <button type="button" id="clearImageBtn" class="small-btn clear-btn"
+                                            disabled>Clear Image</button>
                                     </div>
                                 </div>
                             </div>
@@ -138,7 +172,8 @@
                         <div class="cropped-faces workspace-card" id="croppedFaces">
                             <div class="cropped-faces-header">
                                 <h3>Cropped Faces:</h3>
-                                <button type="button" id="downloadResultsBtn" class="small-btn primary" disabled>Download Results</button>
+                                <button type="button" id="downloadResultsBtn" class="small-btn primary"
+                                    disabled>Download Results</button>
                             </div>
                             <div id="croppedContainer"></div>
                         </div>
@@ -208,4 +243,5 @@
         </div>
     </div>
 </body>
+
 </html>

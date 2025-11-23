@@ -1,26 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Batch Face Cropping</title>
+    <title>CSV Batch Face Cropping - Face Crop Forge</title>
+    <meta name="description"
+        content="Automate face cropping with CSV data. Map filenames to output names for organized, bulk image processing.">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://face-crop-forge.app/csv-processing.html">
+    <meta property="og:title" content="CSV Batch Face Cropping - Face Crop Forge">
+    <meta property="og:description"
+        content="Automate face cropping with CSV data. Map filenames to output names for organized, bulk image processing.">
+    <meta property="og:image" content="assets/og-image.jpg">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://face-crop-forge.app/csv-processing.html">
+    <meta property="twitter:title" content="CSV Batch Face Cropping - Face Crop Forge">
+    <meta property="twitter:description"
+        content="Automate face cropping with CSV data. Map filenames to output names for organized, bulk image processing.">
+    <meta property="twitter:image" content="assets/og-image.jpg">
+
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
     <script src="/dist/component-loader.js"></script>
 </head>
+
 <body>
     <div class="app-shell">
         <header class="app-header">
             <div class="title-row">
-                <h1><a href="index.html">CSV Batch Face Cropping</a></h1>
+                <h1><a href="index.html">Face Crop Forge</a></h1>
                 <div class="header-actions">
-                    <button type="button" id="multipleImageModeBtn" class="ghost-btn" title="Switch to multiple image mode">
+                    <button type="button" id="multipleImageModeBtn" class="ghost-btn"
+                        title="Switch to multiple image mode">
                         <span>Multiple Images</span>
                     </button>
                     <button type="button" id="singleImageModeBtn" class="ghost-btn" title="Switch to single image mode">
                         <span>Single Image</span>
                     </button>
-                    <button type="button" id="darkModeBtn" class="ghost-btn" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
+                    <button type="button" id="darkModeBtn" class="ghost-btn" title="Switch to dark mode"
+                        aria-label="Switch to dark mode" aria-pressed="false">🌙</button>
                 </div>
             </div>
 
@@ -62,94 +90,96 @@
         <div class="app-body">
             <aside class="control-panel">
                 <div class="control-scroll">
-        <div class="workflow-tools">
-            <h3 class="collapsible-header">
-                CSV Processing Status
-                <span class="collapse-icon">▼</span>
-            </h3>
-            <div class="collapsible-content">
+                    <div class="workflow-tools">
+                        <h3 class="collapsible-header">
+                            CSV Processing Status
+                            <span class="collapse-icon">▼</span>
+                        </h3>
+                        <div class="collapsible-content">
 
-                <div class="workflow-section">
-                    <h4>CSV Statistics</h4>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Rows</span>
-                            <span class="stat-value" id="totalRows">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Images Uploaded</span>
-                            <span class="stat-value" id="imagesUploaded">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Images Matched</span>
-                            <span class="stat-value" id="imagesMatched">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Processing Status</span>
-                            <span class="stat-value" id="processingStatus">Ready</span>
+                            <div class="workflow-section">
+                                <h4>CSV Statistics</h4>
+                                <div class="stats-grid">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Total Rows</span>
+                                        <span class="stat-value" id="totalRows">0</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Images Uploaded</span>
+                                        <span class="stat-value" id="imagesUploaded">0</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Images Matched</span>
+                                        <span class="stat-value" id="imagesMatched">0</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Processing Status</span>
+                                        <span class="stat-value" id="processingStatus">Ready</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="workflow-section">
+                                <h4>Processing Statistics</h4>
+                                <div class="stats-grid">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Total Faces Detected</span>
+                                        <span class="stat-value" id="totalFacesDetected">0</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Success Rate</span>
+                                        <span class="stat-value" id="successRate">0%</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Avg. Processing Time</span>
+                                        <span class="stat-value" id="avgProcessingTime">0ms</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Images Processed</span>
+                                        <span class="stat-value" id="imagesProcessed">0</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="workflow-section">
+                                <h4>File Loading Log</h4>
+                                <div class="processing-log" id="loadingLog">
+                                    <div class="log-entry">Ready to process CSV...</div>
+                                </div>
+                            </div>
+
+                            <div class="workflow-section">
+                                <h4>Processing Log</h4>
+                                <div class="processing-log" id="processingLog">
+                                    <div class="log-entry">Ready to process images...</div>
+                                </div>
+                            </div>
+
+                            <div class="workflow-section">
+                                <h4 class="collapsible-header error-log-header">
+                                    Error Details
+                                    <span class="collapse-icon">▼</span>
+                                </h4>
+                                <div class="collapsible-content error-log-panel">
+                                    <div class="error-log" id="errorLog">
+                                        <div class="log-entry">No errors detected</div>
+                                    </div>
+                                    <div class="error-actions">
+                                        <button type="button" id="clearErrorsBtn" class="reset-button">Clear
+                                            Errors</button>
+                                        <button type="button" id="exportErrorsBtn" class="export-btn">Export Error
+                                            Log</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="workflow-section">
-                    <h4>Processing Statistics</h4>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Faces Detected</span>
-                            <span class="stat-value" id="totalFacesDetected">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Success Rate</span>
-                            <span class="stat-value" id="successRate">0%</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Avg. Processing Time</span>
-                            <span class="stat-value" id="avgProcessingTime">0ms</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Images Processed</span>
-                            <span class="stat-value" id="imagesProcessed">0</span>
-                        </div>
-                    </div>
-                </div>
+                    <div id="crop-settings-container"></div>
 
-                <div class="workflow-section">
-                    <h4>File Loading Log</h4>
-                    <div class="processing-log" id="loadingLog">
-                        <div class="log-entry">Ready to process CSV...</div>
-                    </div>
-                </div>
+                    <div id="preprocessing-settings-container"></div>
 
-                <div class="workflow-section">
-                    <h4>Processing Log</h4>
-                    <div class="processing-log" id="processingLog">
-                        <div class="log-entry">Ready to process images...</div>
-                    </div>
-                </div>
-
-                <div class="workflow-section">
-                    <h4 class="collapsible-header error-log-header">
-                        Error Details
-                        <span class="collapse-icon">▼</span>
-                    </h4>
-                    <div class="collapsible-content error-log-panel">
-                        <div class="error-log" id="errorLog">
-                            <div class="log-entry">No errors detected</div>
-                        </div>
-                        <div class="error-actions">
-                            <button type="button" id="clearErrorsBtn" class="reset-button">Clear Errors</button>
-                            <button type="button" id="exportErrorsBtn" class="export-btn">Export Error Log</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="crop-settings-container"></div>
-
-        <div id="preprocessing-settings-container"></div>
-
-        <div id="output-settings-container"></div>
+                    <div id="output-settings-container"></div>
                 </div>
             </aside>
             <main class="workspace">
@@ -189,7 +219,8 @@
                             <div class="face-selection-controls">
                                 <button type="button" id="selectAllFacesBtn" class="small-btn">Select All Faces</button>
                                 <button type="button" id="selectNoneFacesBtn" class="small-btn">Select None</button>
-                                <button type="button" id="detectFacesBtn" class="small-btn primary">Detect Faces</button>
+                                <button type="button" id="detectFacesBtn" class="small-btn primary">Detect
+                                    Faces</button>
                             </div>
                         </div>
                     </div>
@@ -250,4 +281,5 @@
     <!-- JSZip for batch downloads -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </body>
+
 </html>
