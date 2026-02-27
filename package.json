@@ -4,14 +4,13 @@
   "description": "Face detection and cropping tool using MediaPipe",
   "type": "module",
   "scripts": {
-    "dev": "bun --hot src/server.ts",
-    "start": "bun src/server.ts",
-    "build": "bun build src/server.ts --outdir ./dist --target bun --minify --sourcemap",
-    "build:types": "tsc --emitDeclarationOnly",
-    "build:prod": "bun run build && bun run build:types",
-    "serve:prod": "bun dist/server.js",
-    "clean": "rimraf dist",
-    "type-check": "tsc --noEmit"
+    "dev": "trunk serve",
+    "build": "trunk build --release",
+    "check": "cargo check --target wasm32-unknown-unknown",
+    "fmt": "cargo fmt",
+    "lint": "cargo clippy --target wasm32-unknown-unknown -- -D warnings",
+    "test": "cargo test",
+    "clean": "cargo clean"
   },
   "devDependencies": {
     "@types/bun": "latest",

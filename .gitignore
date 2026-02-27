@@ -5,6 +5,7 @@ bun.lockb
 
 # Build output
 dist/
+target/
 *.js.map
 *.d.ts
 *.d.ts.map
