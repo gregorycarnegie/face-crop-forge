@@ -1,5 +1,42 @@
 use super::*;
 
+fn is_probably_image_file(file: &web_sys::File) -> bool {
+    let mime = file.type_().to_lowercase();
+    if mime.starts_with("image/") {
+        return true;
+    }
+    let name = file.name().to_lowercase();
+    [
+        ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif", ".tif", ".tiff",
+    ]
+    .iter()
+    .any(|ext| name.ends_with(ext))
+}
+
+fn revoke_blob_urls(urls: &HashMap<String, String>) {
+    for url in urls.values() {
+        if url.starts_with("blob:") {
+            revoke_object_url(url);
+        }
+    }
+}
+
+async fn build_preview_map_from_files(
+    files: &HashMap<String, web_sys::File>,
+) -> HashMap<String, String> {
+    let mut previews = HashMap::new();
+    for (id, file) in files {
+        if let Ok(url) = data_url_for_file(file).await {
+            previews.insert(id.clone(), url);
+            continue;
+        }
+        if let Some(url) = object_url_for_file(file) {
+            previews.insert(id.clone(), url);
+        }
+    }
+    previews
+}
+
 #[component]
 pub(super) fn AppShell(title: &'static str, children: Children) -> impl IntoView {
     view! {
@@ -243,17 +280,21 @@ pub(super) fn BatchUploadCard(
                 let Some(data) = ev.data_transfer() else {
                     return;
                 };
-                let Some(files) = data.files() else {
-                    return;
-                };
-                for url in preview_urls.get().values() {
-                    revoke_object_url(url);
-                }
-                let mut ids = Vec::new();
-                let mut files_map = HashMap::new();
-                let mut previews = HashMap::new();
-                for idx in 0..files.length() {
-                    if let Some(file) = files.get(idx) {
+                let old_previews = preview_urls.get();
+                let state_for_drop = state;
+                let queue_for_drop = queue;
+                let files_by_id_for_drop = files_by_id;
+                let preview_urls_for_drop = preview_urls;
+                let progress_for_drop = progress;
+                leptos::task::spawn_local(async move {
+                    let dropped_files = files_from_data_transfer(data).await.unwrap_or_default();
+                    let mut ids = Vec::new();
+                    let mut files_map = HashMap::new();
+                    let mut previews = HashMap::new();
+                    for (idx, file) in dropped_files.into_iter().enumerate() {
+                        if !is_probably_image_file(&file) {
+                            continue;
+                        }
                         let id = format!(
                             "{}::{}::{}::{}",
                             file.name(),
@@ -267,28 +308,33 @@ pub(super) fn BatchUploadCard(
                         files_map.insert(id.clone(), file);
                         ids.push(id);
                     }
-                }
-                let count = ids.len();
-                let queue_state = BatchQueueState::from_files(ids, 20);
-                let queued_pages = queue_state.queued_pages_count();
-                let queued_files = queue_state.queued_files_count();
-                let initial_loaded = queue_state.loaded_ids.len();
-                state.update(|s| s.set_images(queue_state.loaded_ids.clone()));
-                queue.set(queue_state);
-                files_by_id.set(files_map);
-                preview_urls.set(previews);
-                progress.update(|p| {
-                    p.reset();
-                    p.status = if queued_pages > 0 {
-                        format!(
-                            "Loaded first {} image(s); queued {} image(s) across {} page(s).",
-                            initial_loaded,
-                            queued_files,
-                            queued_pages
-                        )
-                    } else {
-                        format!("Loaded {count} image(s). Ready to process.")
-                    };
+                    let count = ids.len();
+                    let queue_state = BatchQueueState::from_files(ids, 20);
+                    let queued_pages = queue_state.queued_pages_count();
+                    let queued_files = queue_state.queued_files_count();
+                    let initial_loaded = queue_state.loaded_ids.len();
+                    let files_for_previews = files_map.clone();
+                    state_for_drop.update(|s| s.set_images(queue_state.loaded_ids.clone()));
+                    queue_for_drop.set(queue_state);
+                    files_by_id_for_drop.set(files_map);
+                    preview_urls_for_drop.set(previews);
+                    let preview_urls_for_task = preview_urls_for_drop;
+                    let final_previews = build_preview_map_from_files(&files_for_previews).await;
+                    preview_urls_for_task.set(final_previews);
+                    revoke_blob_urls(&old_previews);
+                    progress_for_drop.update(|p| {
+                        p.reset();
+                        p.status = if queued_pages > 0 {
+                            format!(
+                                "Loaded first {} image(s); queued {} image(s) across {} page(s).",
+                                initial_loaded,
+                                queued_files,
+                                queued_pages
+                            )
+                        } else {
+                            format!("Loaded {count} image(s). Ready to process.")
+                        };
+                    });
                 });
             }
         >
@@ -312,14 +358,15 @@ pub(super) fn BatchUploadCard(
                         let Some(files) = input.files() else {
                             return;
                         };
-                        for url in preview_urls.get().values() {
-                            revoke_object_url(url);
-                        }
+                        let old_previews = preview_urls.get();
                         let mut ids = Vec::new();
                         let mut files_map = HashMap::new();
                         let mut previews = HashMap::new();
                         for idx in 0..files.length() {
                             if let Some(file) = files.get(idx) {
+                                if !is_probably_image_file(&file) {
+                                    continue;
+                                }
                                 let id = format!(
                                     "{}::{}::{}::{}",
                                     file.name(),
@@ -339,10 +386,18 @@ pub(super) fn BatchUploadCard(
                         let queued_pages = queue_state.queued_pages_count();
                         let queued_files = queue_state.queued_files_count();
                         let initial_loaded = queue_state.loaded_ids.len();
+                        let files_for_previews = files_map.clone();
                         state.update(|s| s.set_images(queue_state.loaded_ids.clone()));
                         queue.set(queue_state);
                         files_by_id.set(files_map);
                         preview_urls.set(previews);
+                        let preview_urls_for_task = preview_urls;
+                        leptos::task::spawn_local(async move {
+                            let final_previews = build_preview_map_from_files(&files_for_previews)
+                                .await;
+                            preview_urls_for_task.set(final_previews);
+                            revoke_blob_urls(&old_previews);
+                        });
                         progress.update(|p| {
                             p.reset();
                             p.status = if queued_pages > 0 {
@@ -590,19 +645,23 @@ pub(super) fn CsvImageUploadCard(
                 let Some(data) = ev.data_transfer() else {
                     return;
                 };
-                let Some(files) = data.files() else {
-                    return;
-                };
-                for url in preview_urls.get().values() {
-                    revoke_object_url(url);
-                }
+                let old_previews = preview_urls.get();
                 let csv = csv_state.get();
-                let mut ids = Vec::new();
-                let mut file_map = HashMap::new();
-                let mut preview_map = HashMap::new();
-                let mut source_name_map = HashMap::new();
-                for idx in 0..files.length() {
-                    if let Some(file) = files.get(idx) {
+                let state_for_drop = state;
+                let queue_for_drop = queue;
+                let files_by_id_for_drop = files_by_id;
+                let preview_urls_for_drop = preview_urls;
+                let source_name_by_id_for_drop = source_name_by_id;
+                leptos::task::spawn_local(async move {
+                    let dropped_files = files_from_data_transfer(data).await.unwrap_or_default();
+                    let mut ids = Vec::new();
+                    let mut file_map = HashMap::new();
+                    let mut preview_map = HashMap::new();
+                    let mut source_name_map = HashMap::new();
+                    for (idx, file) in dropped_files.into_iter().enumerate() {
+                        if !is_probably_image_file(&file) {
+                            continue;
+                        }
                         let source_name = file.name();
                         if csv.output_name_for_file(&source_name).is_none() {
                             continue;
@@ -621,13 +680,18 @@ pub(super) fn CsvImageUploadCard(
                         file_map.insert(id.clone(), file);
                         ids.push(id);
                     }
-                }
-                let queue_state = BatchQueueState::from_files(ids, 20);
-                state.update(|s| s.set_images(queue_state.loaded_ids.clone()));
-                queue.set(queue_state);
-                files_by_id.set(file_map);
-                preview_urls.set(preview_map);
-                source_name_by_id.set(source_name_map);
+                    let queue_state = BatchQueueState::from_files(ids, 20);
+                    let files_for_previews = file_map.clone();
+                    state_for_drop.update(|s| s.set_images(queue_state.loaded_ids.clone()));
+                    queue_for_drop.set(queue_state);
+                    files_by_id_for_drop.set(file_map);
+                    preview_urls_for_drop.set(preview_map);
+                    source_name_by_id_for_drop.set(source_name_map);
+                    let preview_urls_for_task = preview_urls_for_drop;
+                    let final_previews = build_preview_map_from_files(&files_for_previews).await;
+                    preview_urls_for_task.set(final_previews);
+                    revoke_blob_urls(&old_previews);
+                });
             }
         >
             <label class="file-label" for="imageInput">
@@ -650,9 +714,7 @@ pub(super) fn CsvImageUploadCard(
                         let Some(files) = input.files() else {
                             return;
                         };
-                        for url in preview_urls.get().values() {
-                            revoke_object_url(url);
-                        }
+                        let old_previews = preview_urls.get();
                         let csv = csv_state.get();
                         let mut ids = Vec::new();
                         let mut file_map = HashMap::new();
@@ -660,6 +722,9 @@ pub(super) fn CsvImageUploadCard(
                         let mut source_name_map = HashMap::new();
                         for idx in 0..files.length() {
                             if let Some(file) = files.get(idx) {
+                                if !is_probably_image_file(&file) {
+                                    continue;
+                                }
                                 let source_name = file.name();
                                 if csv.output_name_for_file(&source_name).is_none() {
                                     continue;
@@ -680,11 +745,19 @@ pub(super) fn CsvImageUploadCard(
                             }
                         }
                         let queue_state = BatchQueueState::from_files(ids, 20);
+                        let files_for_previews = file_map.clone();
                         state.update(|s| s.set_images(queue_state.loaded_ids.clone()));
                         queue.set(queue_state);
                         files_by_id.set(file_map);
                         preview_urls.set(preview_map);
                         source_name_by_id.set(source_name_map);
+                        let preview_urls_for_task = preview_urls;
+                        leptos::task::spawn_local(async move {
+                            let final_previews = build_preview_map_from_files(&files_for_previews)
+                                .await;
+                            preview_urls_for_task.set(final_previews);
+                            revoke_blob_urls(&old_previews);
+                        });
                     }
                 />
             </label>

@@ -146,7 +146,7 @@ pub fn stop_face_worker(state: &mut FaceWorkerBridgeState) {
 const fn default_status() -> FaceWorkerStatus {
     #[cfg(target_arch = "wasm32")]
     {
-        FaceWorkerStatus::Idle
+        FaceWorkerStatus::Stopped
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -467,10 +467,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_state_is_idle_or_unsupported() {
+    fn default_state_is_stopped_or_unsupported() {
         let state = FaceWorkerBridgeState::default();
         #[cfg(target_arch = "wasm32")]
-        assert_eq!(state.status, FaceWorkerStatus::Idle);
+        assert_eq!(state.status, FaceWorkerStatus::Stopped);
         #[cfg(not(target_arch = "wasm32"))]
         assert_eq!(state.status, FaceWorkerStatus::Unsupported);
     }

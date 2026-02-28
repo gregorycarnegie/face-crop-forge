@@ -324,7 +324,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                         continue;
                                     }
 
-                                    let start = Instant::now();
+                                    let start_ms = now_ms();
                                     let mut success_faces: Option<Vec<DetectedFace>> = None;
                                     let mut last_error = String::new();
                                     for _ in 0..=1 {
@@ -349,7 +349,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             Err(error) => last_error = error,
                                         }
                                     }
-                                    let elapsed_ms = start.elapsed().as_millis() as u64;
+                                    let elapsed_ms = elapsed_ms_since(start_ms);
                                     match success_faces {
                                         Some(faces) => {
                                             let face_count = faces.len();
@@ -533,7 +533,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                         batch_state_for_run.update(|s| s.mark_error(&id));
                                         continue;
                                     }
-                                    let start = Instant::now();
+                                    let start_ms = now_ms();
                                     let mut success_faces: Option<Vec<DetectedFace>> = None;
                                     let mut last_error = String::new();
                                     for _ in 0..=1 {
@@ -558,7 +558,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             Err(error) => last_error = error,
                                         }
                                     }
-                                    let elapsed_ms = start.elapsed().as_millis() as u64;
+                                    let elapsed_ms = elapsed_ms_since(start_ms);
                                     match success_faces {
                                         Some(faces) => {
                                             let face_count = faces.len();

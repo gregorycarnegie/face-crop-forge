@@ -112,6 +112,226 @@ pub(super) fn object_url_for_file(_file: &web_sys::File) -> Option<String> {
 }
 
 #[cfg(target_arch = "wasm32")]
+pub(super) fn now_ms() -> u64 {
+    web_sys::js_sys::Date::now() as u64
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn now_ms() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+pub(super) fn elapsed_ms_since(start_ms: u64) -> u64 {
+    now_ms().saturating_sub(start_ms)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(super) async fn data_url_for_file(file: &web_sys::File) -> Result<String, String> {
+    use web_sys::js_sys::{Function, Promise};
+    use web_sys::wasm_bindgen::JsCast;
+    use web_sys::wasm_bindgen::JsValue;
+    use web_sys::wasm_bindgen::closure::Closure;
+
+    let reader = web_sys::FileReader::new().map_err(|err| format!("{err:?}"))?;
+
+    let promise = Promise::new(&mut move |resolve: Function, reject: Function| {
+        let resolve_fn = resolve.clone();
+        let reject_fn = reject.clone();
+        let reader_for_load = reader.clone();
+        let onload = Closure::once(move || {
+            let result = reader_for_load.result();
+            match result {
+                Ok(value) => {
+                    let _ = resolve_fn.call1(&JsValue::NULL, &value);
+                }
+                Err(err) => {
+                    let _ = reject_fn.call1(
+                        &JsValue::NULL,
+                        &JsValue::from(format!("FileReader result failed: {err:?}")),
+                    );
+                }
+            }
+        });
+
+        let reader_clone = reader.clone();
+        let reject_fn = reject.clone();
+        let onerror = Closure::once(move || {
+            let _ = reject_fn.call1(
+                &JsValue::NULL,
+                &JsValue::from(format!(
+                    "FileReader read failed (ready_state={})",
+                    reader_clone.ready_state()
+                )),
+            );
+        });
+
+        reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+        reader.set_onerror(Some(onerror.as_ref().unchecked_ref()));
+        onload.forget();
+        onerror.forget();
+
+        if let Err(err) = reader.read_as_data_url(file) {
+            let _ = reject.call1(
+                &JsValue::NULL,
+                &JsValue::from(format!("read_as_data_url failed: {err:?}")),
+            );
+        }
+    });
+
+    let value = JsFuture::from(promise)
+        .await
+        .map_err(|err| format!("read_as_data_url rejected: {err:?}"))?;
+    value
+        .as_string()
+        .ok_or_else(|| "FileReader did not produce a string result".to_string())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) async fn data_url_for_file(_file: &web_sys::File) -> Result<String, String> {
+    Err("Data URL conversion is only available on wasm32".to_string())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(super) async fn files_from_data_transfer(
+    data: web_sys::DataTransfer,
+) -> Result<Vec<web_sys::File>, String> {
+    use web_sys::js_sys::{Array, Function, Promise};
+    use web_sys::wasm_bindgen::JsCast;
+    use web_sys::wasm_bindgen::JsValue;
+
+    // Extract files from drop payload, including recursive folder traversal via webkit entries.
+    let extractor = Function::new_with_args(
+        "dt",
+        r#"
+        const fromList = (list) => {
+          const out = [];
+          for (let i = 0; i < list.length; i++) {
+            const file = list[i];
+            if (file) out.push(file);
+          }
+          return out;
+        };
+
+        const walkHandle = async (handle) => {
+          if (!handle) return [];
+          if (handle.kind === 'file') {
+            try {
+              const file = await handle.getFile();
+              return file ? [file] : [];
+            } catch {
+              return [];
+            }
+          }
+          if (handle.kind !== 'directory') return [];
+          const out = [];
+          try {
+            for await (const entry of handle.values()) {
+              const nested = await walkHandle(entry);
+              out.push(...nested);
+            }
+          } catch {
+            // ignore and return what we gathered
+          }
+          return out;
+        };
+
+        const walkEntry = (entry) => new Promise((resolve) => {
+          if (!entry) return resolve([]);
+          if (entry.isFile) {
+            entry.file((file) => resolve(file ? [file] : []), () => resolve([]));
+            return;
+          }
+          if (!entry.isDirectory) return resolve([]);
+          const reader = entry.createReader();
+          const out = [];
+          const pump = () => {
+            reader.readEntries(async (entries) => {
+              if (!entries || entries.length === 0) return resolve(out);
+              for (const child of entries) {
+                const nested = await walkEntry(child);
+                out.push(...nested);
+              }
+              pump();
+            }, () => resolve(out));
+          };
+          pump();
+        });
+
+        return (async () => {
+          const items = dt?.items ? Array.from(dt.items) : [];
+
+          // Modern Chromium folder/file drops via File System Access API.
+          const supportsHandles = items.some((item) => item && typeof item.getAsFileSystemHandle === 'function');
+          if (supportsHandles) {
+            const handles = [];
+            for (const item of items) {
+              if (!item || typeof item.getAsFileSystemHandle !== 'function') continue;
+              try {
+                const handle = await item.getAsFileSystemHandle();
+                if (handle) handles.push(handle);
+              } catch {
+                // ignore and continue
+              }
+            }
+            if (handles.length > 0) {
+              const nested = await Promise.all(handles.map(walkHandle));
+              const files = nested.flat();
+              if (files.length > 0) return files;
+            }
+          }
+
+          // Legacy Chromium/WebKit folder drops.
+          const entries = items
+            .map((item) => item && typeof item.webkitGetAsEntry === 'function'
+              ? item.webkitGetAsEntry()
+              : null)
+            .filter(Boolean);
+          if (entries.length > 0) {
+            const nested = await Promise.all(entries.map(walkEntry));
+            const files = nested.flat();
+            if (files.length > 0) return files;
+          }
+
+          // Standard file drops.
+          if (dt?.files?.length) return fromList(dt.files);
+
+          const direct = items
+            .map((item) => item && typeof item.getAsFile === 'function' ? item.getAsFile() : null)
+            .filter(Boolean);
+          return direct;
+        })();
+        "#,
+    );
+
+    let promise_value = extractor
+        .call1(&JsValue::NULL, data.as_ref())
+        .map_err(|err| format!("DataTransfer extraction failed: {err:?}"))?;
+    let js_files = JsFuture::from(Promise::from(promise_value))
+        .await
+        .map_err(|err| format!("DataTransfer extraction rejected: {err:?}"))?;
+    let arr = Array::from(&js_files);
+    let mut files = Vec::with_capacity(arr.length() as usize);
+    for idx in 0..arr.length() {
+        let value = arr.get(idx);
+        if let Ok(file) = value.dyn_into::<web_sys::File>() {
+            files.push(file);
+        }
+    }
+    Ok(files)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) async fn files_from_data_transfer(
+    _data: web_sys::DataTransfer,
+) -> Result<Vec<web_sys::File>, String> {
+    Ok(Vec::new())
+}
+
+#[cfg(target_arch = "wasm32")]
 pub(super) fn revoke_object_url(url: &str) {
     let _ = web_sys::Url::revoke_object_url(url);
 }

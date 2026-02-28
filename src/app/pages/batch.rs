@@ -254,7 +254,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         continue;
                                     }
 
-                                    let run_start = Instant::now();
+                                    let run_start_ms = now_ms();
                                     let mut success_faces: Option<Vec<DetectedFace>> = None;
                                     let mut last_error = String::new();
                                     let mut attempts = 0_u32;
@@ -283,7 +283,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                             }
                                         }
                                     }
-                                    let elapsed_ms = run_start.elapsed().as_millis() as u64;
+                                    let elapsed_ms = elapsed_ms_since(run_start_ms);
 
                                     match success_faces {
                                         Some(faces) => {
@@ -484,7 +484,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         continue;
                                     }
 
-                                    let run_start = Instant::now();
+                                    let run_start_ms = now_ms();
                                     let mut success_faces: Option<Vec<DetectedFace>> = None;
                                     let mut last_error = String::new();
                                     let mut attempts = 0_u32;
@@ -513,7 +513,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                             }
                                         }
                                     }
-                                    let elapsed_ms = run_start.elapsed().as_millis() as u64;
+                                    let elapsed_ms = elapsed_ms_since(run_start_ms);
 
                                     match success_faces {
                                         Some(faces) => {

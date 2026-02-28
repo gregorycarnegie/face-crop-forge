@@ -31,7 +31,6 @@ use crate::worker_bridge::{
 };
 use leptos::prelude::*;
 use std::collections::HashMap;
-use std::time::Instant;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{DragEvent, HtmlInputElement};
 
