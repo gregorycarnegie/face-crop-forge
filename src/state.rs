@@ -44,28 +44,15 @@ impl Default for ProcessingSettings {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct UiState {
-    pub dark_mode: bool,
-    pub model_loaded: bool,
-    pub is_processing: bool,
-    pub status_message: String,
-}
-
 #[derive(Copy, Clone)]
 pub struct AppState {
     pub settings: RwSignal<ProcessingSettings>,
-    pub ui: RwSignal<UiState>,
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
             settings: RwSignal::new(ProcessingSettings::default()),
-            ui: RwSignal::new(UiState {
-                status_message: "Ready".to_string(),
-                ..UiState::default()
-            }),
         }
     }
 }

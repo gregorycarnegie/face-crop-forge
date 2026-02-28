@@ -1,3 +1,4 @@
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SizePresetName {
     LinkedIn,
@@ -15,6 +16,7 @@ pub enum ThemeMode {
     Dark,
 }
 
+#[cfg(test)]
 pub fn extract_file_name(file_path: &str) -> String {
     file_path
         .rsplit(['/', '\\'])
@@ -23,6 +25,7 @@ pub fn extract_file_name(file_path: &str) -> String {
         .to_string()
 }
 
+#[cfg(test)]
 pub fn escape_html(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -31,6 +34,7 @@ pub fn escape_html(text: &str) -> String {
         .replace('\'', "&#39;")
 }
 
+#[cfg(test)]
 pub fn processing_status_short(message: &str) -> String {
     message
         .split('.')
@@ -40,10 +44,12 @@ pub fn processing_status_short(message: &str) -> String {
         .to_string()
 }
 
+#[cfg(test)]
 pub fn generate_image_id(timestamp_ms: u64, sequence: u32) -> String {
     format!("img_{timestamp_ms}_{:09x}", sequence)
 }
 
+#[cfg(test)]
 pub fn find_matching_preset(width: u32, height: u32) -> SizePresetName {
     match (width, height) {
         (400, 400) => SizePresetName::LinkedIn,
@@ -56,6 +62,7 @@ pub fn find_matching_preset(width: u32, height: u32) -> SizePresetName {
     }
 }
 
+#[cfg(test)]
 pub fn aspect_ratio_display(width: u32, height: u32) -> String {
     if width == 0 || height == 0 {
         return "0.00:1 ratio".to_string();
@@ -77,6 +84,7 @@ pub fn aspect_ratio_display(width: u32, height: u32) -> String {
     format!("{ratio_text} ratio")
 }
 
+#[cfg(test)]
 pub fn preview_text(width: u32, height: u32, face_height_pct: u8, output_format: &str) -> String {
     format!(
         "{}×{}px, face at {}% height, {} format",
@@ -94,6 +102,7 @@ pub fn toggle_theme(mode: ThemeMode) -> ThemeMode {
     }
 }
 
+#[cfg(test)]
 pub fn theme_storage_value(mode: ThemeMode) -> Option<&'static str> {
     match mode {
         ThemeMode::Dark => Some("dark"),
@@ -101,6 +110,7 @@ pub fn theme_storage_value(mode: ThemeMode) -> Option<&'static str> {
     }
 }
 
+#[cfg(test)]
 pub fn theme_from_storage(value: Option<&str>) -> ThemeMode {
     if matches!(value, Some("dark")) {
         ThemeMode::Dark

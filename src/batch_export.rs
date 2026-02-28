@@ -1,15 +1,11 @@
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ExportMode {
-    Zip,
-    Individual,
-}
-
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DownloadEntry {
     pub file_name: String,
     pub source_image: String,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ZipPlan {
     pub zip_name: String,
@@ -70,10 +66,12 @@ impl BatchProgress {
     }
 }
 
+#[cfg(test)]
 pub fn default_zip_name(timestamp_utc: &str) -> String {
     format!("face-crops-{}.zip", timestamp_utc)
 }
 
+#[cfg(test)]
 pub fn plan_zip_export(entries: &[DownloadEntry], timestamp_utc: &str) -> ZipPlan {
     ZipPlan {
         zip_name: default_zip_name(timestamp_utc),

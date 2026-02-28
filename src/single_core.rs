@@ -83,6 +83,7 @@ pub struct DisplaySize {
 }
 
 impl SingleCoreState {
+    #[cfg(test)]
     pub fn new(face_ids: Vec<String>) -> Self {
         let selected_face_ids = face_ids.iter().cloned().collect();
         Self {

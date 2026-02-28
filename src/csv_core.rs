@@ -17,6 +17,7 @@ pub struct CsvCoreState {
     pub filename_to_output: HashMap<String, String>,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MatchedUpload {
     pub file_name: String,
@@ -36,6 +37,7 @@ pub struct CsvExportNameContext<'a> {
 }
 
 impl CsvCoreState {
+    #[cfg(test)]
     pub fn set_headers(&mut self, headers: Vec<String>) {
         self.headers = headers;
         self.rows.clear();
@@ -123,16 +125,19 @@ impl CsvCoreState {
         true
     }
 
+    #[cfg(test)]
     pub fn mapped_file_name<'a>(&self, row: &'a CsvRow) -> Option<&'a str> {
         let mapping = self.mapping.as_ref()?;
         row.0.get(&mapping.file_name_column).map(|s| s.as_str())
     }
 
+    #[cfg(test)]
     pub fn mapped_file_path<'a>(&self, row: &'a CsvRow) -> Option<&'a str> {
         let mapping = self.mapping.as_ref()?;
         row.0.get(&mapping.file_path_column).map(|s| s.as_str())
     }
 
+    #[cfg(test)]
     pub fn build_output_name(&self, row: &CsvRow, fallback_original_name: &str) -> String {
         self.mapped_file_name(row)
             .filter(|value| !value.trim().is_empty())
@@ -179,6 +184,7 @@ impl CsvCoreState {
         }
     }
 
+    #[cfg(test)]
     pub fn match_uploaded_files(&self, uploaded_file_names: &[String]) -> Vec<MatchedUpload> {
         let mut matched = Vec::new();
         for file_name in uploaded_file_names {

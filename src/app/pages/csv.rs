@@ -908,7 +908,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             {move || {
                                                 let (source_width, source_height) = csv_current_dimensions.get();
                                                 if source_width <= 0.0 || source_height <= 0.0 {
-                                                    return view! {}.into_any();
+                                                    return ().into_any();
                                                 }
                                                 csv_current_faces
                                                     .get()

@@ -60,7 +60,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                 crate::worker_bridge::FaceWorkerStatus::Starting
             )
     });
-    let browser_capabilities = Signal::derive(move || detect_browser_capabilities());
+    let browser_capabilities = Signal::derive(detect_browser_capabilities);
     let mediapipe_plan = Signal::derive(move || {
         build_load_plan(
             browser_capabilities.get(),
@@ -415,7 +415,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                     {move || {
                                                         let (source_width, source_height) = source_image_dimensions.get();
                                                         if source_width <= 0.0 || source_height <= 0.0 {
-                                                            return view! {}.into_any();
+                                                            return ().into_any();
                                                         }
                                                         let selected_ids = single_state.get().selected_face_ids;
                                                         detected_faces
@@ -556,9 +556,8 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                     state
                                                         .all_face_ids
                                                         .iter()
-                                                        .cloned()
                                                         .map(|face_id| {
-                                                            let is_selected = state.selected_face_ids.contains(&face_id);
+                                                            let is_selected = state.selected_face_ids.contains(face_id);
                                                             let label = if is_selected {
                                                                 format!("{face_id} ✓")
                                                             } else {

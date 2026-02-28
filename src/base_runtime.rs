@@ -16,6 +16,7 @@ pub struct MemoryIndicator {
     pub text: String,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryManagementMode {
     Aggressive,
@@ -23,6 +24,7 @@ pub enum MemoryManagementMode {
     Manual,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MemoryCleanupEntry {
     pub id: String,
@@ -73,6 +75,7 @@ pub struct DetectionRetryPolicy {
     pub reduced_resolution: bool,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DetectionAttempt {
     pub attempt: u32,
@@ -81,6 +84,7 @@ pub struct DetectionAttempt {
     pub success: bool,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DetectionOutcome {
     pub image_id: String,
@@ -91,6 +95,7 @@ pub struct DetectionOutcome {
     pub error_message: Option<String>,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FaceRect {
     pub x: f32,
@@ -121,6 +126,7 @@ pub fn build_memory_indicator(images: usize, processed: usize, errors: usize) ->
     }
 }
 
+#[cfg(test)]
 pub fn cleanup_candidate_ids(
     mode: MemoryManagementMode,
     entries: &[MemoryCleanupEntry],
@@ -142,6 +148,7 @@ pub fn cleanup_candidate_ids(
         .collect()
 }
 
+#[cfg(test)]
 pub fn retry_delay_ms(attempt: u32) -> u64 {
     // TS behavior: delay(1000 * attempt) for retry attempt N.
     (attempt as u64).saturating_mul(1000)
@@ -153,6 +160,7 @@ pub fn parse_max_retries(raw_value: Option<&str>) -> u32 {
         .unwrap_or(0)
 }
 
+#[cfg(test)]
 pub fn reduced_resolution_dimensions(source: Dimensions, enabled: bool) -> Dimensions {
     if !enabled {
         return source;
@@ -183,6 +191,7 @@ pub fn validate_image_meta(
     Ok(())
 }
 
+#[cfg(test)]
 pub fn model_detection_retry_outcome(
     image_id: &str,
     source_dimensions: Dimensions,
@@ -242,6 +251,7 @@ pub fn model_detection_retry_outcome(
     }
 }
 
+#[cfg(test)]
 pub fn scale_faces_after_reduced_resolution(faces: &[FaceRect], scale: f32) -> Vec<FaceRect> {
     faces
         .iter()

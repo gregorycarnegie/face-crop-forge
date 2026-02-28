@@ -152,6 +152,7 @@ pub fn build_load_plan(
     }
 }
 
+#[cfg(test)]
 pub fn validate_asset_path(path: &str) -> bool {
     path.starts_with('/') && !path.contains("..")
 }

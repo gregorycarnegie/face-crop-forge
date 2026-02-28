@@ -46,6 +46,7 @@ pub struct BatchWorkPlan {
     pub chunks: Vec<Vec<String>>,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BatchLazyLoadPlan {
     pub total_files: usize,
@@ -223,6 +224,7 @@ impl BatchCoreState {
         rgba_bytes_per_image.saturating_mul(buffered_images)
     }
 
+    #[cfg(test)]
     pub fn build_lazy_load_plan(
         total_files: usize,
         preferred_page_size: usize,

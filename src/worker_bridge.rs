@@ -43,7 +43,6 @@ fn set_last_detection_backend(backend: DetectionBackend) {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FaceWorkerStatus {
     Unsupported,
-    Idle,
     Starting,
     Ready,
     Error,
@@ -79,7 +78,6 @@ impl FaceWorkerBridgeState {
     pub fn status_label(&self) -> &'static str {
         match self.status {
             FaceWorkerStatus::Unsupported => "Unsupported",
-            FaceWorkerStatus::Idle => "Idle",
             FaceWorkerStatus::Starting => "Starting",
             FaceWorkerStatus::Ready => "Ready",
             FaceWorkerStatus::Error => "Error",
@@ -90,7 +88,7 @@ impl FaceWorkerBridgeState {
     pub fn can_start(&self) -> bool {
         matches!(
             self.status,
-            FaceWorkerStatus::Idle | FaceWorkerStatus::Stopped
+            FaceWorkerStatus::Stopped
         )
     }
 
@@ -480,11 +478,11 @@ mod tests {
     #[test]
     fn stop_requires_active_state() {
         let mut state = FaceWorkerBridgeState {
-            status: FaceWorkerStatus::Idle,
+            status: FaceWorkerStatus::Stopped,
             ..FaceWorkerBridgeState::default()
         };
         stop_face_worker(&mut state);
-        assert_eq!(state.status, FaceWorkerStatus::Idle);
+        assert_eq!(state.status, FaceWorkerStatus::Stopped);
 
         state.status = FaceWorkerStatus::Ready;
         stop_face_worker(&mut state);
