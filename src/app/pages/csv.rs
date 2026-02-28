@@ -252,39 +252,39 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                 let total = selected_ids.len();
                                 for (index, id) in selected_ids.into_iter().enumerate() {
                                     let Some(file) = files_by_id.get(&id).cloned() else {
-                                        progress_for_run.update(|p| {
-                                            p.record_result(false);
-                                            p.status = format!(
+                                        record_failed_image!(
+                                            progress_for_run,
+                                            stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            0,
+                                            format!(
                                                 "CSV failed {}/{}: missing file payload for {}",
                                                 index + 1,
                                                 total,
                                                 batch_file_label(&id)
-                                            );
-                                        });
-                                        stats_for_run.update(|stats| {
-                                            stats.record_image(0, 0, false);
-                                            stats.push_log(format!("CSV missing file payload for id {id}."));
-                                        });
-                                        batch_state_for_run.update(|s| s.mark_error(&id));
+                                            ),
+                                            format!("CSV missing file payload for id {id}.")
+                                        );
                                         continue;
                                     };
                                     let dimensions = match decode_image_dimensions(&file).await {
                                         Ok(dimensions) => dimensions,
                                         Err(error) => {
-                                            progress_for_run.update(|p| {
-                                                p.record_result(false);
-                                                p.status = format!(
+                                            record_failed_image!(
+                                                progress_for_run,
+                                                stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                0,
+                                                format!(
                                                     "CSV failed {}/{}: {} ({error})",
                                                     index + 1,
                                                     total,
                                                     file.name()
-                                                );
-                                            });
-                                            stats_for_run.update(|stats| {
-                                                stats.record_image(0, 0, false);
-                                                stats.push_log(format!("CSV decode failed for {}: {error}", file.name()));
-                                            });
-                                            batch_state_for_run.update(|s| s.mark_error(&id));
+                                                ),
+                                                format!("CSV decode failed for {}: {error}", file.name())
+                                            );
                                             continue;
                                         }
                                     };
@@ -305,22 +305,20 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                         dimensions,
                                     };
                                     if let Err(message) = validate_image_meta(meta, validation) {
-                                        progress_for_run.update(|p| {
-                                            p.record_result(false);
-                                            p.status = format!(
+                                        record_failed_image!(
+                                            progress_for_run,
+                                            stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            0,
+                                            format!(
                                                 "CSV failed {}/{}: {} ({message})",
                                                 index + 1,
                                                 total,
                                                 file_name
-                                            );
-                                        });
-                                        stats_for_run.update(|stats| {
-                                            stats.record_image(0, 0, false);
-                                            stats.push_log(format!(
-                                                "CSV validation failed for {file_name}: {message}"
-                                            ));
-                                        });
-                                        batch_state_for_run.update(|s| s.mark_error(&id));
+                                            ),
+                                            format!("CSV validation failed for {file_name}: {message}")
+                                        );
                                         continue;
                                     }
 
@@ -382,26 +380,23 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             batch_state_for_run.update(|s| s.mark_processed(&id));
                                         }
                                         None => {
-                                            progress_for_run.update(|p| {
-                                                p.record_result(false);
-                                                p.status = format!(
+                                            record_failed_image!(
+                                                progress_for_run,
+                                                stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms,
+                                                format!(
                                                     "CSV failed {}/{}: {} ({last_error})",
                                                     index + 1,
                                                     total,
                                                     file_name
-                                                );
-                                            });
-                                            stats_for_run.update(|stats| {
-                                                stats.record_image(elapsed_ms, 0, false);
-                                                stats.push_log(format!(
-                                                    "CSV failed {}: {}",
-                                                    file_name, last_error
-                                                ));
-                                            });
+                                                ),
+                                                format!("CSV failed {}: {}", file_name, last_error)
+                                            );
                                             face_count_for_run.update(|m| {
                                                 m.remove(&id);
                                             });
-                                            batch_state_for_run.update(|s| s.mark_error(&id));
                                             stopped_early = false;
                                         }
                                     }
@@ -462,39 +457,39 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                 let total = selected_ids.len();
                                 for (index, id) in selected_ids.into_iter().enumerate() {
                                     let Some(file) = files_by_id.get(&id).cloned() else {
-                                        progress_for_run.update(|p| {
-                                            p.record_result(false);
-                                            p.status = format!(
+                                        record_failed_image!(
+                                            progress_for_run,
+                                            stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            0,
+                                            format!(
                                                 "CSV selected failed {}/{}: missing file payload for {}",
                                                 index + 1,
                                                 total,
                                                 batch_file_label(&id)
-                                            );
-                                        });
-                                        stats_for_run.update(|stats| {
-                                            stats.record_image(0, 0, false);
-                                            stats.push_log(format!("CSV missing file payload for id {id}."));
-                                        });
-                                        batch_state_for_run.update(|s| s.mark_error(&id));
+                                            ),
+                                            format!("CSV missing file payload for id {id}.")
+                                        );
                                         continue;
                                     };
                                     let dimensions = match decode_image_dimensions(&file).await {
                                         Ok(dimensions) => dimensions,
                                         Err(error) => {
-                                            progress_for_run.update(|p| {
-                                                p.record_result(false);
-                                                p.status = format!(
+                                            record_failed_image!(
+                                                progress_for_run,
+                                                stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                0,
+                                                format!(
                                                     "CSV selected failed {}/{}: {} ({error})",
                                                     index + 1,
                                                     total,
                                                     file.name()
-                                                );
-                                            });
-                                            stats_for_run.update(|stats| {
-                                                stats.record_image(0, 0, false);
-                                                stats.push_log(format!("CSV decode failed for {}: {error}", file.name()));
-                                            });
-                                            batch_state_for_run.update(|s| s.mark_error(&id));
+                                                ),
+                                                format!("CSV decode failed for {}: {error}", file.name())
+                                            );
                                             continue;
                                         }
                                     };
@@ -515,22 +510,20 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                         dimensions,
                                     };
                                     if let Err(message) = validate_image_meta(meta, validation) {
-                                        progress_for_run.update(|p| {
-                                            p.record_result(false);
-                                            p.status = format!(
+                                        record_failed_image!(
+                                            progress_for_run,
+                                            stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            0,
+                                            format!(
                                                 "CSV selected failed {}/{}: {} ({message})",
                                                 index + 1,
                                                 total,
                                                 file_name
-                                            );
-                                        });
-                                        stats_for_run.update(|stats| {
-                                            stats.record_image(0, 0, false);
-                                            stats.push_log(format!(
-                                                "CSV validation failed for {file_name}: {message}"
-                                            ));
-                                        });
-                                        batch_state_for_run.update(|s| s.mark_error(&id));
+                                            ),
+                                            format!("CSV validation failed for {file_name}: {message}")
+                                        );
                                         continue;
                                     }
                                     let start_ms = now_ms();
@@ -591,26 +584,23 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             batch_state_for_run.update(|s| s.mark_processed(&id));
                                         }
                                         None => {
-                                            progress_for_run.update(|p| {
-                                                p.record_result(false);
-                                                p.status = format!(
+                                            record_failed_image!(
+                                                progress_for_run,
+                                                stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms,
+                                                format!(
                                                     "CSV selected failed {}/{}: {} ({last_error})",
                                                     index + 1,
                                                     total,
                                                     file_name
-                                                );
-                                            });
-                                            stats_for_run.update(|stats| {
-                                                stats.record_image(elapsed_ms, 0, false);
-                                                stats.push_log(format!(
-                                                    "CSV selected failed {}: {}",
-                                                    file_name, last_error
-                                                ));
-                                            });
+                                                ),
+                                                format!("CSV selected failed {}: {}", file_name, last_error)
+                                            );
                                             face_count_for_run.update(|m| {
                                                 m.remove(&id);
                                             });
-                                            batch_state_for_run.update(|s| s.mark_error(&id));
                                         }
                                     }
                                 }

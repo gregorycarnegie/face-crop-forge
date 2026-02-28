@@ -86,10 +86,7 @@ impl FaceWorkerBridgeState {
     }
 
     pub fn can_start(&self) -> bool {
-        matches!(
-            self.status,
-            FaceWorkerStatus::Stopped
-        )
+        matches!(self.status, FaceWorkerStatus::Stopped)
     }
 
     pub fn can_stop(&self) -> bool {

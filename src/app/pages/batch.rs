@@ -165,20 +165,20 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                 let total = selected_ids.len();
                                 for (index, id) in selected_ids.into_iter().enumerate() {
                                     let Some(file) = files_by_id.get(&id).cloned() else {
-                                        batch_progress_for_run.update(|p| {
-                                            p.record_result(false);
-                                            p.status = format!(
+                                        record_failed_image!(
+                                            batch_progress_for_run,
+                                            batch_stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            0,
+                                            format!(
                                                 "Batch failed {}/{}: missing file payload for {}",
                                                 index + 1,
                                                 total,
                                                 batch_file_label(&id)
-                                            );
-                                        });
-                                        batch_stats_for_run.update(|stats| {
-                                            stats.record_image(0, 0, false);
-                                            stats.push_log(format!("Missing file payload for id {id}."));
-                                        });
-                                        batch_state_for_run.update(|s| s.mark_error(&id));
+                                            ),
+                                            format!("Missing file payload for id {id}.")
+                                        );
                                         if !policy.continue_on_error {
                                             stopped_early = true;
                                             break;
@@ -189,23 +189,20 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     let dimensions = match decode_image_dimensions(&file).await {
                                         Ok(dimensions) => dimensions,
                                         Err(error) => {
-                                            batch_progress_for_run.update(|p| {
-                                                p.record_result(false);
-                                                p.status = format!(
+                                            record_failed_image!(
+                                                batch_progress_for_run,
+                                                batch_stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                0,
+                                                format!(
                                                     "Batch failed {}/{}: {} ({error})",
                                                     index + 1,
                                                     total,
                                                     file.name()
-                                                );
-                                            });
-                                            batch_stats_for_run.update(|stats| {
-                                                stats.record_image(0, 0, false);
-                                                stats.push_log(format!(
-                                                    "Decode failed for {}: {error}",
-                                                    file.name()
-                                                ));
-                                            });
-                                            batch_state_for_run.update(|s| s.mark_error(&id));
+                                                ),
+                                                format!("Decode failed for {}: {error}", file.name())
+                                            );
                                             if !policy.continue_on_error {
                                                 stopped_early = true;
                                                 break;
@@ -231,22 +228,20 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         dimensions,
                                     };
                                     if let Err(message) = validate_image_meta(meta, validation) {
-                                        batch_progress_for_run.update(|p| {
-                                            p.record_result(false);
-                                            p.status = format!(
+                                        record_failed_image!(
+                                            batch_progress_for_run,
+                                            batch_stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            0,
+                                            format!(
                                                 "Batch failed {}/{}: {} ({message})",
                                                 index + 1,
                                                 total,
                                                 file_name
-                                            );
-                                        });
-                                        batch_stats_for_run.update(|stats| {
-                                            stats.record_image(0, 0, false);
-                                            stats.push_log(format!(
-                                                "Validation failed for {file_name}: {message}"
-                                            ));
-                                        });
-                                        batch_state_for_run.update(|s| s.mark_error(&id));
+                                            ),
+                                            format!("Validation failed for {file_name}: {message}")
+                                        );
                                         if !policy.continue_on_error {
                                             stopped_early = true;
                                             break;
@@ -313,23 +308,23 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                             batch_state_for_run.update(|s| s.mark_processed(&id));
                                         }
                                         None => {
-                                            batch_progress_for_run.update(|p| {
-                                                p.record_result(false);
-                                                p.status = format!(
+                                            record_failed_image!(
+                                                batch_progress_for_run,
+                                                batch_stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms,
+                                                format!(
                                                     "Batch failed {}/{}: {} ({last_error})",
                                                     index + 1,
                                                     total,
                                                     file_name
-                                                );
-                                            });
-                                            batch_stats_for_run.update(|stats| {
-                                                stats.record_image(elapsed_ms, 0, false);
-                                                stats.push_log(format!(
+                                                ),
+                                                format!(
                                                     "Failed {} after {} attempt(s): {}",
                                                     file_name, attempts, last_error
-                                                ));
-                                            });
-                                            batch_state_for_run.update(|s| s.mark_error(&id));
+                                                )
+                                            );
                                             if !policy.continue_on_error {
                                                 stopped_early = true;
                                                 break;
@@ -395,20 +390,20 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                 let total = selected_ids.len();
                                 for (index, id) in selected_ids.into_iter().enumerate() {
                                     let Some(file) = files_by_id.get(&id).cloned() else {
-                                        batch_progress_for_run.update(|p| {
-                                            p.record_result(false);
-                                            p.status = format!(
+                                        record_failed_image!(
+                                            batch_progress_for_run,
+                                            batch_stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            0,
+                                            format!(
                                                 "Batch selected failed {}/{}: missing file payload for {}",
                                                 index + 1,
                                                 total,
                                                 batch_file_label(&id)
-                                            );
-                                        });
-                                        batch_stats_for_run.update(|stats| {
-                                            stats.record_image(0, 0, false);
-                                            stats.push_log(format!("Missing file payload for id {id}."));
-                                        });
-                                        batch_state_for_run.update(|s| s.mark_error(&id));
+                                            ),
+                                            format!("Missing file payload for id {id}.")
+                                        );
                                         if !policy.continue_on_error {
                                             stopped_early = true;
                                             break;
@@ -419,23 +414,20 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     let dimensions = match decode_image_dimensions(&file).await {
                                         Ok(dimensions) => dimensions,
                                         Err(error) => {
-                                            batch_progress_for_run.update(|p| {
-                                                p.record_result(false);
-                                                p.status = format!(
+                                            record_failed_image!(
+                                                batch_progress_for_run,
+                                                batch_stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                0,
+                                                format!(
                                                     "Batch selected failed {}/{}: {} ({error})",
                                                     index + 1,
                                                     total,
                                                     file.name()
-                                                );
-                                            });
-                                            batch_stats_for_run.update(|stats| {
-                                                stats.record_image(0, 0, false);
-                                                stats.push_log(format!(
-                                                    "Decode failed for {}: {error}",
-                                                    file.name()
-                                                ));
-                                            });
-                                            batch_state_for_run.update(|s| s.mark_error(&id));
+                                                ),
+                                                format!("Decode failed for {}: {error}", file.name())
+                                            );
                                             if !policy.continue_on_error {
                                                 stopped_early = true;
                                                 break;
@@ -461,22 +453,20 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         dimensions,
                                     };
                                     if let Err(message) = validate_image_meta(meta, validation) {
-                                        batch_progress_for_run.update(|p| {
-                                            p.record_result(false);
-                                            p.status = format!(
+                                        record_failed_image!(
+                                            batch_progress_for_run,
+                                            batch_stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            0,
+                                            format!(
                                                 "Batch selected failed {}/{}: {} ({message})",
                                                 index + 1,
                                                 total,
                                                 file_name
-                                            );
-                                        });
-                                        batch_stats_for_run.update(|stats| {
-                                            stats.record_image(0, 0, false);
-                                            stats.push_log(format!(
-                                                "Validation failed for {file_name}: {message}"
-                                            ));
-                                        });
-                                        batch_state_for_run.update(|s| s.mark_error(&id));
+                                            ),
+                                            format!("Validation failed for {file_name}: {message}")
+                                        );
                                         if !policy.continue_on_error {
                                             stopped_early = true;
                                             break;
@@ -538,23 +528,23 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                             batch_state_for_run.update(|s| s.mark_processed(&id));
                                         }
                                         None => {
-                                            batch_progress_for_run.update(|p| {
-                                                p.record_result(false);
-                                                p.status = format!(
+                                            record_failed_image!(
+                                                batch_progress_for_run,
+                                                batch_stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms,
+                                                format!(
                                                     "Batch selected failed {}/{}: {} ({last_error})",
                                                     index + 1,
                                                     total,
                                                     file_name
-                                                );
-                                            });
-                                            batch_stats_for_run.update(|stats| {
-                                                stats.record_image(elapsed_ms, 0, false);
-                                                stats.push_log(format!(
+                                                ),
+                                                format!(
                                                     "Selected run failed {} after {} attempt(s): {}",
                                                     file_name, attempts, last_error
-                                                ));
-                                            });
-                                            batch_state_for_run.update(|s| s.mark_error(&id));
+                                                )
+                                            );
                                             if !policy.continue_on_error {
                                                 stopped_early = true;
                                                 break;
