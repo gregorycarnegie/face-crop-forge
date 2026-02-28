@@ -1,6 +1,30 @@
 use crate::state::AppState;
 use leptos::prelude::*;
 
+fn preset_value_for_dimensions(width: u32, height: u32) -> &'static str {
+    match (width, height) {
+        (400, 400) => "linkedin",
+        (413, 531) => "passport",
+        (1080, 1080) => "instagram",
+        (332, 498) => "idcard",
+        (512, 512) => "avatar",
+        (600, 800) => "headshot",
+        _ => "custom",
+    }
+}
+
+fn dimensions_for_preset(value: &str) -> Option<(u32, u32)> {
+    match value {
+        "linkedin" => Some((400, 400)),
+        "passport" => Some((413, 531)),
+        "instagram" => Some((1080, 1080)),
+        "idcard" => Some((332, 498)),
+        "avatar" => Some((512, 512)),
+        "headshot" => Some((600, 800)),
+        _ => None,
+    }
+}
+
 #[component]
 pub fn CropSettingsPanel() -> impl IntoView {
     let settings = use_context::<AppState>()
@@ -16,7 +40,21 @@ pub fn CropSettingsPanel() -> impl IntoView {
                 <div class="preset-controls">
                     <div class="setting-group full-width">
                         <label for="sizePreset">"Size Presets"</label>
-                        <select id="sizePreset">
+                        <select
+                            id="sizePreset"
+                            prop:value=move || {
+                                let s = settings.get();
+                                preset_value_for_dimensions(s.output_width, s.output_height).to_string()
+                            }
+                            on:change=move |ev| {
+                                if let Some((w, h)) = dimensions_for_preset(&event_target_value(&ev)) {
+                                    settings.update(|s| {
+                                        s.output_width = w;
+                                        s.output_height = h;
+                                    });
+                                }
+                            }
+                        >
                             <option value="custom">"Custom"</option>
                             <option value="linkedin">"LinkedIn Profile (400×400)"</option>
                             <option value="passport">"Passport Photo (413×531)"</option>
@@ -144,9 +182,29 @@ pub fn CropSettingsPanel() -> impl IntoView {
                 <div class="setting-preview">
                     <span>
                         "Preview: "
-                        <span id="previewText">"256×256px, face at 70% height, PNG format"</span>
+                        <span id="previewText">
+                            {move || {
+                                let s = settings.get();
+                                format!(
+                                    "{}×{}px, face at {}% height, {} format",
+                                    s.output_width,
+                                    s.output_height,
+                                    s.face_height_pct,
+                                    s.output_format.to_uppercase(),
+                                )
+                            }}
+                        </span>
                     </span>
-                    <span class="aspect-ratio" id="aspectRatioText">"1:1 ratio"</span>
+                    <span class="aspect-ratio" id="aspectRatioText">
+                        {move || {
+                            let s = settings.get();
+                            if s.output_height == 0 {
+                                "0.00:1 ratio".to_string()
+                            } else {
+                                format!("{:.2}:1 ratio", s.output_width as f32 / s.output_height as f32)
+                            }
+                        }}
+                    </span>
                 </div>
             </div>
         </div>

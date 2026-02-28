@@ -100,10 +100,22 @@ pub(crate) fn CsvPage() -> impl IntoView {
                 <div class="title-row">
                     <h1><a href="/">"Face Crop Forge"</a></h1>
                     <div class="header-actions">
-                        <button type="button" id="multipleImageModeBtn" class="ghost-btn" title="Switch to multiple image mode">
+                        <button
+                            type="button"
+                            id="multipleImageModeBtn"
+                            class="ghost-btn"
+                            title="Switch to multiple image mode"
+                            on:click=move |_| navigate_to("/batch")
+                        >
                             <span>"Multiple Images"</span>
                         </button>
-                        <button type="button" id="singleImageModeBtn" class="ghost-btn" title="Switch to single image mode">
+                        <button
+                            type="button"
+                            id="singleImageModeBtn"
+                            class="ghost-btn"
+                            title="Switch to single image mode"
+                            on:click=move |_| navigate_to("/single")
+                        >
                             <span>"Single Image"</span>
                         </button>
                         <ThemeToggleButton id="darkModeBtn" />

@@ -94,6 +94,14 @@ pub(super) fn click_element_by_id(id: &str) {
 pub(super) fn click_element_by_id(_id: &str) {}
 
 #[cfg(target_arch = "wasm32")]
+pub(super) fn navigate_to(path: &str) {
+    let _ = window().location().set_href(path);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn navigate_to(_path: &str) {}
+
+#[cfg(target_arch = "wasm32")]
 pub(super) fn object_url_for_file(file: &web_sys::File) -> Option<String> {
     web_sys::Url::create_object_url_with_blob(file).ok()
 }
@@ -248,14 +256,12 @@ pub(super) async fn crop_face_bytes_from_source(
         .ok_or_else(|| "2d canvas context not available".to_string())?
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .map_err(|_| "Failed to cast canvas context".to_string())?;
-    let mut source_x = face.x - ((settings.horizontal_offset_pct as f64 / 100.0) * face.width);
-    let mut source_y = face.y - ((settings.vertical_offset_pct as f64 / 100.0) * face.height);
-    if source_x < 0.0 {
-        source_x = 0.0;
-    }
-    if source_y < 0.0 {
-        source_y = 0.0;
-    }
+    let source_rect = compute_source_crop_rect(
+        face,
+        image.natural_width() as f64,
+        image.natural_height() as f64,
+        settings,
+    );
     let filter = format!(
         "brightness({:.0}%) contrast({:.0}%) blur({:.2}px)",
         (100.0 + settings.exposure_adjustment as f64 * 50.0).clamp(50.0, 200.0),
@@ -266,10 +272,10 @@ pub(super) async fn crop_face_bytes_from_source(
     context
         .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
             &image,
-            source_x,
-            source_y,
-            face.width.max(1.0),
-            face.height.max(1.0),
+            source_rect.0,
+            source_rect.1,
+            source_rect.2,
+            source_rect.3,
             0.0,
             0.0,
             crop_w as f64,
@@ -342,7 +348,22 @@ pub(super) fn apply_detection_quality_filters(
     faces
 }
 
-pub(super) fn overlay_percent_rect(
+pub(super) fn overlay_percent_crop_rect(
+    face: &DetectedFace,
+    source_width: f64,
+    source_height: f64,
+    settings: &ProcessingSettings,
+) -> (f64, f64, f64, f64) {
+    let (x, y, width, height) =
+        compute_source_crop_rect(face, source_width, source_height, settings);
+    let left = (x / source_width * 100.0).clamp(0.0, 100.0);
+    let top = (y / source_height * 100.0).clamp(0.0, 100.0);
+    let w = (width / source_width * 100.0).clamp(0.0, 100.0);
+    let h = (height / source_height * 100.0).clamp(0.0, 100.0);
+    (left, top, w, h)
+}
+
+fn normalize_face_box(
     face: &DetectedFace,
     source_width: f64,
     source_height: f64,
@@ -351,20 +372,52 @@ pub(super) fn overlay_percent_rect(
     let mut y = face.y;
     let mut width = face.width;
     let mut height = face.height;
-
-    // Some detectors return normalized [0..1] boxes; map those to source pixels first.
     if width <= 1.0 && height <= 1.0 && x <= 1.0 && y <= 1.0 {
         x *= source_width;
         y *= source_height;
         width *= source_width;
         height *= source_height;
     }
+    (x, y, width.max(1.0), height.max(1.0))
+}
 
-    let left = (x / source_width * 100.0).clamp(0.0, 100.0);
-    let top = (y / source_height * 100.0).clamp(0.0, 100.0);
-    let w = (width / source_width * 100.0).clamp(0.0, 100.0);
-    let h = (height / source_height * 100.0).clamp(0.0, 100.0);
-    (left, top, w, h)
+fn compute_source_crop_rect(
+    face: &DetectedFace,
+    source_width: f64,
+    source_height: f64,
+    settings: &ProcessingSettings,
+) -> (f64, f64, f64, f64) {
+    let (face_x, face_y, face_w, face_h) = normalize_face_box(face, source_width, source_height);
+    let target_ratio =
+        (settings.output_width.max(1) as f64) / (settings.output_height.max(1) as f64);
+    let face_height_ratio = (settings.face_height_pct as f64 / 100.0).clamp(0.10, 1.0);
+
+    let mut crop_h = (face_h / face_height_ratio).max(face_h);
+    let mut crop_w = (crop_h * target_ratio).max(face_w);
+    // Keep the target ratio after width floor-up.
+    crop_h = crop_w / target_ratio;
+    if crop_h < face_h {
+        crop_h = face_h;
+        crop_w = crop_h * target_ratio;
+    }
+
+    // Ensure crop fits in source image while keeping aspect ratio.
+    if crop_w > source_width || crop_h > source_height {
+        let scale = (source_width / crop_w)
+            .min(source_height / crop_h)
+            .max(0.0001);
+        crop_w *= scale;
+        crop_h *= scale;
+    }
+
+    let center_x = face_x + face_w / 2.0 + (settings.horizontal_offset_pct as f64 / 100.0) * face_w;
+    let center_y = face_y + face_h / 2.0 + (settings.vertical_offset_pct as f64 / 100.0) * face_h;
+    let mut crop_x = center_x - crop_w / 2.0;
+    let mut crop_y = center_y - crop_h / 2.0;
+    crop_x = crop_x.clamp(0.0, (source_width - crop_w).max(0.0));
+    crop_y = crop_y.clamp(0.0, (source_height - crop_h).max(0.0));
+
+    (crop_x, crop_y, crop_w.max(1.0), crop_h.max(1.0))
 }
 
 pub(super) fn render_naming_template(

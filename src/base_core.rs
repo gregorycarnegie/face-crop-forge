@@ -150,8 +150,8 @@ impl BaseCore {
         image_width: f32,
         image_height: f32,
     ) -> CropRegion {
-        let face_center_x = face.x_min + (face.width / 2.0);
-        let face_center_y = face.y_min + (face.height / 2.0);
+        let face_center_x = face.x_min + (face.width * 0.5);
+        let face_center_y = face.y_min + (face.height * 0.5);
         let v_offset = self.settings.vertical_offset_pct / 100.0;
         let h_offset = self.settings.horizontal_offset_pct / 100.0;
 
@@ -159,20 +159,20 @@ impl BaseCore {
             PositioningMode::RuleOfThirds => {
                 let eyes_y = face.y_min + face.height * 0.35;
                 (
-                    face_center_x + (h_offset * crop_width / 2.0),
+                    face_center_x + (h_offset * crop_width * 0.5),
                     eyes_y - (crop_height / 3.0),
                 )
             }
             PositioningMode::Custom => (
-                face_center_x + (h_offset * crop_width / 2.0),
-                face_center_y + (v_offset * crop_height / 2.0),
+                face_center_x + (h_offset * crop_width * 0.5),
+                face_center_y + (v_offset * crop_height * 0.5),
             ),
             PositioningMode::Center => (face_center_x, face_center_y),
         };
 
-        let crop_x = clamp(target_x - crop_width / 2.0, 0.0, image_width - crop_width);
+        let crop_x = clamp(target_x - crop_width * 0.5, 0.0, image_width - crop_width);
         let crop_y = clamp(
-            target_y - crop_height / 2.0,
+            target_y - crop_height * 0.5,
             0.0,
             image_height - crop_height,
         );

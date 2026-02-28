@@ -48,8 +48,8 @@ pub fn compute_crop_region(
     let crop_width = settings.output_width / scale;
     let crop_height = settings.output_height / scale;
 
-    let mut center_x = face_box.x_min + (face_box.width / 2.0);
-    let mut center_y = face_box.y_min + (face_box.height / 2.0);
+    let mut center_x = face_box.x_min + (face_box.width * 0.5);
+    let mut center_y = face_box.y_min + (face_box.height * 0.5);
 
     match settings.positioning_mode {
         PositioningMode::Center => {}
@@ -62,9 +62,9 @@ pub fn compute_crop_region(
         }
     }
 
-    let crop_x = clamp(center_x - (crop_width / 2.0), 0.0, image_width - crop_width);
+    let crop_x = clamp(center_x - (crop_width * 0.5), 0.0, image_width - crop_width);
     let crop_y = clamp(
-        center_y - (crop_height / 2.0),
+        center_y - (crop_height * 0.5),
         0.0,
         image_height - crop_height,
     );

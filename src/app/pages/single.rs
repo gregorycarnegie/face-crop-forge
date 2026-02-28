@@ -161,10 +161,22 @@ pub(crate) fn SinglePage() -> impl IntoView {
                 <div class="title-row">
                     <h1><a href="/">"Face Crop Forge"</a></h1>
                     <div class="header-actions">
-                        <button type="button" id="backToMultipleBtn" class="ghost-btn" title="Switch to multiple image mode">
+                        <button
+                            type="button"
+                            id="backToMultipleBtn"
+                            class="ghost-btn"
+                            title="Switch to multiple image mode"
+                            on:click=move |_| navigate_to("/batch")
+                        >
                             <span>"Multiple Images"</span>
                         </button>
-                        <button type="button" id="csvBatchModeBtn" class="ghost-btn" title="Switch to CSV batch mode">
+                        <button
+                            type="button"
+                            id="csvBatchModeBtn"
+                            class="ghost-btn"
+                            title="Switch to CSV batch mode"
+                            on:click=move |_| navigate_to("/csv")
+                        >
                             <span>"CSV Batch"</span>
                         </button>
                         <ThemeToggleButton id="darkModeBtn" />
@@ -411,10 +423,11 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                             .into_iter()
                                                             .map(|face| {
                                                                 let is_selected = selected_ids.contains(&face.id);
-                                                                let (left, top, width, height) = overlay_percent_rect(
+                                                                let (left, top, width, height) = overlay_percent_crop_rect(
                                                                     &face,
                                                                     source_width,
                                                                     source_height,
+                                                                    &settings.get(),
                                                                 );
                                                                 let class_name = if is_selected {
                                                                     "face-box selected"
