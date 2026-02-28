@@ -1,17 +1,6 @@
-# Dependencies
-node_modules/
-package-lock.json
-bun.lockb
-
 # Build output
 dist/
 target/
-*.js.map
-*.d.ts
-*.d.ts.map
-
-# TypeScript cache
-*.tsbuildinfo
 
 # OS files
 .DS_Store
@@ -28,7 +17,6 @@ nul
 
 # Logs
 *.log
-npm-debug.log*
 
 # Environment variables
 .env

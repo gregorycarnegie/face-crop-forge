@@ -28,8 +28,6 @@ Primary routes:
 - `/batch` batch processing
 - `/csv` CSV workflow
 
-Legacy path aliases (`/single-processing.html`, `/batch-processing.html`, `/csv-processing.html`) resolve to the same Leptos routes.
-
 ## Runtime Status
 
 - Single, Batch, and CSV flows run on real image inputs end-to-end.
@@ -45,6 +43,8 @@ Prerequisites:
 - `wasm32-unknown-unknown` target
 - Trunk
 - `just` (optional)
+
+No Node/Bun toolchain is required.
 
 Setup:
 
