@@ -84,10 +84,10 @@ pub struct MediaPipeAssetPaths {
 impl Default for MediaPipeAssetPaths {
     fn default() -> Self {
         Self {
-            wasm_root: "/models/wasm".to_string(),
-            vision_bundle_url: "/models/vision_bundle.mjs".to_string(),
-            detector_model_url: "/models/blaze_face_short_range.tflite".to_string(),
-            landmarker_model_url: "/models/face_landmarker.task".to_string(),
+            wasm_root: "models/wasm".to_string(),
+            vision_bundle_url: "models/vision_bundle.mjs".to_string(),
+            detector_model_url: "models/blaze_face_short_range.tflite".to_string(),
+            landmarker_model_url: "models/face_landmarker.task".to_string(),
         }
     }
 }
@@ -156,7 +156,7 @@ pub fn build_load_plan(
 
 #[cfg(test)]
 pub fn validate_asset_path(path: &str) -> bool {
-    path.starts_with('/') && !path.contains("..")
+    !path.is_empty() && !path.contains("..")
 }
 
 pub fn evaluate_pipeline_health(capabilities: BrowserCapabilities) -> PipelineHealth {
@@ -373,9 +373,11 @@ mod tests {
 
     #[test]
     fn asset_path_validation_blocks_parent_traversal() {
+        assert!(validate_asset_path("models/face_landmarker.task"));
         assert!(validate_asset_path("/models/face_landmarker.task"));
-        assert!(!validate_asset_path("models/face_landmarker.task"));
         assert!(!validate_asset_path("/models/../../secret"));
+        assert!(!validate_asset_path("models/../../../secret"));
+        assert!(!validate_asset_path(""));
     }
 
     #[test]
