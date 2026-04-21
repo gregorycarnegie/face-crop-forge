@@ -61,7 +61,7 @@ jobs:
         with:
           version: latest
       - name: Build (release)
-        run: trunk build --release --public-url /
+        run: trunk build --release --public-url /face-crop-forge/
       - name: Add CNAME
         if: github.ref == 'refs/heads/main'
         run: echo "face-crop-forge.app" > dist/CNAME
