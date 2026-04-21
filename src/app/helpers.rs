@@ -1020,7 +1020,10 @@ mod route_tests {
 
     #[test]
     fn subpath_prefixed_routes_resolve_correctly() {
-        assert_eq!(route_for_path("/face-crop-forge/single"), RouteTarget::Single);
+        assert_eq!(
+            route_for_path("/face-crop-forge/single"),
+            RouteTarget::Single
+        );
         assert_eq!(route_for_path("/face-crop-forge/batch"), RouteTarget::Batch);
         assert_eq!(route_for_path("/face-crop-forge/csv"), RouteTarget::Csv);
         assert_eq!(route_for_path("/face-crop-forge/"), RouteTarget::Landing);
