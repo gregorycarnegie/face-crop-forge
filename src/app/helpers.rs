@@ -1,4 +1,11 @@
-use super::*;
+use super::{HashMap, ProcessingSettings, window, SAVED_SETTINGS_KEY, JsFuture, Dimensions, DetectedFace, ThemeMode};
+
+#[cfg(target_arch = "wasm32")]
+type BlobClosureSlot = std::rc::Rc<
+    std::cell::RefCell<
+        Option<web_sys::wasm_bindgen::closure::Closure<dyn FnMut(Option<web_sys::Blob>)>>,
+    >,
+>;
 
 #[cfg(target_arch = "wasm32")]
 pub(super) fn load_saved_settings_map() -> HashMap<String, ProcessingSettings> {
@@ -81,13 +88,11 @@ pub(super) fn import_saved_settings_json(json: &str) -> Result<usize, String> {
 #[cfg(target_arch = "wasm32")]
 pub(super) fn click_element_by_id(id: &str) {
     use web_sys::wasm_bindgen::JsCast;
-    if let Some(document) = window().document() {
-        if let Some(element) = document.get_element_by_id(id) {
-            if let Ok(html) = element.dyn_into::<web_sys::HtmlElement>() {
+    if let Some(document) = window().document()
+        && let Some(element) = document.get_element_by_id(id)
+            && let Ok(html) = element.dyn_into::<web_sys::HtmlElement>() {
                 html.click();
             }
-        }
-    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -113,7 +118,8 @@ pub(super) fn object_url_for_file(_file: &web_sys::File) -> Option<String> {
 
 #[cfg(target_arch = "wasm32")]
 pub(super) fn now_ms() -> u64 {
-    web_sys::js_sys::Date::now() as u64
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    { web_sys::js_sys::Date::now() as u64 }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -196,6 +202,7 @@ pub(super) async fn data_url_for_file(_file: &web_sys::File) -> Result<String, S
 }
 
 #[cfg(target_arch = "wasm32")]
+#[allow(clippy::too_many_lines)]
 pub(super) async fn files_from_data_transfer(
     data: web_sys::DataTransfer,
 ) -> Result<Vec<web_sys::File>, String> {
@@ -206,7 +213,7 @@ pub(super) async fn files_from_data_transfer(
     // Extract files from drop payload, including recursive folder traversal via webkit entries.
     let extractor = Function::new_with_args(
         "dt",
-        r#"
+        r"
         const fromList = (list) => {
           const out = [];
           for (let i = 0; i < list.length; i++) {
@@ -304,7 +311,7 @@ pub(super) async fn files_from_data_transfer(
             .filter(Boolean);
           return direct;
         })();
-        "#,
+        ",
     );
 
     let promise_value = extractor
@@ -374,7 +381,7 @@ pub(super) async fn draw_source_image_to_canvas(
         .ok_or_else(|| "2d canvas context not available".to_string())?
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .map_err(|_| "Failed to cast to CanvasRenderingContext2d".to_string())?;
-    context.clear_rect(0.0, 0.0, width as f64, height as f64);
+    context.clear_rect(0.0, 0.0, f64::from(width), f64::from(height));
     context
         .draw_image_with_html_image_element(&image, 0.0, 0.0)
         .map_err(|err| format!("Canvas draw failed: {err:?}"))?;
@@ -409,7 +416,7 @@ pub(super) fn clear_canvas(canvas_id: &str) {
     let Ok(context) = context.dyn_into::<web_sys::CanvasRenderingContext2d>() else {
         return;
     };
-    context.clear_rect(0.0, 0.0, canvas.width() as f64, canvas.height() as f64);
+    context.clear_rect(0.0, 0.0, f64::from(canvas.width()), f64::from(canvas.height()));
     canvas.set_width(0);
     canvas.set_height(0);
 }
@@ -438,6 +445,7 @@ pub(super) async fn decode_image_dimensions(_file: &web_sys::File) -> Result<Dim
 }
 
 #[cfg(target_arch = "wasm32")]
+#[allow(clippy::too_many_lines)]
 pub(super) async fn crop_face_bytes_from_source(
     source_url: &str,
     face: &DetectedFace,
@@ -478,15 +486,15 @@ pub(super) async fn crop_face_bytes_from_source(
         .map_err(|_| "Failed to cast canvas context".to_string())?;
     let source_rect = compute_source_crop_rect(
         face,
-        image.natural_width() as f64,
-        image.natural_height() as f64,
+        f64::from(image.natural_width()),
+        f64::from(image.natural_height()),
         settings,
     );
     let filter = format!(
         "brightness({:.0}%) contrast({:.0}%) blur({:.2}px)",
-        (100.0 + settings.exposure_adjustment as f64 * 50.0).clamp(50.0, 200.0),
-        (settings.contrast_adjustment as f64 * 100.0).clamp(50.0, 200.0),
-        settings.background_blur as f64 + settings.skin_smoothing as f64 * 0.2
+        (100.0 + f64::from(settings.exposure_adjustment) * 50.0).clamp(50.0, 200.0),
+        (f64::from(settings.contrast_adjustment) * 100.0).clamp(50.0, 200.0),
+        f64::from(settings.background_blur) + f64::from(settings.skin_smoothing) * 0.2
     );
     context.set_filter(&filter);
     context
@@ -498,8 +506,8 @@ pub(super) async fn crop_face_bytes_from_source(
             source_rect.3,
             0.0,
             0.0,
-            crop_w as f64,
-            crop_h as f64,
+            f64::from(crop_w),
+            f64::from(crop_h),
         )
         .map_err(|err| format!("Crop draw failed: {err:?}"))?;
 
@@ -508,10 +516,8 @@ pub(super) async fn crop_face_bytes_from_source(
     let blob_promise = Promise::new(&mut move |resolve: Function, reject: Function| {
         let resolve_fn = resolve.clone();
         let reject_fn = reject.clone();
-        let slot: Rc<RefCell<Option<Closure<dyn FnMut(Option<web_sys::Blob>)>>>> =
-            Rc::new(RefCell::new(None));
-        let slot_for_cb: Rc<RefCell<Option<Closure<dyn FnMut(Option<web_sys::Blob>)>>>> =
-            Rc::clone(&slot);
+        let slot: BlobClosureSlot = Rc::new(RefCell::new(None));
+        let slot_for_cb: BlobClosureSlot = Rc::clone(&slot);
         let callback = Closure::new(move |blob: Option<web_sys::Blob>| {
             if let Some(blob) = blob {
                 let _ = resolve_fn.call1(&JsValue::NULL, &blob);
@@ -564,7 +570,7 @@ pub(super) fn apply_detection_quality_filters(
     mut faces: Vec<DetectedFace>,
     settings: &ProcessingSettings,
 ) -> Vec<DetectedFace> {
-    faces.retain(|face| face.confidence as f32 >= settings.min_confidence);
+    faces.retain(|face| face.confidence >= f64::from(settings.min_confidence));
     faces
 }
 
@@ -609,8 +615,8 @@ fn compute_source_crop_rect(
 ) -> (f64, f64, f64, f64) {
     let (face_x, face_y, face_w, face_h) = normalize_face_box(face, source_width, source_height);
     let target_ratio =
-        (settings.output_width.max(1) as f64) / (settings.output_height.max(1) as f64);
-    let face_height_ratio = (settings.face_height_pct as f64 / 100.0).clamp(0.10, 1.0);
+        f64::from(settings.output_width.max(1)) / f64::from(settings.output_height.max(1));
+    let face_height_ratio = (f64::from(settings.face_height_pct) / 100.0).clamp(0.10, 1.0);
 
     let mut crop_h = (face_h / face_height_ratio).max(face_h);
     let mut crop_w = (crop_h * target_ratio).max(face_w);
@@ -630,8 +636,8 @@ fn compute_source_crop_rect(
         crop_h *= scale;
     }
 
-    let center_x = face_x + face_w / 2.0 + (settings.horizontal_offset_pct as f64 / 100.0) * face_w;
-    let center_y = face_y + face_h / 2.0 + (settings.vertical_offset_pct as f64 / 100.0) * face_h;
+    let center_x = face_x + face_w / 2.0 + (f64::from(settings.horizontal_offset_pct) / 100.0) * face_w;
+    let center_y = face_y + face_h / 2.0 + (f64::from(settings.vertical_offset_pct) / 100.0) * face_h;
     let mut crop_x = center_x - crop_w / 2.0;
     let mut crop_y = center_y - crop_h / 2.0;
     crop_x = crop_x.clamp(0.0, (source_width - crop_w).max(0.0));
@@ -650,8 +656,7 @@ pub(super) fn render_naming_template(
 ) -> String {
     let original = original_file_name
         .rsplit_once('.')
-        .map(|(base, _)| base)
-        .unwrap_or(original_file_name);
+        .map_or(original_file_name, |(base, _)| base);
     template
         .replace("{original}", original)
         .replace("{index}", &(index_zero_based + 1).to_string())
@@ -888,10 +893,8 @@ pub(super) async fn capture_webcam_frame_to_file(
     let blob_promise = Promise::new(&mut move |resolve: Function, reject: Function| {
         let resolve_fn = resolve.clone();
         let reject_fn = reject.clone();
-        let callback_slot: Rc<RefCell<Option<Closure<dyn FnMut(Option<web_sys::Blob>)>>>> =
-            Rc::new(RefCell::new(None));
-        let callback_slot_for_cb: Rc<RefCell<Option<Closure<dyn FnMut(Option<web_sys::Blob>)>>>> =
-            Rc::clone(&callback_slot);
+        let callback_slot: BlobClosureSlot = Rc::new(RefCell::new(None));
+        let callback_slot_for_cb: BlobClosureSlot = Rc::clone(&callback_slot);
         let callback = Closure::new(move |blob: Option<web_sys::Blob>| {
             if let Some(blob) = blob {
                 let _ = resolve_fn.call1(&JsValue::NULL, &blob);

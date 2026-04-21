@@ -1,5 +1,6 @@
-use super::*;
+use super::{component, view, IntoView, use_context, AppState, RwSignal, BatchCoreState, BatchQueueState, HashMap, BatchProgress, BatchRuntimeStats, list_saved_setting_names, Signal, Get, build_memory_indicator, MemoryIndicatorLevel, ClassAttribute, ElementChild, OnAttribute, GlobalAttributes, navigate_to, ThemeToggleButton, BatchUploadCard, Update, DetectionRetryPolicy, parse_max_retries, ImageValidationConfig, batch_file_label, decode_image_dimensions, ImageMeta, validate_image_meta, now_ms, DetectedFace, detect_faces_with_worker, apply_detection_quality_filters, elapsed_ms_since, Set, revoke_object_url, current_timestamp_ms, current_utc_timestamp_token, file_to_bytes, render_naming_template, normalize_export_filename_for_mime, validate_export_filename_for_mime, build_zip_bytes, download_bytes, PropAttribute, CollectView, event_target_value, load_named_processing_settings, save_named_processing_settings, export_saved_settings_json, click_element_by_id, HtmlInputElement, event_target, JsFuture, import_saved_settings_json, event_target_checked, IntoAny, CropSettingsPanel, PreprocessingSettingsPanel, OutputSettingsBatchPanel, BatchImageGalleryPanel};
 
+#[allow(clippy::too_many_lines)]
 #[component]
 pub(crate) fn BatchPage() -> impl IntoView {
     let settings = use_context::<AppState>()
@@ -10,7 +11,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
     let batch_files_by_id = RwSignal::new(HashMap::<String, web_sys::File>::new());
     let batch_preview_urls = RwSignal::new(HashMap::<String, String>::new());
     let batch_progress = RwSignal::new(BatchProgress::default());
-    let batch_stats = RwSignal::new(BatchRuntimeStats::default());
+    let batch_perf = RwSignal::new(BatchRuntimeStats::default());
     let batch_preview_filename = RwSignal::new(String::new());
     let settings_name_input = RwSignal::new(String::new());
     let selected_recent_setting = RwSignal::new(String::new());
@@ -29,14 +30,14 @@ pub(crate) fn BatchPage() -> impl IntoView {
     let rust_lazy_queued_files =
         Signal::derive(move || batch_queue.get().queued_files_count().to_string());
     let total_faces_detected =
-        Signal::derive(move || batch_stats.get().total_faces_detected.to_string());
-    let success_rate = Signal::derive(move || format!("{}%", batch_stats.get().success_rate_pct()));
+        Signal::derive(move || batch_perf.get().total_faces_detected.to_string());
+    let success_rate = Signal::derive(move || format!("{}%", batch_perf.get().success_rate_pct()));
     let avg_processing_time =
-        Signal::derive(move || format!("{}ms", batch_stats.get().avg_processing_time_ms()));
-    let images_processed = Signal::derive(move || batch_stats.get().images_processed.to_string());
-    let batch_logs = Signal::derive(move || batch_stats.get().logs);
+        Signal::derive(move || format!("{}ms", batch_perf.get().avg_processing_time_ms()));
+    let images_processed = Signal::derive(move || batch_perf.get().images_processed.to_string());
+    let batch_logs = Signal::derive(move || batch_perf.get().logs);
     let batch_error_logs = Signal::derive(move || {
-        batch_stats
+        batch_perf
             .get()
             .logs
             .into_iter()
@@ -51,7 +52,8 @@ pub(crate) fn BatchPage() -> impl IntoView {
     let rust_estimated_preview_mib = Signal::derive(move || {
         let selected = batch_state.get().selected_count().min(128);
         let bytes = BatchCoreState::estimate_preview_memory_bytes(640, 640, selected);
-        format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))
+        #[allow(clippy::cast_precision_loss)]
+        { format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0)) }
     });
     let rust_memory_indicator_text = Signal::derive(move || {
         let state = batch_state.get();
@@ -154,11 +156,11 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         plan.chunks.len(),
                                         plan.chunk_size
                                     ),
-                                )
+                                );
                             });
                             let batch_state_for_run = batch_state;
                             let batch_progress_for_run = batch_progress;
-                            let batch_stats_for_run = batch_stats;
+                            let batch_perf_for_run = batch_perf;
                             let settings_snapshot = settings.get();
                             leptos::task::spawn_local(async move {
                                 let mut stopped_early = false;
@@ -167,7 +169,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     let Some(file) = files_by_id.get(&id).cloned() else {
                                         record_failed_image!(
                                             batch_progress_for_run,
-                                            batch_stats_for_run,
+                                            batch_perf_for_run,
                                             batch_state_for_run,
                                             &id,
                                             0,
@@ -191,7 +193,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         Err(error) => {
                                             record_failed_image!(
                                                 batch_progress_for_run,
-                                                batch_stats_for_run,
+                                                batch_perf_for_run,
                                                 batch_state_for_run,
                                                 &id,
                                                 0,
@@ -224,13 +226,14 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     let meta = ImageMeta {
                                         file_name: &file_name,
                                         mime_type: &mime_type,
+                                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                                         file_size_bytes: file.size() as u64,
                                         dimensions,
                                     };
                                     if let Err(message) = validate_image_meta(meta, validation) {
                                         record_failed_image!(
                                             batch_progress_for_run,
-                                            batch_stats_for_run,
+                                            batch_perf_for_run,
                                             batch_state_for_run,
                                             &id,
                                             0,
@@ -280,55 +283,53 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     }
                                     let elapsed_ms = elapsed_ms_since(run_start_ms);
 
-                                    match success_faces {
-                                        Some(faces) => {
-                                            let face_count = faces.len() as u32;
-                                            batch_progress_for_run.update(|p| {
-                                                p.record_result(true);
-                                                p.status = format!(
-                                                    "Batch processed {}/{}: {} ({} face(s))",
-                                                    index + 1,
-                                                    total,
-                                                    file_name,
-                                                    face_count
-                                                );
-                                            });
-                                            batch_stats_for_run.update(|stats| {
-                                                stats.record_image(elapsed_ms, face_count, true);
-                                                stats.push_log(format!(
-                                                    "Processed {} in {}ms ({} attempt(s), {}x{}, {} face(s)).",
-                                                    file_name,
-                                                    elapsed_ms,
-                                                    attempts,
-                                                    dimensions.width,
-                                                    dimensions.height,
-                                                    face_count
-                                                ));
-                                            });
-                                            batch_state_for_run.update(|s| s.mark_processed(&id));
-                                        }
-                                        None => {
-                                            record_failed_image!(
-                                                batch_progress_for_run,
-                                                batch_stats_for_run,
-                                                batch_state_for_run,
-                                                &id,
-                                                elapsed_ms,
-                                                format!(
-                                                    "Batch failed {}/{}: {} ({last_error})",
-                                                    index + 1,
-                                                    total,
-                                                    file_name
-                                                ),
-                                                format!(
-                                                    "Failed {} after {} attempt(s): {}",
-                                                    file_name, attempts, last_error
-                                                )
+                                    if let Some(faces) = success_faces {
+                                        #[allow(clippy::cast_possible_truncation)]
+                                        let face_count = faces.len() as u32;
+                                        batch_progress_for_run.update(|p| {
+                                            p.record_result(true);
+                                            p.status = format!(
+                                                "Batch processed {}/{}: {} ({} face(s))",
+                                                index + 1,
+                                                total,
+                                                file_name,
+                                                face_count
                                             );
-                                            if !policy.continue_on_error {
-                                                stopped_early = true;
-                                                break;
-                                            }
+                                        });
+                                        batch_perf_for_run.update(|stats| {
+                                            stats.record_image(elapsed_ms, face_count, true);
+                                            stats.push_log(format!(
+                                                "Processed {} in {}ms ({} attempt(s), {}x{}, {} face(s)).",
+                                                file_name,
+                                                elapsed_ms,
+                                                attempts,
+                                                dimensions.width,
+                                                dimensions.height,
+                                                face_count
+                                            ));
+                                        });
+                                        batch_state_for_run.update(|s| s.mark_processed(&id));
+                                    } else {
+                                        record_failed_image!(
+                                            batch_progress_for_run,
+                                            batch_perf_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            elapsed_ms,
+                                            format!(
+                                                "Batch failed {}/{}: {} ({last_error})",
+                                                index + 1,
+                                                total,
+                                                file_name
+                                            ),
+                                            format!(
+                                                "Failed {} after {} attempt(s): {}",
+                                                file_name, attempts, last_error
+                                            )
+                                        );
+                                        if !policy.continue_on_error {
+                                            stopped_early = true;
+                                            break;
                                         }
                                     }
                                 }
@@ -379,11 +380,11 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         plan.chunks.len(),
                                         plan.chunk_size
                                     ),
-                                )
+                                );
                             });
                             let batch_state_for_run = batch_state;
                             let batch_progress_for_run = batch_progress;
-                            let batch_stats_for_run = batch_stats;
+                            let batch_perf_for_run = batch_perf;
                             let settings_snapshot = settings.get();
                             leptos::task::spawn_local(async move {
                                 let mut stopped_early = false;
@@ -392,7 +393,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     let Some(file) = files_by_id.get(&id).cloned() else {
                                         record_failed_image!(
                                             batch_progress_for_run,
-                                            batch_stats_for_run,
+                                            batch_perf_for_run,
                                             batch_state_for_run,
                                             &id,
                                             0,
@@ -416,7 +417,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         Err(error) => {
                                             record_failed_image!(
                                                 batch_progress_for_run,
-                                                batch_stats_for_run,
+                                                batch_perf_for_run,
                                                 batch_state_for_run,
                                                 &id,
                                                 0,
@@ -449,13 +450,14 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     let meta = ImageMeta {
                                         file_name: &file_name,
                                         mime_type: &mime_type,
+                                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                                         file_size_bytes: file.size() as u64,
                                         dimensions,
                                     };
                                     if let Err(message) = validate_image_meta(meta, validation) {
                                         record_failed_image!(
                                             batch_progress_for_run,
-                                            batch_stats_for_run,
+                                            batch_perf_for_run,
                                             batch_state_for_run,
                                             &id,
                                             0,
@@ -505,50 +507,47 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     }
                                     let elapsed_ms = elapsed_ms_since(run_start_ms);
 
-                                    match success_faces {
-                                        Some(faces) => {
-                                            let face_count = faces.len() as u32;
-                                            batch_progress_for_run.update(|p| {
-                                                p.record_result(true);
-                                                p.status = format!(
-                                                    "Batch selected processed {}/{}: {} ({} face(s))",
-                                                    index + 1,
-                                                    total,
-                                                    file_name,
-                                                    face_count
-                                                );
-                                            });
-                                            batch_stats_for_run.update(|stats| {
-                                                stats.record_image(elapsed_ms, face_count, true);
-                                                stats.push_log(format!(
-                                                    "Selected run processed {} in {}ms ({} attempt(s), {} face(s)).",
-                                                    file_name, elapsed_ms, attempts, face_count
-                                                ));
-                                            });
-                                            batch_state_for_run.update(|s| s.mark_processed(&id));
-                                        }
-                                        None => {
-                                            record_failed_image!(
-                                                batch_progress_for_run,
-                                                batch_stats_for_run,
-                                                batch_state_for_run,
-                                                &id,
-                                                elapsed_ms,
-                                                format!(
-                                                    "Batch selected failed {}/{}: {} ({last_error})",
-                                                    index + 1,
-                                                    total,
-                                                    file_name
-                                                ),
-                                                format!(
-                                                    "Selected run failed {} after {} attempt(s): {}",
-                                                    file_name, attempts, last_error
-                                                )
+                                    if let Some(faces) = success_faces {
+                                        #[allow(clippy::cast_possible_truncation)]
+                                        let face_count = faces.len() as u32;
+                                        batch_progress_for_run.update(|p| {
+                                            p.record_result(true);
+                                            p.status = format!(
+                                                "Batch selected processed {}/{}: {} ({} face(s))",
+                                                index + 1,
+                                                total,
+                                                file_name,
+                                                face_count
                                             );
-                                            if !policy.continue_on_error {
-                                                stopped_early = true;
-                                                break;
-                                            }
+                                        });
+                                        batch_perf_for_run.update(|stats| {
+                                            stats.record_image(elapsed_ms, face_count, true);
+                                            stats.push_log(format!(
+                                                "Selected run processed {file_name} in {elapsed_ms}ms ({attempts} attempt(s), {face_count} face(s))."
+                                            ));
+                                        });
+                                        batch_state_for_run.update(|s| s.mark_processed(&id));
+                                    } else {
+                                        record_failed_image!(
+                                            batch_progress_for_run,
+                                            batch_perf_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            elapsed_ms,
+                                            format!(
+                                                "Batch selected failed {}/{}: {} ({last_error})",
+                                                index + 1,
+                                                total,
+                                                file_name
+                                            ),
+                                            format!(
+                                                "Selected run failed {} after {} attempt(s): {}",
+                                                file_name, attempts, last_error
+                                            )
+                                        );
+                                        if !policy.continue_on_error {
+                                            stopped_early = true;
+                                            break;
                                         }
                                     }
                                 }
@@ -579,8 +578,8 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                 revoke_object_url(url);
                             }
                             batch_preview_urls.set(HashMap::new());
-                            batch_progress.update(|p| p.reset());
-                            batch_stats.update(|s| s.reset());
+                            batch_progress.update(crate::batch_export::BatchProgress::reset);
+                            batch_perf.update(crate::batch_core::BatchRuntimeStats::reset);
                             batch_preview_filename.set(String::new());
                         }
                     >
@@ -612,7 +611,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                             let zip_name =
                                 format!("face-crops-{}.zip", current_utc_timestamp_token());
                             let progress_for_download = batch_progress;
-                            let stats_for_download = batch_stats;
+                            let stats_for_download = batch_perf;
                             let preview_for_download = batch_preview_filename;
                             leptos::task::spawn_local(async move {
                                 let mut zip_entries = Vec::new();
@@ -627,7 +626,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                                 p.complete(format!("Batch ZIP failed: {error}"));
                                             });
                                             stats_for_download.update(|s| {
-                                                s.push_log(format!("Batch ZIP read failed for {}: {error}", file.name()))
+                                                s.push_log(format!("Batch ZIP read failed for {}: {error}", file.name()));
                                             });
                                             return;
                                         }
@@ -646,9 +645,8 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     if !validate_export_filename_for_mime(&final_name, &mime_type) {
                                         stats_for_download.update(|s| {
                                             s.push_log(format!(
-                                                "Batch ZIP skipped invalid filename/mime pair: {} ({})",
-                                                final_name, mime_type
-                                            ))
+                                                "Batch ZIP skipped invalid filename/mime pair: {final_name} ({mime_type})"
+                                            ));
                                         });
                                         continue;
                                     }
@@ -674,10 +672,10 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     download_bytes(&zip_name, "application/zip", &zip_bytes)
                                 {
                                     progress_for_download.update(|p| {
-                                        p.complete(format!("Batch ZIP download failed: {error}"))
+                                        p.complete(format!("Batch ZIP download failed: {error}"));
                                     });
                                     stats_for_download.update(|s| {
-                                        s.push_log(format!("Batch ZIP download failed: {error}"))
+                                        s.push_log(format!("Batch ZIP download failed: {error}"));
                                     });
                                     return;
                                 }
@@ -687,14 +685,14 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         "Exported ZIP {} with {} file(s).",
                                         zip_name,
                                         zip_entries.len()
-                                    ))
+                                    ));
                                 });
                                 progress_for_download.update(|p| {
                                     p.complete(format!(
                                         "Batch ZIP exported: {} ({})",
                                         zip_name,
                                         zip_entries.len()
-                                    ))
+                                    ));
                                 });
                             });
                         }

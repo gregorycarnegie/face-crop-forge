@@ -34,7 +34,7 @@ use std::collections::HashMap;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{DragEvent, HtmlInputElement};
 
-use helpers::*;
+use helpers::{revoke_object_url, data_url_for_file, object_url_for_file, apply_detection_quality_filters, files_from_data_transfer, load_theme_mode, apply_theme_mode, persist_theme_mode};
 use pages::{BatchPage, CsvPage, LandingPage, PanelsGalleryPage, SinglePage};
 
 #[component]
@@ -84,12 +84,9 @@ enum RouteTarget {
 
 fn route_for_path(path: &str) -> RouteTarget {
     match path {
-        "/single" => RouteTarget::Single,
-        "/single-processing.html" => RouteTarget::Single,
-        "/batch" => RouteTarget::Batch,
-        "/batch-processing.html" => RouteTarget::Batch,
-        "/csv" => RouteTarget::Csv,
-        "/csv-processing.html" => RouteTarget::Csv,
+        "/single" | "/single-processing.html" => RouteTarget::Single,
+        "/batch" | "/batch-processing.html" => RouteTarget::Batch,
+        "/csv" | "/csv-processing.html" => RouteTarget::Csv,
         "/_panels" => RouteTarget::Panels,
         _ => RouteTarget::Landing,
     }

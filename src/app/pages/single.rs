@@ -1,5 +1,6 @@
-use super::*;
+use super::{component, view, IntoView, use_context, AppState, RwSignal, SingleCoreState, FaceWorkerBridgeState, SingleRuntimeState, DetectedFace, Signal, Get, compute_display_size, last_detection_backend_label, detect_browser_capabilities, build_load_plan, MediaPipeAssetPaths, evaluate_pipeline_health, revalidate_browser_fallbacks, Effect, Update, draw_source_image_to_canvas, Set, clear_canvas, stop_media_stream, clear_video_source, start_face_worker, ClassAttribute, ElementChild, OnAttribute, GlobalAttributes, navigate_to, ThemeToggleButton, SingleUploadCard, list_video_input_devices, start_webcam_stream, CollectView, CropSettingsPanel, PreprocessingSettingsPanel, OutputSettingsBatchPanel, IntoAny, overlay_percent_crop_rect, StyleAttribute, detect_faces_with_worker, apply_detection_quality_filters, revoke_object_url, clear_last_detection_backend, stop_face_worker, current_timestamp_ms, build_export_plan, crop_face_bytes_from_source, normalize_export_filename_for_mime, validate_export_filename_for_mime, download_bytes, capture_webcam_frame_to_file, object_url_for_file};
 
+#[allow(clippy::too_many_lines)]
 #[component]
 pub(crate) fn SinglePage() -> impl IntoView {
     let settings = use_context::<AppState>()
@@ -102,7 +103,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
         }
     });
     let browser_fallback_matrix = Signal::derive(move || {
-        revalidate_browser_fallbacks(true, true, MediaPipeAssetPaths::default())
+        revalidate_browser_fallbacks(true, true, &MediaPipeAssetPaths::default())
     });
 
     Effect::new(move |_| {
@@ -122,7 +123,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
             leptos::task::spawn_local(async move {
                 match draw_source_image_to_canvas("inputCanvas", &url).await {
                     Ok((width, height)) => {
-                        dimensions.set((width as f64, height as f64));
+                        dimensions.set((f64::from(width), f64::from(height)));
                     }
                     Err(error) => {
                         dimensions.set((0.0, 0.0));
@@ -206,7 +207,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                             if single_busy.get() {
                                 return;
                             }
-                            single_state.update(|s| s.open_webcam_modal());
+                            single_state.update(crate::single_core::SingleCoreState::open_webcam_modal);
                             single_status.set("Webcam modal opened. Initializing camera...".to_string());
                             let status_for_camera = single_status;
                             let stream_for_camera = webcam_stream;
@@ -530,7 +531,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                 id="selectAllFacesBtn"
                                                 class="small-btn selection-btn"
                                                 on:click=move |_| {
-                                                    single_state.update(|s| s.select_all_faces());
+                                                    single_state.update(crate::single_core::SingleCoreState::select_all_faces);
                                                     single_status.set("Selected all detected faces.".to_string());
                                                 }
                                             >
@@ -541,7 +542,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                 id="selectNoneFacesBtn"
                                                 class="small-btn selection-btn"
                                                 on:click=move |_| {
-                                                    single_state.update(|s| s.select_none_faces());
+                                                    single_state.update(crate::single_core::SingleCoreState::select_none_faces);
                                                     single_status.set("Cleared selected faces.".to_string());
                                                 }
                                             >
@@ -604,7 +605,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                     let worker_for_detect = worker_state;
                                                     if let Some(file) = source_image_file.get() {
                                                         let settings_for_detect = settings.get();
-                                                        worker_for_detect.update(|w| w.mark_request_started());
+                                                        worker_for_detect.update(crate::worker_bridge::FaceWorkerBridgeState::mark_request_started);
                                                         leptos::task::spawn_local(async move {
                                                             runtime_for_detect.update(|r| r.start("Detecting faces..."));
                                                             match detect_faces_with_worker(
@@ -622,7 +623,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                                     let count = ids.len();
                                                                     faces_for_detect.set(filtered);
                                                                     state_for_detect.update(|s| s.set_faces(ids));
-                                                                    worker_for_detect.update(|w| w.mark_request_succeeded());
+                                                                    worker_for_detect.update(crate::worker_bridge::FaceWorkerBridgeState::mark_request_succeeded);
                                                                     runtime_for_detect.update(|r| {
                                                                         r.complete(24, format!("Detected {count} face(s)."));
                                                                     });
@@ -678,8 +679,8 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                         webcam_stream.set(None);
                                                     }
                                                     clear_video_source("webcamVideo");
-                                                    single_state.update(|s| s.close_webcam_modal());
-                                                    single_runtime.update(|r| r.reset());
+                                                    single_state.update(crate::single_core::SingleCoreState::close_webcam_modal);
+                                                    single_runtime.update(crate::single_core::SingleRuntimeState::reset);
                                                     worker_state.update(stop_face_worker);
                                                     single_status.set("Cleared current image state.".to_string());
                                                 }
@@ -832,7 +833,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                     webcam_stream.set(None);
                                 }
                                 clear_video_source("webcamVideo");
-                                single_state.update(|s| s.close_webcam_modal());
+                                single_state.update(crate::single_core::SingleCoreState::close_webcam_modal);
                                 single_status.set("Webcam modal closed.".to_string());
                             }
                         >
@@ -884,14 +885,14 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                 });
                                                 detected_faces_for_capture.set(Vec::new());
                                                 runtime_for_capture.update(|r| r.start("Detecting faces..."));
-                                                worker_for_capture.update(|w| w.mark_request_started());
+                                                worker_for_capture.update(crate::worker_bridge::FaceWorkerBridgeState::mark_request_started);
 
                                                 if let Some(stream) = stream_for_capture.get() {
                                                     stop_media_stream(&stream);
                                                     stream_for_capture.set(None);
                                                 }
                                                 clear_video_source("webcamVideo");
-                                                state_for_capture.update(|s| s.close_webcam_modal());
+                                                state_for_capture.update(crate::single_core::SingleCoreState::close_webcam_modal);
 
                                                 match detect_faces_with_worker(
                                                     "browser-face-detector",
@@ -908,7 +909,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                                         let count = ids.len();
                                                         detected_faces_for_capture.set(filtered);
                                                         core_state_for_capture.update(|s| s.set_faces(ids));
-                                                        worker_for_capture.update(|w| w.mark_request_succeeded());
+                                                        worker_for_capture.update(crate::worker_bridge::FaceWorkerBridgeState::mark_request_succeeded);
                                                         runtime_for_capture.update(|r| {
                                                             r.complete(24, format!("Detected {count} face(s)."));
                                                         });
@@ -949,7 +950,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                     if single_busy.get() {
                                         return;
                                     }
-                                    single_state.update(|s| s.switch_camera());
+                                    single_state.update(crate::single_core::SingleCoreState::switch_camera);
                                     let active_name = single_state.get().active_camera_name().to_string();
                                     single_status.set(format!("Switching to {active_name}..."));
                                     let state_for_switch = single_state;

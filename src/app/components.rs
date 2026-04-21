@@ -1,4 +1,4 @@
-use super::*;
+use super::{component, view, HashMap, revoke_object_url, data_url_for_file, object_url_for_file, Children, IntoView, ClassAttribute, ElementChild, StyleAttribute, GlobalAttributes, use_context, RwSignal, ThemeMode, Signal, Get, OnAttribute, AriaAttributes, Update, toggle_theme, SingleCoreState, FaceWorkerBridgeState, ProcessingSettings, DetectedFace, HtmlInputElement, event_target, Set, detect_faces_with_worker, apply_detection_quality_filters, DragEvent, BatchCoreState, BatchQueueState, BatchProgress, files_from_data_transfer, CollectView, CsvCoreState, JsFuture};
 
 fn is_probably_image_file(file: &web_sys::File) -> bool {
     let mime = file.type_().to_lowercase();
@@ -138,7 +138,7 @@ pub(super) fn SingleUploadCard(
                 state.update(|s| s.set_faces(Vec::new()));
                 detected_faces.set(Vec::new());
                 status.set("Image loaded. Running face detection...".to_string());
-                worker_state.update(|w| w.mark_request_started());
+                worker_state.update(super::super::worker_bridge::FaceWorkerBridgeState::mark_request_started);
                 let state_for_detect = state;
                 let status_for_detect = status;
                 let faces_for_detect = detected_faces;
@@ -156,7 +156,7 @@ pub(super) fn SingleUploadCard(
                             let count = ids.len();
                             faces_for_detect.set(filtered);
                             state_for_detect.update(|s| s.set_faces(ids));
-                            worker_for_detect.update(|w| w.mark_request_succeeded());
+                            worker_for_detect.update(super::super::worker_bridge::FaceWorkerBridgeState::mark_request_succeeded);
                             status_for_detect.set(if count == 0 {
                                 "Detection completed. No faces found.".to_string()
                             } else {
@@ -202,7 +202,7 @@ pub(super) fn SingleUploadCard(
                         state.update(|s| s.set_faces(Vec::new()));
                         detected_faces.set(Vec::new());
                         status.set("Image loaded. Running face detection...".to_string());
-                        worker_state.update(|w| w.mark_request_started());
+                        worker_state.update(super::super::worker_bridge::FaceWorkerBridgeState::mark_request_started);
                         let state_for_detect = state;
                         let status_for_detect = status;
                         let faces_for_detect = detected_faces;
@@ -222,7 +222,7 @@ pub(super) fn SingleUploadCard(
                                     let count = ids.len();
                                     faces_for_detect.set(filtered);
                                     state_for_detect.update(|s| s.set_faces(ids));
-                                    worker_for_detect.update(|w| w.mark_request_succeeded());
+                                    worker_for_detect.update(super::super::worker_bridge::FaceWorkerBridgeState::mark_request_succeeded);
                                     status_for_detect.set(if count == 0 {
                                         "Detection completed. No faces found.".to_string()
                                     } else {
@@ -309,7 +309,7 @@ pub(super) fn BatchUploadCard(
                         ids.push(id);
                     }
                     let count = ids.len();
-                    let queue_state = BatchQueueState::from_files(ids, 20);
+                    let queue_state = BatchQueueState::from_files(&ids, 20);
                     let queued_pages = queue_state.queued_pages_count();
                     let queued_files = queue_state.queued_files_count();
                     let initial_loaded = queue_state.loaded_ids.len();
@@ -326,10 +326,7 @@ pub(super) fn BatchUploadCard(
                         p.reset();
                         p.status = if queued_pages > 0 {
                             format!(
-                                "Loaded first {} image(s); queued {} image(s) across {} page(s).",
-                                initial_loaded,
-                                queued_files,
-                                queued_pages
+                                "Loaded first {initial_loaded} image(s); queued {queued_files} image(s) across {queued_pages} page(s)."
                             )
                         } else {
                             format!("Loaded {count} image(s). Ready to process.")
@@ -382,7 +379,7 @@ pub(super) fn BatchUploadCard(
                             }
                         }
                         let count = ids.len();
-                        let queue_state = BatchQueueState::from_files(ids, 20);
+                        let queue_state = BatchQueueState::from_files(&ids, 20);
                         let queued_pages = queue_state.queued_pages_count();
                         let queued_files = queue_state.queued_files_count();
                         let initial_loaded = queue_state.loaded_ids.len();
@@ -402,10 +399,7 @@ pub(super) fn BatchUploadCard(
                             p.reset();
                             p.status = if queued_pages > 0 {
                                 format!(
-                                    "Loaded first {} image(s); queued {} image(s) across {} page(s).",
-                                    initial_loaded,
-                                    queued_files,
-                                    queued_pages
+                                    "Loaded first {initial_loaded} image(s); queued {queued_files} image(s) across {queued_pages} page(s)."
                                 )
                             } else {
                                 format!("Loaded {count} image(s). Ready to process.")
@@ -450,7 +444,7 @@ pub(super) fn BatchImageGalleryPanel(
                     type="button"
                     id="selectAllBtn"
                     disabled=move || busy.get()
-                    on:click=move |_| state.update(|s| s.select_all())
+                    on:click=move |_| state.update(super::super::batch_core::BatchCoreState::select_all)
                 >
                     "Select All"
                 </button>
@@ -458,7 +452,7 @@ pub(super) fn BatchImageGalleryPanel(
                     type="button"
                     id="selectNoneBtn"
                     disabled=move || busy.get()
-                    on:click=move |_| state.update(|s| s.select_none())
+                    on:click=move |_| state.update(super::super::batch_core::BatchCoreState::select_none)
                 >
                     "Select None"
                 </button>
@@ -477,11 +471,9 @@ pub(super) fn BatchImageGalleryPanel(
                         .into_iter()
                         .map(|id| {
                             let image = state.get().images.get(&id).cloned();
-                            let selected = image.as_ref().map(|img| img.selected).unwrap_or(false);
+                            let selected = image.as_ref().is_some_and(|img| img.selected);
                             let status_label = image
-                                .as_ref()
-                                .map(|img| format!("{:?}", img.status))
-                                .unwrap_or_else(|| "Unknown".to_string());
+                                .as_ref().map_or_else(|| "Unknown".to_string(), |img| format!("{:?}", img.status));
                             let border = if selected {
                                 "2px solid var(--accent)"
                             } else {
@@ -680,7 +672,7 @@ pub(super) fn CsvImageUploadCard(
                         file_map.insert(id.clone(), file);
                         ids.push(id);
                     }
-                    let queue_state = BatchQueueState::from_files(ids, 20);
+                    let queue_state = BatchQueueState::from_files(&ids, 20);
                     let files_for_previews = file_map.clone();
                     state_for_drop.update(|s| s.set_images(queue_state.loaded_ids.clone()));
                     queue_for_drop.set(queue_state);
@@ -744,7 +736,7 @@ pub(super) fn CsvImageUploadCard(
                                 ids.push(id);
                             }
                         }
-                        let queue_state = BatchQueueState::from_files(ids, 20);
+                        let queue_state = BatchQueueState::from_files(&ids, 20);
                         let files_for_previews = file_map.clone();
                         state.update(|s| s.set_images(queue_state.loaded_ids.clone()));
                         queue.set(queue_state);

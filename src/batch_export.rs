@@ -62,7 +62,8 @@ impl BatchProgress {
         if self.total == 0 {
             return 0;
         }
-        ((self.processed as f64 / self.total as f64) * 100.0).round() as u8
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        { ((self.processed as f64 / self.total as f64) * 100.0).round() as u8 }
     }
 }
 

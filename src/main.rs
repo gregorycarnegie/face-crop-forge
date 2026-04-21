@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 mod app;
 mod base_runtime;
 mod base_ui;

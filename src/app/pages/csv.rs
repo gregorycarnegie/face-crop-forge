@@ -1,5 +1,6 @@
-use super::*;
+use super::{component, view, IntoView, use_context, AppState, RwSignal, CsvCoreState, BatchCoreState, BatchQueueState, HashMap, DetectedFace, BatchProgress, BatchRuntimeStats, Signal, Get, Effect, Set, draw_source_image_to_canvas, clear_canvas, ClassAttribute, ElementChild, OnAttribute, GlobalAttributes, navigate_to, ThemeToggleButton, CsvUploadCard, CollectView, event_target_value, Update, CsvImageUploadCard, ImageValidationConfig, batch_file_label, decode_image_dimensions, ImageMeta, validate_image_meta, now_ms, detect_faces_with_worker, apply_detection_quality_filters, elapsed_ms_since, revoke_object_url, current_timestamp_ms, CsvExportNameContext, current_utc_timestamp_token, file_to_bytes, normalize_export_filename_for_mime, validate_export_filename_for_mime, build_zip_bytes, download_bytes, IntoAny, CropSettingsPanel, PreprocessingSettingsPanel, OutputSettingsCsvPanel, BatchImageGalleryPanel, StyleAttribute};
 
+#[allow(clippy::too_many_lines)]
 #[component]
 pub(crate) fn CsvPage() -> impl IntoView {
     let settings = use_context::<AppState>()
@@ -16,7 +17,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
     let csv_current_dimensions = RwSignal::new((0.0_f64, 0.0_f64));
     let csv_face_count_by_id = RwSignal::new(HashMap::<String, usize>::new());
     let csv_progress = RwSignal::new(BatchProgress::default());
-    let csv_stats = RwSignal::new(BatchRuntimeStats::default());
+    let csv_perf = RwSignal::new(BatchRuntimeStats::default());
     let csv_preview_filename = RwSignal::new(String::new());
     let mapping_confirmed = RwSignal::new(false);
     let file_path_column = RwSignal::new(String::new());
@@ -49,15 +50,15 @@ pub(crate) fn CsvPage() -> impl IntoView {
     let csv_progress_status = Signal::derive(move || csv_progress.get().status);
     let csv_progress_running = Signal::derive(move || csv_progress.get().running);
     let csv_busy = Signal::derive(move || csv_progress.get().running);
-    let csv_total_faces = Signal::derive(move || csv_stats.get().total_faces_detected.to_string());
+    let csv_total_faces = Signal::derive(move || csv_perf.get().total_faces_detected.to_string());
     let csv_success_rate =
-        Signal::derive(move || format!("{}%", csv_stats.get().success_rate_pct()));
+        Signal::derive(move || format!("{}%", csv_perf.get().success_rate_pct()));
     let csv_avg_processing_time =
-        Signal::derive(move || format!("{}ms", csv_stats.get().avg_processing_time_ms()));
-    let csv_images_processed = Signal::derive(move || csv_stats.get().images_processed.to_string());
-    let csv_logs = Signal::derive(move || csv_stats.get().logs);
+        Signal::derive(move || format!("{}ms", csv_perf.get().avg_processing_time_ms()));
+    let csv_images_processed = Signal::derive(move || csv_perf.get().images_processed.to_string());
+    let csv_logs = Signal::derive(move || csv_perf.get().logs);
     let csv_error_logs = Signal::derive(move || {
-        csv_stats
+        csv_perf
             .get()
             .logs
             .into_iter()
@@ -85,7 +86,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
             let dims = csv_current_dimensions;
             leptos::task::spawn_local(async move {
                 if let Ok((w, h)) = draw_source_image_to_canvas("csvInputCanvas", &url).await {
-                    dims.set((w as f64, h as f64));
+                    dims.set((f64::from(w), f64::from(h)));
                 }
             });
         } else {
@@ -241,7 +242,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             });
                             let batch_state_for_run = csv_batch_state;
                             let progress_for_run = csv_progress;
-                            let stats_for_run = csv_stats;
+                            let stats_for_run = csv_perf;
                             let current_id_for_run = csv_current_image_id;
                             let current_faces_for_run = csv_current_faces;
                             let face_count_for_run = csv_face_count_by_id;
@@ -301,6 +302,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                     let meta = ImageMeta {
                                         file_name: &file_name,
                                         mime_type: &mime_type,
+                                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                                         file_size_bytes: file.size() as u64,
                                         dimensions,
                                     };
@@ -348,57 +350,54 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                         }
                                     }
                                     let elapsed_ms = elapsed_ms_since(start_ms);
-                                    match success_faces {
-                                        Some(faces) => {
-                                            let face_count = faces.len();
-                                            progress_for_run.update(|p| {
-                                                p.record_result(true);
-                                                p.status = format!(
-                                                    "CSV processed {}/{}: {} ({} face(s))",
-                                                    index + 1,
-                                                    total,
-                                                    file_name,
-                                                    face_count
-                                                );
-                                            });
-                                            stats_for_run.update(|stats| {
-                                                stats.record_image(elapsed_ms, face_count as u32, true);
-                                                let source_name = source_name_by_id
-                                                    .get(&id)
-                                                    .cloned()
-                                                    .unwrap_or_else(|| file_name.clone());
-                                                stats.push_log(format!(
-                                                    "CSV processed {} in {}ms ({} face(s)).",
-                                                    source_name, elapsed_ms, face_count
-                                                ));
-                                            });
-                                            face_count_for_run.update(|m| {
-                                                m.insert(id.clone(), face_count);
-                                            });
-                                            current_id_for_run.set(Some(id.clone()));
-                                            current_faces_for_run.set(faces);
-                                            batch_state_for_run.update(|s| s.mark_processed(&id));
-                                        }
-                                        None => {
-                                            record_failed_image!(
-                                                progress_for_run,
-                                                stats_for_run,
-                                                batch_state_for_run,
-                                                &id,
-                                                elapsed_ms,
-                                                format!(
-                                                    "CSV failed {}/{}: {} ({last_error})",
-                                                    index + 1,
-                                                    total,
-                                                    file_name
-                                                ),
-                                                format!("CSV failed {}: {}", file_name, last_error)
+                                    if let Some(faces) = success_faces {
+                                        let face_count = faces.len();
+                                        progress_for_run.update(|p| {
+                                            p.record_result(true);
+                                            p.status = format!(
+                                                "CSV processed {}/{}: {} ({} face(s))",
+                                                index + 1,
+                                                total,
+                                                file_name,
+                                                face_count
                                             );
-                                            face_count_for_run.update(|m| {
-                                                m.remove(&id);
-                                            });
-                                            stopped_early = false;
-                                        }
+                                        });
+                                        stats_for_run.update(|stats| {
+                                            #[allow(clippy::cast_possible_truncation)]
+                                            stats.record_image(elapsed_ms, face_count as u32, true);
+                                            let source_name = source_name_by_id
+                                                .get(&id)
+                                                .cloned()
+                                                .unwrap_or_else(|| file_name.clone());
+                                            stats.push_log(format!(
+                                                "CSV processed {source_name} in {elapsed_ms}ms ({face_count} face(s))."
+                                            ));
+                                        });
+                                        face_count_for_run.update(|m| {
+                                            m.insert(id.clone(), face_count);
+                                        });
+                                        current_id_for_run.set(Some(id.clone()));
+                                        current_faces_for_run.set(faces);
+                                        batch_state_for_run.update(|s| s.mark_processed(&id));
+                                    } else {
+                                        record_failed_image!(
+                                            progress_for_run,
+                                            stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            elapsed_ms,
+                                            format!(
+                                                "CSV failed {}/{}: {} ({last_error})",
+                                                index + 1,
+                                                total,
+                                                file_name
+                                            ),
+                                            format!("CSV failed {}: {}", file_name, last_error)
+                                        );
+                                        face_count_for_run.update(|m| {
+                                            m.remove(&id);
+                                        });
+                                        stopped_early = false;
                                     }
                                 }
                                 progress_for_run.update(|p| {
@@ -447,7 +446,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             });
                             let batch_state_for_run = csv_batch_state;
                             let progress_for_run = csv_progress;
-                            let stats_for_run = csv_stats;
+                            let stats_for_run = csv_perf;
                             let current_id_for_run = csv_current_image_id;
                             let current_faces_for_run = csv_current_faces;
                             let face_count_for_run = csv_face_count_by_id;
@@ -506,6 +505,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                     let meta = ImageMeta {
                                         file_name: &file_name,
                                         mime_type: &mime_type,
+                                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                                         file_size_bytes: file.size() as u64,
                                         dimensions,
                                     };
@@ -552,56 +552,53 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                         }
                                     }
                                     let elapsed_ms = elapsed_ms_since(start_ms);
-                                    match success_faces {
-                                        Some(faces) => {
-                                            let face_count = faces.len();
-                                            progress_for_run.update(|p| {
-                                                p.record_result(true);
-                                                p.status = format!(
-                                                    "CSV selected processed {}/{}: {} ({} face(s))",
-                                                    index + 1,
-                                                    total,
-                                                    file_name,
-                                                    face_count
-                                                );
-                                            });
-                                            stats_for_run.update(|stats| {
-                                                stats.record_image(elapsed_ms, face_count as u32, true);
-                                                let source_name = source_name_by_id
-                                                    .get(&id)
-                                                    .cloned()
-                                                    .unwrap_or_else(|| file_name.clone());
-                                                stats.push_log(format!(
-                                                    "CSV selected processed {} in {}ms ({} face(s)).",
-                                                    source_name, elapsed_ms, face_count
-                                                ));
-                                            });
-                                            face_count_for_run.update(|m| {
-                                                m.insert(id.clone(), face_count);
-                                            });
-                                            current_id_for_run.set(Some(id.clone()));
-                                            current_faces_for_run.set(faces);
-                                            batch_state_for_run.update(|s| s.mark_processed(&id));
-                                        }
-                                        None => {
-                                            record_failed_image!(
-                                                progress_for_run,
-                                                stats_for_run,
-                                                batch_state_for_run,
-                                                &id,
-                                                elapsed_ms,
-                                                format!(
-                                                    "CSV selected failed {}/{}: {} ({last_error})",
-                                                    index + 1,
-                                                    total,
-                                                    file_name
-                                                ),
-                                                format!("CSV selected failed {}: {}", file_name, last_error)
+                                    if let Some(faces) = success_faces {
+                                        let face_count = faces.len();
+                                        progress_for_run.update(|p| {
+                                            p.record_result(true);
+                                            p.status = format!(
+                                                "CSV selected processed {}/{}: {} ({} face(s))",
+                                                index + 1,
+                                                total,
+                                                file_name,
+                                                face_count
                                             );
-                                            face_count_for_run.update(|m| {
-                                                m.remove(&id);
-                                            });
-                                        }
+                                        });
+                                        stats_for_run.update(|stats| {
+                                            #[allow(clippy::cast_possible_truncation)]
+                                            stats.record_image(elapsed_ms, face_count as u32, true);
+                                            let source_name = source_name_by_id
+                                                .get(&id)
+                                                .cloned()
+                                                .unwrap_or_else(|| file_name.clone());
+                                            stats.push_log(format!(
+                                                "CSV selected processed {source_name} in {elapsed_ms}ms ({face_count} face(s))."
+                                            ));
+                                        });
+                                        face_count_for_run.update(|m| {
+                                            m.insert(id.clone(), face_count);
+                                        });
+                                        current_id_for_run.set(Some(id.clone()));
+                                        current_faces_for_run.set(faces);
+                                        batch_state_for_run.update(|s| s.mark_processed(&id));
+                                    } else {
+                                        record_failed_image!(
+                                            progress_for_run,
+                                            stats_for_run,
+                                            batch_state_for_run,
+                                            &id,
+                                            elapsed_ms,
+                                            format!(
+                                                "CSV selected failed {}/{}: {} ({last_error})",
+                                                index + 1,
+                                                total,
+                                                file_name
+                                            ),
+                                            format!("CSV selected failed {}: {}", file_name, last_error)
+                                        );
+                                        face_count_for_run.update(|m| {
+                                            m.remove(&id);
+                                        });
                                     }
                                 }
                                 progress_for_run
@@ -637,8 +634,8 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                 s.mapping = None;
                                 s.filename_to_output.clear();
                             });
-                            csv_stats.update(|s| s.reset());
-                            csv_progress.update(|p| p.reset());
+                            csv_perf.update(crate::batch_core::BatchRuntimeStats::reset);
+                            csv_progress.update(crate::batch_export::BatchProgress::reset);
                             csv_preview_filename.set(String::new());
                             mapping_confirmed.set(false);
                             file_path_column.set(String::new());
@@ -705,7 +702,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             let zip_name =
                                 format!("face-crops-{}.zip", current_utc_timestamp_token());
                             let progress_for_download = csv_progress;
-                            let stats_for_download = csv_stats;
+                            let stats_for_download = csv_perf;
                             leptos::task::spawn_local(async move {
                                 let mut zip_entries = Vec::new();
                                 for (id, generated_name, source_name) in entries {
@@ -721,7 +718,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             stats_for_download.update(|s| {
                                                 s.push_log(format!(
                                                     "CSV ZIP read failed for {source_name}: {error}"
-                                                ))
+                                                ));
                                             });
                                             return;
                                         }
@@ -733,9 +730,8 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                     if !validate_export_filename_for_mime(&final_name, &mime_type) {
                                         stats_for_download.update(|s| {
                                             s.push_log(format!(
-                                                "CSV ZIP skipped invalid filename/mime pair: {} ({})",
-                                                final_name, mime_type
-                                            ))
+                                                "CSV ZIP skipped invalid filename/mime pair: {final_name} ({mime_type})"
+                                            ));
                                         });
                                         continue;
                                     }
@@ -760,10 +756,10 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                     download_bytes(&zip_name, "application/zip", &zip_bytes)
                                 {
                                     progress_for_download.update(|p| {
-                                        p.complete(format!("CSV ZIP download failed: {error}"))
+                                        p.complete(format!("CSV ZIP download failed: {error}"));
                                     });
                                     stats_for_download.update(|s| {
-                                        s.push_log(format!("CSV ZIP download failed: {error}"))
+                                        s.push_log(format!("CSV ZIP download failed: {error}"));
                                     });
                                     return;
                                 }
@@ -772,14 +768,14 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                         "Exported CSV ZIP {} with {} file(s).",
                                         zip_name,
                                         zip_entries.len()
-                                    ))
+                                    ));
                                 });
                                 progress_for_download.update(|p| {
                                     p.complete(format!(
                                         "CSV ZIP exported: {} ({})",
                                         zip_name,
                                         zip_entries.len()
-                                    ))
+                                    ));
                                 });
                             });
                         }

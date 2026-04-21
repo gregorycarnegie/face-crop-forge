@@ -21,6 +21,7 @@ impl WasmVariant {
     }
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BrowserCapabilities {
     pub simd: bool,
@@ -30,6 +31,7 @@ pub struct BrowserCapabilities {
 }
 
 impl BrowserCapabilities {
+    #[cfg(not(target_arch = "wasm32"))]
     pub const fn baseline() -> Self {
         Self {
             simd: true,
@@ -66,7 +68,7 @@ pub struct PipelineHealth {
 }
 
 impl PipelineHealth {
-    pub fn summary(&self) -> &'static str {
+    pub fn summary(self) -> &'static str {
         self.state.label()
     }
 }
@@ -252,7 +254,7 @@ pub fn browser_validation_profiles() -> [BrowserValidationProfile; 6] {
 pub fn revalidate_browser_fallbacks(
     prefer_gpu: bool,
     prefer_landmarker: bool,
-    assets: MediaPipeAssetPaths,
+    assets: &MediaPipeAssetPaths,
 ) -> Vec<BrowserFallbackValidation> {
     browser_validation_profiles()
         .into_iter()
@@ -269,8 +271,8 @@ pub fn revalidate_browser_fallbacks(
                 (WasmVariant::SimdSingleThread, PipelineState::Ready) => {
                     "Threads unavailable; using SIMD single-thread"
                 }
-                (WasmVariant::SimdThreaded, PipelineState::Partial)
-                | (WasmVariant::SimdSingleThread, PipelineState::Partial) => {
+                (WasmVariant::SimdThreaded | WasmVariant::SimdSingleThread,
+PipelineState::Partial) => {
                     "Offscreen/transfer partial; running mixed pipeline"
                 }
                 (_, PipelineState::Unavailable) => "Worker pipeline unavailable; main-thread path",
@@ -408,7 +410,7 @@ mod tests {
 
     #[test]
     fn browser_fallback_matrix_has_expected_profiles() {
-        let matrix = revalidate_browser_fallbacks(true, true, MediaPipeAssetPaths::default());
+        let matrix = revalidate_browser_fallbacks(true, true, &MediaPipeAssetPaths::default());
         assert_eq!(matrix.len(), 6);
         assert!(matrix.iter().any(|entry| entry.browser.contains("Chrome")));
         assert!(matrix.iter().any(|entry| entry.browser.contains("Safari")));
@@ -416,7 +418,7 @@ mod tests {
 
     #[test]
     fn safari_profiles_degrade_to_no_threads() {
-        let matrix = revalidate_browser_fallbacks(true, true, MediaPipeAssetPaths::default());
+        let matrix = revalidate_browser_fallbacks(true, true, &MediaPipeAssetPaths::default());
         let mac = matrix
             .iter()
             .find(|entry| entry.browser == "Safari 17+ (macOS)")
@@ -427,7 +429,7 @@ mod tests {
 
     #[test]
     fn legacy_profile_uses_full_fallback_path() {
-        let matrix = revalidate_browser_fallbacks(true, true, MediaPipeAssetPaths::default());
+        let matrix = revalidate_browser_fallbacks(true, true, &MediaPipeAssetPaths::default());
         let legacy = matrix
             .iter()
             .find(|entry| entry.browser == "Legacy WebView")

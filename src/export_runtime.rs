@@ -19,8 +19,7 @@ pub fn normalize_export_filename_for_mime(file_name: &str, mime_type: &str) -> S
     };
     let stem = file_name
         .rsplit_once('.')
-        .map(|(base, _)| base)
-        .unwrap_or(file_name);
+        .map_or(file_name, |(base, _)| base);
     format!("{stem}.{ext}")
 }
 
@@ -38,10 +37,10 @@ pub fn current_utc_timestamp_token() -> String {
             .to_iso_string()
             .as_string()
             .unwrap_or_else(|| "1970-01-01T00:00:00.000Z".to_string());
-        return iso
+        iso
             .chars()
             .filter(|ch| ch.is_ascii_digit() || *ch == 'T' || *ch == 'Z')
-            .collect();
+            .collect()
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -51,8 +50,9 @@ pub fn current_utc_timestamp_token() -> String {
 
 pub fn current_timestamp_ms() -> u64 {
     #[cfg(target_arch = "wasm32")]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     {
-        return web_sys::js_sys::Date::now() as u64;
+        web_sys::js_sys::Date::now() as u64
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -118,7 +118,7 @@ pub fn download_bytes(file_name: &str, mime_type: &str, bytes: &[u8]) -> Result<
         .map_err(|_| "Failed to cast anchor".to_string())?;
     anchor.set_href(&url);
     anchor.set_download(file_name);
-    let _ = anchor.click();
+    let () = anchor.click();
     let _ = web_sys::Url::revoke_object_url(&url);
     Ok(())
 }

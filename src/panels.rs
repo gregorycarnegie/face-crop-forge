@@ -25,6 +25,7 @@ fn dimensions_for_preset(value: &str) -> Option<(u32, u32)> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 #[component]
 pub fn CropSettingsPanel() -> impl IntoView {
     let settings = use_context::<AppState>()
@@ -201,7 +202,7 @@ pub fn CropSettingsPanel() -> impl IntoView {
                             if s.output_height == 0 {
                                 "0.00:1 ratio".to_string()
                             } else {
-                                format!("{:.2}:1 ratio", s.output_width as f32 / s.output_height as f32)
+                                format!("{:.2}:1 ratio", f64::from(s.output_width) / f64::from(s.output_height))
                             }
                         }}
                     </span>
@@ -211,6 +212,7 @@ pub fn CropSettingsPanel() -> impl IntoView {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 #[component]
 pub fn PreprocessingSettingsPanel() -> impl IntoView {
     let settings = use_context::<AppState>()

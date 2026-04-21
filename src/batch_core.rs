@@ -82,7 +82,7 @@ impl BatchRuntimeStats {
         self.images_processed = self.images_processed.saturating_add(1);
         self.total_faces_detected = self
             .total_faces_detected
-            .saturating_add(faces_detected as u64);
+            .saturating_add(u64::from(faces_detected));
         if success {
             self.successful_processing = self.successful_processing.saturating_add(1);
         }
@@ -97,7 +97,8 @@ impl BatchRuntimeStats {
         if self.images_processed == 0 {
             return 0;
         }
-        ((self.successful_processing as f64 / self.images_processed as f64) * 100.0).round() as u32
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        { ((self.successful_processing as f64 / self.images_processed as f64) * 100.0).round() as u32 }
     }
 
     pub fn avg_processing_time_ms(&self) -> u64 {
@@ -105,7 +106,8 @@ impl BatchRuntimeStats {
             return 0;
         }
         let sum: u64 = self.processing_times_ms.iter().sum();
-        (sum as f64 / self.processing_times_ms.len() as f64).round() as u64
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        { (sum as f64 / self.processing_times_ms.len() as f64).round() as u64 }
     }
 
     pub fn push_log(&mut self, message: impl Into<String>) {
@@ -204,7 +206,7 @@ impl BatchCoreState {
         let chunk_size = preferred_chunk_size.max(1);
         let chunks = selected_ids
             .chunks(chunk_size)
-            .map(|chunk| chunk.to_vec())
+            .map(<[std::string::String]>::to_vec)
             .collect();
 
         BatchWorkPlan {
@@ -249,11 +251,11 @@ impl BatchCoreState {
 }
 
 impl BatchQueueState {
-    pub fn from_files(ids: Vec<String>, preferred_page_size: usize) -> Self {
+    pub fn from_files(ids: &[String], preferred_page_size: usize) -> Self {
         let page_size = preferred_page_size.max(1);
         let mut chunks = ids
             .chunks(page_size)
-            .map(|chunk| chunk.to_vec())
+            .map(<[std::string::String]>::to_vec)
             .collect::<Vec<_>>();
         let loaded_ids = chunks.first().cloned().unwrap_or_default();
         if !chunks.is_empty() {
@@ -396,8 +398,8 @@ mod tests {
 
     #[test]
     fn queue_state_loads_first_page_and_dequeues_remaining() {
-        let ids = (1..=7).map(|i| format!("img_{i}")).collect();
-        let mut queue = BatchQueueState::from_files(ids, 3);
+        let ids = (1..=7).map(|i| format!("img_{i}")).collect::<Vec<_>>();
+        let mut queue = BatchQueueState::from_files(&ids, 3);
 
         assert_eq!(queue.loaded_ids.len(), 3);
         assert_eq!(queue.queued_pages_count(), 2);

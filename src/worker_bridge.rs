@@ -42,6 +42,7 @@ fn set_last_detection_backend(backend: DetectionBackend) {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FaceWorkerStatus {
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     Unsupported,
     Starting,
     Ready,
@@ -280,6 +281,7 @@ async fn detect_faces_with_browser_api(file: web_sys::File) -> Result<Vec<Detect
 }
 
 #[cfg(target_arch = "wasm32")]
+#[allow(clippy::too_many_lines)]
 async fn detect_faces_with_mediapipe(file: web_sys::File) -> Result<Vec<DetectedFace>, String> {
     use web_sys::js_sys::{Array, Function, Object, Reflect};
     use web_sys::wasm_bindgen::JsCast;

@@ -24,7 +24,7 @@ pub struct MatchedUpload {
     pub output_name: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CsvExportNameContext<'a> {
     pub template: &'a str,
     pub csv_output_name: Option<&'a str>,

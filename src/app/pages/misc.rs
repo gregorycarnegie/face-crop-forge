@@ -1,4 +1,4 @@
-use super::*;
+use super::{component, view, IntoView, AppShell, ClassAttribute, StyleAttribute, ElementChild, CropSettingsPanel, PreprocessingSettingsPanel, OutputSettingsBatchPanel, OutputSettingsCsvPanel, OnAttribute, CustomAttribute};
 
 #[component]
 pub(crate) fn PanelsGalleryPage() -> impl IntoView {

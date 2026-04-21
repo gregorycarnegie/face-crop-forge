@@ -18,7 +18,7 @@ use zip::ZipArchive;
 #[test]
 fn batch_drag_drop_queue_contract_preserves_all_files_across_pages() {
     let ids = (1..=45).map(|i| format!("img_{i}.jpg")).collect::<Vec<_>>();
-    let mut queue = BatchQueueState::from_files(ids, 20);
+    let mut queue = BatchQueueState::from_files(&ids, 20);
     let mut state = BatchCoreState::default();
     state.set_images(queue.loaded_ids.clone());
 
@@ -79,13 +79,11 @@ fn csv_mapping_and_export_name_contract_uses_real_output_names() {
     ]);
     assert_eq!(matched.len(), 2);
 
-    let mut queue = BatchQueueState::from_files(
-        matched
-            .iter()
-            .map(|m| m.file_name.clone())
-            .collect::<Vec<_>>(),
-        1,
-    );
+    let collected = matched
+        .iter()
+        .map(|m| m.file_name.clone())
+        .collect::<Vec<_>>();
+    let mut queue = BatchQueueState::from_files(&collected, 1);
     let mut state = BatchCoreState::default();
     state.set_images(queue.loaded_ids.clone());
     while let Some(page) = queue.dequeue_next_page() {

@@ -97,7 +97,7 @@ impl SingleCoreState {
     }
 
     pub fn set_faces(&mut self, face_ids: Vec<String>) {
-        self.all_face_ids = face_ids.clone();
+        self.all_face_ids.clone_from(&face_ids);
         self.selected_face_ids = face_ids.into_iter().collect();
     }
 
@@ -126,7 +126,7 @@ impl SingleCoreState {
     /// Rotates by +/-90 style increments, normalized to [0, 359].
     /// Mirrors TS logic: `(angle + degrees + 360) % 360`.
     pub fn rotate_by(&mut self, delta_degrees: i16) {
-        let raw = self.rotation_degrees as i32 + delta_degrees as i32 + 3600;
+        let raw = i32::from(self.rotation_degrees) + i32::from(delta_degrees) + 3600;
         self.rotation_degrees = (raw % 360) as i16;
     }
 
@@ -151,8 +151,7 @@ impl SingleCoreState {
     pub fn active_camera_name(&self) -> &str {
         self.cameras
             .get(self.active_camera_index)
-            .map(String::as_str)
-            .unwrap_or("Unknown Camera")
+            .map_or("Unknown Camera", String::as_str)
     }
 
     pub fn switch_camera(&mut self) {
