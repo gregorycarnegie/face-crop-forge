@@ -86,12 +86,16 @@ enum RouteTarget {
 }
 
 fn route_for_path(path: &str) -> RouteTarget {
-    match path {
-        "/single" | "/single-processing.html" => RouteTarget::Single,
-        "/batch" | "/batch-processing.html" => RouteTarget::Batch,
-        "/csv" | "/csv-processing.html" => RouteTarget::Csv,
-        "/_panels" => RouteTarget::Panels,
-        _ => RouteTarget::Landing,
+    if path.ends_with("/single") || path.ends_with("/single-processing.html") {
+        RouteTarget::Single
+    } else if path.ends_with("/batch") || path.ends_with("/batch-processing.html") {
+        RouteTarget::Batch
+    } else if path.ends_with("/csv") || path.ends_with("/csv-processing.html") {
+        RouteTarget::Csv
+    } else if path.ends_with("/_panels") {
+        RouteTarget::Panels
+    } else {
+        RouteTarget::Landing
     }
 }
 

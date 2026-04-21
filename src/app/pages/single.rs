@@ -174,14 +174,14 @@ pub(crate) fn SinglePage() -> impl IntoView {
         <div class="app-shell">
             <header class="app-header">
                 <div class="title-row">
-                    <h1><a href="/">"Face Crop Forge"</a></h1>
+                    <h1><a href="./">"Face Crop Forge"</a></h1>
                     <div class="header-actions">
                         <button
                             type="button"
                             id="backToMultipleBtn"
                             class="ghost-btn"
                             title="Switch to multiple image mode"
-                            on:click=move |_| navigate_to("/batch")
+                            on:click=move |_| navigate_to("batch")
                         >
                             <span>"Multiple Images"</span>
                         </button>
@@ -190,7 +190,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                             id="csvBatchModeBtn"
                             class="ghost-btn"
                             title="Switch to CSV batch mode"
-                            on:click=move |_| navigate_to("/csv")
+                            on:click=move |_| navigate_to("csv")
                         >
                             <span>"CSV Batch"</span>
                         </button>

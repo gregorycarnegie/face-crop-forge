@@ -63,7 +63,7 @@ pub(crate) fn LandingPage() -> impl IntoView {
 
                 <main class="modes-grid">
                     <ModeCard
-                        href="/batch"
+                        href="batch"
                         title="Batch Processing"
                         description="The powerhouse mode. Drag and drop folders of images and process them all at once."
                         action="Launch Batch Mode"
@@ -74,7 +74,7 @@ pub(crate) fn LandingPage() -> impl IntoView {
                         feature_3="Smart centering"
                     />
                     <ModeCard
-                        href="/single"
+                        href="single"
                         title="Single Image"
                         description="Perfect for fine-tuning. Adjust crops, rotate, and inspect detections one by one."
                         action="Launch Single Mode"
@@ -85,7 +85,7 @@ pub(crate) fn LandingPage() -> impl IntoView {
                         feature_3="Webcam support"
                     />
                     <ModeCard
-                        href="/csv"
+                        href="csv"
                         title="CSV Workflow"
                         description="Enterprise workflow. Map CSV data to filenames for automated organization."
                         action="Launch CSV Mode"

@@ -54,11 +54,11 @@ pub(super) fn AppShell(title: &'static str, children: Children) -> impl IntoView
                     <strong>{title}</strong>
                     <div class="header-actions">
                         <nav style="display:flex;gap:12px;">
-                            <a href="/" style="color:var(--text-secondary);text-decoration:none;">"Home"</a>
-                            <a href="/single" style="color:var(--text-secondary);text-decoration:none;">"Single"</a>
-                            <a href="/batch" style="color:var(--text-secondary);text-decoration:none;">"Batch"</a>
-                            <a href="/csv" style="color:var(--text-secondary);text-decoration:none;">"CSV"</a>
-                            <a href="/_panels" style="color:var(--text-secondary);text-decoration:none;">"Panels"</a>
+                            <a href="./" style="color:var(--text-secondary);text-decoration:none;">"Home"</a>
+                            <a href="single" style="color:var(--text-secondary);text-decoration:none;">"Single"</a>
+                            <a href="batch" style="color:var(--text-secondary);text-decoration:none;">"Batch"</a>
+                            <a href="csv" style="color:var(--text-secondary);text-decoration:none;">"CSV"</a>
+                            <a href="_panels" style="color:var(--text-secondary);text-decoration:none;">"Panels"</a>
                         </nav>
                         <ThemeToggleButton id="darkModeBtn" />
                     </div>

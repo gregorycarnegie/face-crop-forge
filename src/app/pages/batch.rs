@@ -103,14 +103,14 @@ pub(crate) fn BatchPage() -> impl IntoView {
         <div class="app-shell">
             <header class="app-header">
                 <div class="title-row">
-                    <h1><a href="/">"Face Crop Forge"</a></h1>
+                    <h1><a href="./">"Face Crop Forge"</a></h1>
                     <div class="header-actions">
                         <button
                             type="button"
                             id="singleImageModeBtn"
                             class="ghost-btn"
                             title="Switch to single image mode"
-                            on:click=move |_| navigate_to("/single")
+                            on:click=move |_| navigate_to("single")
                         >
                             <span>"Single Image"</span>
                         </button>
@@ -119,7 +119,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                             id="csvBatchModeBtn"
                             class="ghost-btn"
                             title="Switch to CSV batch mode"
-                            on:click=move |_| navigate_to("/csv")
+                            on:click=move |_| navigate_to("csv")
                         >
                             <span>"CSV Batch"</span>
                         </button>
