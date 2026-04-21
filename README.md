@@ -3,6 +3,7 @@
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Rust](https://img.shields.io/badge/Rust-stable-f74c00.svg)
 ![Leptos](https://img.shields.io/badge/Leptos-0.8.16-blue.svg)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-Face%20Detection-brightgreen.svg)
 
 Client-side face detection and cropping app running as a Leptos (WASM) SPA.
 
