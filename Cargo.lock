@@ -373,6 +373,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "face-crop-forge"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "leptos",
+ "serde",
+ "serde_json",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "zip",
+]
+
+[[package]]
 name = "flate2"
 version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -971,19 +984,6 @@ name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
-
-[[package]]
-name = "opencv-face-crop"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "leptos",
- "serde",
- "serde_json",
- "wasm-bindgen-futures",
- "web-sys",
- "zip",
-]
 
 [[package]]
 name = "or_poisoned"

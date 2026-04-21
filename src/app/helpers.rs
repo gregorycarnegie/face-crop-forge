@@ -1,7 +1,6 @@
-use super::{
-    DetectedFace, Dimensions, HashMap, JsFuture, ProcessingSettings, SAVED_SETTINGS_KEY, ThemeMode,
-    window,
-};
+use super::{DetectedFace, Dimensions, HashMap, ProcessingSettings, ThemeMode};
+#[cfg(target_arch = "wasm32")]
+use super::{JsFuture, SAVED_SETTINGS_KEY, window};
 
 #[cfg(target_arch = "wasm32")]
 type BlobClosureSlot = std::rc::Rc<
@@ -1009,7 +1008,7 @@ pub(super) fn apply_theme_mode(_mode: ThemeMode) {}
 
 #[cfg(test)]
 mod route_tests {
-    use super::{RouteTarget, route_for_path};
+    use super::super::{RouteTarget, route_for_path};
 
     #[test]
     fn primary_routes_resolve_to_expected_targets() {
