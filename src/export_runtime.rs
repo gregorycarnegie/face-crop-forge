@@ -37,8 +37,7 @@ pub fn current_utc_timestamp_token() -> String {
             .to_iso_string()
             .as_string()
             .unwrap_or_else(|| "1970-01-01T00:00:00.000Z".to_string());
-        iso
-            .chars()
+        iso.chars()
             .filter(|ch| ch.is_ascii_digit() || *ch == 'T' || *ch == 'Z')
             .collect()
     }

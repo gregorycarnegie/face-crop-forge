@@ -97,8 +97,15 @@ impl BatchRuntimeStats {
         if self.images_processed == 0 {
             return 0;
         }
-        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        { ((self.successful_processing as f64 / self.images_processed as f64) * 100.0).round() as u32 }
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
+        {
+            ((self.successful_processing as f64 / self.images_processed as f64) * 100.0).round()
+                as u32
+        }
     }
 
     pub fn avg_processing_time_ms(&self) -> u64 {
@@ -106,8 +113,14 @@ impl BatchRuntimeStats {
             return 0;
         }
         let sum: u64 = self.processing_times_ms.iter().sum();
-        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        { (sum as f64 / self.processing_times_ms.len() as f64).round() as u64 }
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
+        {
+            (sum as f64 / self.processing_times_ms.len() as f64).round() as u64
+        }
     }
 
     pub fn push_log(&mut self, message: impl Into<String>) {

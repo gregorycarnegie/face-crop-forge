@@ -271,10 +271,10 @@ pub fn revalidate_browser_fallbacks(
                 (WasmVariant::SimdSingleThread, PipelineState::Ready) => {
                     "Threads unavailable; using SIMD single-thread"
                 }
-                (WasmVariant::SimdThreaded | WasmVariant::SimdSingleThread,
-PipelineState::Partial) => {
-                    "Offscreen/transfer partial; running mixed pipeline"
-                }
+                (
+                    WasmVariant::SimdThreaded | WasmVariant::SimdSingleThread,
+                    PipelineState::Partial,
+                ) => "Offscreen/transfer partial; running mixed pipeline",
                 (_, PipelineState::Unavailable) => "Worker pipeline unavailable; main-thread path",
                 (WasmVariant::NoSimd, _) => "SIMD unavailable; using scalar WASM fallback",
             };

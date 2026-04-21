@@ -34,7 +34,10 @@ use std::collections::HashMap;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{DragEvent, HtmlInputElement};
 
-use helpers::{revoke_object_url, data_url_for_file, object_url_for_file, apply_detection_quality_filters, files_from_data_transfer, load_theme_mode, apply_theme_mode, persist_theme_mode};
+use helpers::{
+    apply_detection_quality_filters, apply_theme_mode, data_url_for_file, files_from_data_transfer,
+    load_theme_mode, object_url_for_file, persist_theme_mode, revoke_object_url,
+};
 use pages::{BatchPage, CsvPage, LandingPage, PanelsGalleryPage, SinglePage};
 
 #[component]

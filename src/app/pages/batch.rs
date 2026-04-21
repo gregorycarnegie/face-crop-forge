@@ -1,4 +1,19 @@
-use super::{component, view, IntoView, use_context, AppState, RwSignal, BatchCoreState, BatchQueueState, HashMap, BatchProgress, BatchRuntimeStats, list_saved_setting_names, Signal, Get, build_memory_indicator, MemoryIndicatorLevel, ClassAttribute, ElementChild, OnAttribute, GlobalAttributes, navigate_to, ThemeToggleButton, BatchUploadCard, Update, DetectionRetryPolicy, parse_max_retries, ImageValidationConfig, batch_file_label, decode_image_dimensions, ImageMeta, validate_image_meta, now_ms, DetectedFace, detect_faces_with_worker, apply_detection_quality_filters, elapsed_ms_since, Set, revoke_object_url, current_timestamp_ms, current_utc_timestamp_token, file_to_bytes, render_naming_template, normalize_export_filename_for_mime, validate_export_filename_for_mime, build_zip_bytes, download_bytes, PropAttribute, CollectView, event_target_value, load_named_processing_settings, save_named_processing_settings, export_saved_settings_json, click_element_by_id, HtmlInputElement, event_target, JsFuture, import_saved_settings_json, event_target_checked, IntoAny, CropSettingsPanel, PreprocessingSettingsPanel, OutputSettingsBatchPanel, BatchImageGalleryPanel};
+use super::{
+    AppState, BatchCoreState, BatchImageGalleryPanel, BatchProgress, BatchQueueState,
+    BatchRuntimeStats, BatchUploadCard, ClassAttribute, CollectView, CropSettingsPanel,
+    DetectedFace, DetectionRetryPolicy, ElementChild, Get, GlobalAttributes, HashMap,
+    HtmlInputElement, ImageMeta, ImageValidationConfig, IntoAny, IntoView, JsFuture,
+    MemoryIndicatorLevel, OnAttribute, OutputSettingsBatchPanel, PreprocessingSettingsPanel,
+    PropAttribute, RwSignal, Set, Signal, ThemeToggleButton, Update,
+    apply_detection_quality_filters, batch_file_label, build_memory_indicator, build_zip_bytes,
+    click_element_by_id, component, current_timestamp_ms, current_utc_timestamp_token,
+    decode_image_dimensions, detect_faces_with_worker, download_bytes, elapsed_ms_since,
+    event_target, event_target_checked, event_target_value, export_saved_settings_json,
+    file_to_bytes, import_saved_settings_json, list_saved_setting_names,
+    load_named_processing_settings, navigate_to, normalize_export_filename_for_mime, now_ms,
+    parse_max_retries, render_naming_template, revoke_object_url, save_named_processing_settings,
+    use_context, validate_export_filename_for_mime, validate_image_meta, view,
+};
 
 #[allow(clippy::too_many_lines)]
 #[component]
@@ -53,7 +68,9 @@ pub(crate) fn BatchPage() -> impl IntoView {
         let selected = batch_state.get().selected_count().min(128);
         let bytes = BatchCoreState::estimate_preview_memory_bytes(640, 640, selected);
         #[allow(clippy::cast_precision_loss)]
-        { format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0)) }
+        {
+            format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))
+        }
     });
     let rust_memory_indicator_text = Signal::derive(move || {
         let state = batch_state.get();

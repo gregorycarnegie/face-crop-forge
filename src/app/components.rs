@@ -1,4 +1,12 @@
-use super::{component, view, HashMap, revoke_object_url, data_url_for_file, object_url_for_file, Children, IntoView, ClassAttribute, ElementChild, StyleAttribute, GlobalAttributes, use_context, RwSignal, ThemeMode, Signal, Get, OnAttribute, AriaAttributes, Update, toggle_theme, SingleCoreState, FaceWorkerBridgeState, ProcessingSettings, DetectedFace, HtmlInputElement, event_target, Set, detect_faces_with_worker, apply_detection_quality_filters, DragEvent, BatchCoreState, BatchQueueState, BatchProgress, files_from_data_transfer, CollectView, CsvCoreState, JsFuture};
+use super::{
+    AriaAttributes, BatchCoreState, BatchProgress, BatchQueueState, Children, ClassAttribute,
+    CollectView, CsvCoreState, DetectedFace, DragEvent, ElementChild, FaceWorkerBridgeState, Get,
+    GlobalAttributes, HashMap, HtmlInputElement, IntoView, JsFuture, OnAttribute,
+    ProcessingSettings, RwSignal, Set, Signal, SingleCoreState, StyleAttribute, ThemeMode, Update,
+    apply_detection_quality_filters, component, data_url_for_file, detect_faces_with_worker,
+    event_target, files_from_data_transfer, object_url_for_file, revoke_object_url, toggle_theme,
+    use_context, view,
+};
 
 fn is_probably_image_file(file: &web_sys::File) -> bool {
     let mime = file.type_().to_lowercase();

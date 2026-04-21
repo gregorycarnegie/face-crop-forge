@@ -1,4 +1,7 @@
-use super::{HashMap, ProcessingSettings, window, SAVED_SETTINGS_KEY, JsFuture, Dimensions, DetectedFace, ThemeMode};
+use super::{
+    DetectedFace, Dimensions, HashMap, JsFuture, ProcessingSettings, SAVED_SETTINGS_KEY, ThemeMode,
+    window,
+};
 
 #[cfg(target_arch = "wasm32")]
 type BlobClosureSlot = std::rc::Rc<
@@ -90,9 +93,10 @@ pub(super) fn click_element_by_id(id: &str) {
     use web_sys::wasm_bindgen::JsCast;
     if let Some(document) = window().document()
         && let Some(element) = document.get_element_by_id(id)
-            && let Ok(html) = element.dyn_into::<web_sys::HtmlElement>() {
-                html.click();
-            }
+        && let Ok(html) = element.dyn_into::<web_sys::HtmlElement>()
+    {
+        html.click();
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -119,7 +123,9 @@ pub(super) fn object_url_for_file(_file: &web_sys::File) -> Option<String> {
 #[cfg(target_arch = "wasm32")]
 pub(super) fn now_ms() -> u64 {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    { web_sys::js_sys::Date::now() as u64 }
+    {
+        web_sys::js_sys::Date::now() as u64
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -416,7 +422,12 @@ pub(super) fn clear_canvas(canvas_id: &str) {
     let Ok(context) = context.dyn_into::<web_sys::CanvasRenderingContext2d>() else {
         return;
     };
-    context.clear_rect(0.0, 0.0, f64::from(canvas.width()), f64::from(canvas.height()));
+    context.clear_rect(
+        0.0,
+        0.0,
+        f64::from(canvas.width()),
+        f64::from(canvas.height()),
+    );
     canvas.set_width(0);
     canvas.set_height(0);
 }
@@ -636,8 +647,10 @@ fn compute_source_crop_rect(
         crop_h *= scale;
     }
 
-    let center_x = face_x + face_w / 2.0 + (f64::from(settings.horizontal_offset_pct) / 100.0) * face_w;
-    let center_y = face_y + face_h / 2.0 + (f64::from(settings.vertical_offset_pct) / 100.0) * face_h;
+    let center_x =
+        face_x + face_w / 2.0 + (f64::from(settings.horizontal_offset_pct) / 100.0) * face_w;
+    let center_y =
+        face_y + face_h / 2.0 + (f64::from(settings.vertical_offset_pct) / 100.0) * face_h;
     let mut crop_x = center_x - crop_w / 2.0;
     let mut crop_y = center_y - crop_h / 2.0;
     crop_x = crop_x.clamp(0.0, (source_width - crop_w).max(0.0));
