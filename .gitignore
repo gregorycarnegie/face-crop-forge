@@ -22,3 +22,5 @@ nul
 .env
 .env.local
 .env.*.local
+
+.codex
