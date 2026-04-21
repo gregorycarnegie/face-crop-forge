@@ -1,5 +1,6 @@
 # Face Crop Forge
 
+[![CI](https://github.com/gregorycarnegie/face-crop-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/gregorycarnegie/face-crop-forge/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Rust](https://img.shields.io/badge/Rust-stable-f74c00.svg)
 ![Leptos](https://img.shields.io/badge/Leptos-0.8.16-blue.svg)
