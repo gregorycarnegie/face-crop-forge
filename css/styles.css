@@ -493,10 +493,6 @@ button:disabled {
     margin-right: auto;
 }
 
-.control-panel {
-    /* width controlled by grid */
-}
-
 .control-scroll {
     display: flex;
     flex-direction: column;
