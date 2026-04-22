@@ -1,14 +1,14 @@
 use super::{
-    AppState, ClassAttribute, CollectView, CropSettingsPanel, DetectedFace, Effect, ElementChild,
-    FaceWorkerBridgeState, Get, GlobalAttributes, IntoAny, IntoView, MediaPipeAssetPaths,
-    OnAttribute, OutputSettingsBatchPanel, PreprocessingSettingsPanel, RwSignal, Set, Signal,
-    SingleCoreState, SingleRuntimeState, SingleUploadCard, StyleAttribute, ThemeToggleButton,
+    AppShell, AppState, ClassAttribute, CollectView, CropSettingsPanel, DetectedFace, Effect,
+    ElementChild, FaceWorkerBridgeState, Get, GlobalAttributes, IntoAny, IntoView,
+    MediaPipeAssetPaths, OnAttribute, OutputSettingsBatchPanel, PreprocessingSettingsPanel,
+    RwSignal, Set, Signal, SingleCoreState, SingleRuntimeState, SingleUploadCard, StyleAttribute,
     Update, apply_detection_quality_filters, build_export_plan, build_load_plan,
     capture_webcam_frame_to_file, clear_canvas, clear_last_detection_backend, clear_video_source,
     component, compute_display_size, crop_face_bytes_from_source, current_timestamp_ms,
     detect_browser_capabilities, detect_faces_with_worker, download_bytes,
     draw_source_image_to_canvas, evaluate_pipeline_health, last_detection_backend_label,
-    list_video_input_devices, navigate_to, normalize_export_filename_for_mime, object_url_for_file,
+    list_video_input_devices, normalize_export_filename_for_mime, object_url_for_file,
     overlay_percent_crop_rect, revalidate_browser_fallbacks, revoke_object_url, start_face_worker,
     start_webcam_stream, stop_face_worker, stop_media_stream, use_context,
     validate_export_filename_for_mime, view,
@@ -171,34 +171,8 @@ pub(crate) fn SinglePage() -> impl IntoView {
     });
 
     view! {
-        <div class="app-shell">
-            <header class="app-header">
-                <div class="title-row">
-                    <h1><a href="./">"Face Crop Forge"</a></h1>
-                    <div class="header-actions">
-                        <button
-                            type="button"
-                            id="backToMultipleBtn"
-                            class="ghost-btn"
-                            title="Switch to multiple image mode"
-                            on:click=move |_| navigate_to("batch")
-                        >
-                            <span>"Multiple Images"</span>
-                        </button>
-                        <button
-                            type="button"
-                            id="csvBatchModeBtn"
-                            class="ghost-btn"
-                            title="Switch to CSV batch mode"
-                            on:click=move |_| navigate_to("csv")
-                        >
-                            <span>"CSV Batch"</span>
-                        </button>
-                        <ThemeToggleButton id="darkModeBtn" />
-                    </div>
-                </div>
-
-                <SingleUploadCard
+        <AppShell title="Single Image">
+            <SingleUploadCard
                     state=single_state
                     worker_state=worker_state
                     processing_settings=settings
@@ -268,8 +242,6 @@ pub(crate) fn SinglePage() -> impl IntoView {
                         <span>"📷 Use Webcam"</span>
                     </button>
                 </div>
-            </header>
-
             <div class="app-body">
                 <aside class="control-panel">
                     <div class="control-scroll">
@@ -1011,6 +983,6 @@ pub(crate) fn SinglePage() -> impl IntoView {
                 </div>
             </div>
 
-        </div>
+        </AppShell>
     }
 }

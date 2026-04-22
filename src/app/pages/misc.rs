@@ -1,24 +1,22 @@
 use super::{
     AppShell, ClassAttribute, CropSettingsPanel, CustomAttribute, ElementChild, IntoView,
     OnAttribute, OutputSettingsBatchPanel, OutputSettingsCsvPanel, PreprocessingSettingsPanel,
-    StyleAttribute, component, view,
+    component, view,
 };
 
 #[component]
 pub(crate) fn PanelsGalleryPage() -> impl IntoView {
     view! {
         <AppShell title="Leptos Panels Gallery">
-            <div class="app-shell" style="padding-top: 24px;">
-                <div class="app-body">
-                    <aside class="control-panel">
-                        <div class="control-scroll">
-                            <CropSettingsPanel />
-                            <PreprocessingSettingsPanel />
-                            <OutputSettingsBatchPanel />
-                            <OutputSettingsCsvPanel />
-                        </div>
-                    </aside>
-                </div>
+            <div class="app-body">
+                <aside class="control-panel">
+                    <div class="control-scroll">
+                        <CropSettingsPanel />
+                        <PreprocessingSettingsPanel />
+                        <OutputSettingsBatchPanel />
+                        <OutputSettingsCsvPanel />
+                    </div>
+                </aside>
             </div>
         </AppShell>
     }
@@ -29,11 +27,6 @@ pub(crate) fn LandingPage() -> impl IntoView {
     view! {
         <AppShell title="Face Crop Forge">
             <div class="home-container">
-                <div class="background-blobs">
-                    <div class="blob blob-1"></div>
-                    <div class="blob blob-2"></div>
-                </div>
-
                 <header class="hero-section">
                     <div class="hero-badge">"v1.7.0 • 100% Client-Side Privacy"</div>
                     <h1 class="hero-title">

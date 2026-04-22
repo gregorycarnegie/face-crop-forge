@@ -1,18 +1,18 @@
 use super::{
-    AppState, BatchCoreState, BatchImageGalleryPanel, BatchProgress, BatchQueueState,
+    AppShell, AppState, BatchCoreState, BatchImageGalleryPanel, BatchProgress, BatchQueueState,
     BatchRuntimeStats, BatchUploadCard, ClassAttribute, CollectView, CropSettingsPanel,
     DetectedFace, DetectionRetryPolicy, ElementChild, Get, GlobalAttributes, HashMap,
     HtmlInputElement, ImageMeta, ImageValidationConfig, IntoAny, IntoView, JsFuture,
     MemoryIndicatorLevel, OnAttribute, OutputSettingsBatchPanel, PreprocessingSettingsPanel,
-    PropAttribute, RwSignal, Set, Signal, ThemeToggleButton, Update,
-    apply_detection_quality_filters, batch_file_label, build_memory_indicator, build_zip_bytes,
-    click_element_by_id, component, current_timestamp_ms, current_utc_timestamp_token,
-    decode_image_dimensions, detect_faces_with_worker, download_bytes, elapsed_ms_since,
-    event_target, event_target_checked, event_target_value, export_saved_settings_json,
-    file_to_bytes, import_saved_settings_json, list_saved_setting_names,
-    load_named_processing_settings, navigate_to, normalize_export_filename_for_mime, now_ms,
-    parse_max_retries, render_naming_template, revoke_object_url, save_named_processing_settings,
-    use_context, validate_export_filename_for_mime, validate_image_meta, view,
+    PropAttribute, RwSignal, Set, Signal, Update, apply_detection_quality_filters,
+    batch_file_label, build_memory_indicator, build_zip_bytes, click_element_by_id, component,
+    current_timestamp_ms, current_utc_timestamp_token, decode_image_dimensions,
+    detect_faces_with_worker, download_bytes, elapsed_ms_since, event_target, event_target_checked,
+    event_target_value, export_saved_settings_json, file_to_bytes, import_saved_settings_json,
+    list_saved_setting_names, load_named_processing_settings, normalize_export_filename_for_mime,
+    now_ms, parse_max_retries, render_naming_template, revoke_object_url,
+    save_named_processing_settings, use_context, validate_export_filename_for_mime,
+    validate_image_meta, view,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -100,34 +100,8 @@ pub(crate) fn BatchPage() -> impl IntoView {
     });
 
     view! {
-        <div class="app-shell">
-            <header class="app-header">
-                <div class="title-row">
-                    <h1><a href="./">"Face Crop Forge"</a></h1>
-                    <div class="header-actions">
-                        <button
-                            type="button"
-                            id="singleImageModeBtn"
-                            class="ghost-btn"
-                            title="Switch to single image mode"
-                            on:click=move |_| navigate_to("single")
-                        >
-                            <span>"Single Image"</span>
-                        </button>
-                        <button
-                            type="button"
-                            id="csvBatchModeBtn"
-                            class="ghost-btn"
-                            title="Switch to CSV batch mode"
-                            on:click=move |_| navigate_to("csv")
-                        >
-                            <span>"CSV Batch"</span>
-                        </button>
-                        <ThemeToggleButton id="darkModeBtn" />
-                    </div>
-                </div>
-
-                <BatchUploadCard
+        <AppShell title="Batch Processing">
+            <BatchUploadCard
                     state=batch_state
                     queue=batch_queue
                     progress=batch_progress
@@ -717,7 +691,6 @@ pub(crate) fn BatchPage() -> impl IntoView {
                         "Download All Results"
                     </button>
                 </div>
-            </header>
 
             <div class="app-body">
                 <aside class="control-panel">
@@ -1120,6 +1093,6 @@ pub(crate) fn BatchPage() -> impl IntoView {
                 </main>
             </div>
 
-        </div>
+        </AppShell>
     }
 }

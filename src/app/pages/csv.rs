@@ -1,15 +1,15 @@
 use super::{
-    AppState, BatchCoreState, BatchImageGalleryPanel, BatchProgress, BatchQueueState,
+    AppShell, AppState, BatchCoreState, BatchImageGalleryPanel, BatchProgress, BatchQueueState,
     BatchRuntimeStats, ClassAttribute, CollectView, CropSettingsPanel, CsvCoreState,
     CsvExportNameContext, CsvImageUploadCard, CsvUploadCard, DetectedFace, Effect, ElementChild,
     Get, GlobalAttributes, HashMap, ImageMeta, ImageValidationConfig, IntoAny, IntoView,
     OnAttribute, OutputSettingsCsvPanel, PreprocessingSettingsPanel, RwSignal, Set, Signal,
-    StyleAttribute, ThemeToggleButton, Update, apply_detection_quality_filters, batch_file_label,
-    build_zip_bytes, clear_canvas, component, current_timestamp_ms, current_utc_timestamp_token,
+    StyleAttribute, Update, apply_detection_quality_filters, batch_file_label, build_zip_bytes,
+    clear_canvas, component, current_timestamp_ms, current_utc_timestamp_token,
     decode_image_dimensions, detect_faces_with_worker, download_bytes, draw_source_image_to_canvas,
-    elapsed_ms_since, event_target_value, file_to_bytes, navigate_to,
-    normalize_export_filename_for_mime, now_ms, revoke_object_url, use_context,
-    validate_export_filename_for_mime, validate_image_meta, view,
+    elapsed_ms_since, event_target_value, file_to_bytes, normalize_export_filename_for_mime,
+    now_ms, revoke_object_url, use_context, validate_export_filename_for_mime, validate_image_meta,
+    view,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -108,34 +108,8 @@ pub(crate) fn CsvPage() -> impl IntoView {
     });
 
     view! {
-        <div class="app-shell">
-            <header class="app-header">
-                <div class="title-row">
-                    <h1><a href="./">"Face Crop Forge"</a></h1>
-                    <div class="header-actions">
-                        <button
-                            type="button"
-                            id="multipleImageModeBtn"
-                            class="ghost-btn"
-                            title="Switch to multiple image mode"
-                            on:click=move |_| navigate_to("batch")
-                        >
-                            <span>"Multiple Images"</span>
-                        </button>
-                        <button
-                            type="button"
-                            id="singleImageModeBtn"
-                            class="ghost-btn"
-                            title="Switch to single image mode"
-                            on:click=move |_| navigate_to("single")
-                        >
-                            <span>"Single Image"</span>
-                        </button>
-                        <ThemeToggleButton id="darkModeBtn" />
-                    </div>
-                </div>
-
-                <CsvUploadCard state=csv_state progress=csv_progress busy=csv_busy />
+        <AppShell title="CSV Workflow">
+            <CsvUploadCard state=csv_state progress=csv_progress busy=csv_busy />
 
                 <div class=move || {
                     if headers.get().is_empty() {
@@ -795,7 +769,6 @@ pub(crate) fn CsvPage() -> impl IntoView {
                         "Download All Results"
                     </button>
                 </div>
-            </header>
 
             <div class="app-body">
                 <aside class="control-panel">
@@ -1005,6 +978,6 @@ pub(crate) fn CsvPage() -> impl IntoView {
                 </main>
             </div>
 
-        </div>
+        </AppShell>
     }
 }

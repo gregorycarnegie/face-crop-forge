@@ -8,6 +8,23 @@ use super::{
     use_context, view,
 };
 
+fn nav_link_class(current_path: &str, suffix: &str) -> &'static str {
+    if suffix == "./" {
+        if current_path.ends_with("/single")
+            || current_path.ends_with("/batch")
+            || current_path.ends_with("/csv")
+        {
+            "nav-link"
+        } else {
+            "nav-link active"
+        }
+    } else if current_path.ends_with(suffix) {
+        "nav-link active"
+    } else {
+        "nav-link"
+    }
+}
+
 fn is_probably_image_file(file: &web_sys::File) -> bool {
     let mime = file.type_().to_lowercase();
     if mime.starts_with("image/") {
@@ -47,24 +64,47 @@ async fn build_preview_map_from_files(
 
 #[component]
 pub(super) fn AppShell(title: &'static str, children: Children) -> impl IntoView {
+    let _ = title;
+    let path = web_sys::window()
+        .and_then(|w| w.location().pathname().ok())
+        .unwrap_or_default();
+
+    let home_class = nav_link_class(&path, "./");
+    let single_class = nav_link_class(&path, "single");
+    let batch_class = nav_link_class(&path, "batch");
+    let csv_class = nav_link_class(&path, "csv");
+
     view! {
         <div class="app-shell">
-            <header class="app-header" style="padding:12px 16px;border-bottom:1px solid var(--border-color);">
-                <div class="title-row" style="margin-bottom:0;">
-                    <strong>{title}</strong>
-                    <div class="header-actions">
-                        <nav style="display:flex;gap:12px;">
-                            <a href="./" style="color:var(--text-secondary);text-decoration:none;">"Home"</a>
-                            <a href="single" style="color:var(--text-secondary);text-decoration:none;">"Single"</a>
-                            <a href="batch" style="color:var(--text-secondary);text-decoration:none;">"Batch"</a>
-                            <a href="csv" style="color:var(--text-secondary);text-decoration:none;">"CSV"</a>
-                            <a href="_panels" style="color:var(--text-secondary);text-decoration:none;">"Panels"</a>
-                        </nav>
+            <div class="bg-blobs" aria-hidden="true">
+                <div class="bg-blob bg-blob-1"></div>
+                <div class="bg-blob bg-blob-2"></div>
+            </div>
+            <header class="app-header">
+                <div class="nav-bar">
+                    <a href="./" class="nav-brand" aria-label="Face Crop Forge home">
+                        <span class="nav-brand-icon" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="7" width="20" height="14" rx="2"/>
+                                <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+                                <circle cx="12" cy="13" r="3"/>
+                            </svg>
+                        </span>
+                        <span class="nav-brand-text">"Face Crop Forge"</span>
+                    </a>
+                    <div class="nav-spacer"></div>
+                    <nav class="nav-links" aria-label="Main navigation">
+                        <a href="./"     class=home_class  >"Home"  </a>
+                        <a href="single" class=single_class>"Single"</a>
+                        <a href="batch"  class=batch_class >"Batch" </a>
+                        <a href="csv"    class=csv_class   >"CSV"   </a>
+                    </nav>
+                    <div class="nav-actions">
                         <ThemeToggleButton id="darkModeBtn" />
                     </div>
                 </div>
             </header>
-            <main style="flex:1;">{children()}</main>
+            <main class="app-main">{children()}</main>
         </div>
     }
 }
