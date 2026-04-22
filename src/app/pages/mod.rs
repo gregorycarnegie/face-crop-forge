@@ -7,9 +7,9 @@ use super::helpers::{
     clear_video_source, click_element_by_id, crop_face_bytes_from_source, decode_image_dimensions,
     draw_source_image_to_canvas, elapsed_ms_since, export_saved_settings_json,
     import_saved_settings_json, list_saved_setting_names, list_video_input_devices,
-    load_named_processing_settings, now_ms, object_url_for_file,
-    overlay_percent_crop_rect, render_naming_template, revoke_object_url,
-    save_named_processing_settings, start_webcam_stream, stop_media_stream,
+    load_named_processing_settings, now_ms, object_url_for_file, overlay_percent_crop_rect,
+    render_naming_template, revoke_object_url, save_named_processing_settings, start_webcam_stream,
+    stop_media_stream,
 };
 use super::{
     AppState, BatchCoreState, BatchProgress, BatchQueueState, BatchRuntimeStats, ClassAttribute,
