@@ -1,13 +1,13 @@
 use super::components::{
     AppShell, BatchImageGalleryPanel, BatchUploadCard, CsvImageUploadCard, CsvUploadCard,
-    SingleUploadCard, ThemeToggleButton, batch_file_label,
+    SingleUploadCard, batch_file_label,
 };
 use super::helpers::{
     apply_detection_quality_filters, capture_webcam_frame_to_file, clear_canvas,
     clear_video_source, click_element_by_id, crop_face_bytes_from_source, decode_image_dimensions,
     draw_source_image_to_canvas, elapsed_ms_since, export_saved_settings_json,
     import_saved_settings_json, list_saved_setting_names, list_video_input_devices,
-    load_named_processing_settings, navigate_to, now_ms, object_url_for_file,
+    load_named_processing_settings, now_ms, object_url_for_file,
     overlay_percent_crop_rect, render_naming_template, revoke_object_url,
     save_named_processing_settings, start_webcam_stream, stop_media_stream,
 };

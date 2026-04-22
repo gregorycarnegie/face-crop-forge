@@ -102,14 +102,6 @@ pub(super) fn click_element_by_id(id: &str) {
 pub(super) fn click_element_by_id(_id: &str) {}
 
 #[cfg(target_arch = "wasm32")]
-pub(super) fn navigate_to(path: &str) {
-    let _ = window().location().set_href(path);
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub(super) fn navigate_to(_path: &str) {}
-
-#[cfg(target_arch = "wasm32")]
 pub(super) fn object_url_for_file(file: &web_sys::File) -> Option<String> {
     web_sys::Url::create_object_url_with_blob(file).ok()
 }
@@ -132,7 +124,7 @@ pub(super) fn now_ms() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
+        .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
         .unwrap_or(0)
 }
 
