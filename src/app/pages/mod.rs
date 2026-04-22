@@ -7,9 +7,9 @@ use super::helpers::{
     clear_video_source, click_element_by_id, crop_face_bytes_from_source, decode_image_dimensions,
     draw_source_image_to_canvas, elapsed_ms_since, export_saved_settings_json,
     import_saved_settings_json, list_saved_setting_names, list_video_input_devices,
-    load_named_processing_settings, now_ms, object_url_for_file, overlay_percent_crop_rect,
-    render_naming_template, revoke_object_url, save_named_processing_settings, start_webcam_stream,
-    stop_media_stream,
+    load_named_processing_settings, mime_type_for_output_format, now_ms, object_url_for_bytes,
+    object_url_for_file, overlay_percent_crop_rect, render_naming_template, revoke_object_url,
+    save_named_processing_settings, start_webcam_stream, stop_media_stream,
 };
 use super::{
     AppState, BatchCoreState, BatchProgress, BatchQueueState, BatchRuntimeStats, ClassAttribute,
@@ -23,10 +23,9 @@ use super::{
     clear_last_detection_backend, component, compute_display_size, current_timestamp_ms,
     current_utc_timestamp_token, detect_browser_capabilities, detect_faces_with_worker,
     download_bytes, evaluate_pipeline_health, event_target, event_target_checked,
-    event_target_value, file_to_bytes, last_detection_backend_label,
-    normalize_export_filename_for_mime, parse_max_retries, revalidate_browser_fallbacks,
-    start_face_worker, stop_face_worker, use_context, validate_export_filename_for_mime,
-    validate_image_meta, view,
+    event_target_value, last_detection_backend_label, normalize_export_filename_for_mime,
+    parse_max_retries, revalidate_browser_fallbacks, start_face_worker, stop_face_worker,
+    use_context, validate_export_filename_for_mime, validate_image_meta, view,
 };
 
 macro_rules! record_failed_image {
@@ -49,6 +48,13 @@ macro_rules! record_failed_image {
         });
         $state.update(|s| s.mark_error($id));
     }};
+}
+
+#[derive(Clone)]
+struct ProcessedImageOutput {
+    bytes: Vec<u8>,
+    mime_type: String,
+    preview_url: String,
 }
 
 mod batch;

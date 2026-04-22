@@ -12,7 +12,7 @@ use crate::batch_export::BatchProgress;
 use crate::csv_core::{CsvCoreState, CsvExportNameContext};
 use crate::export_runtime::{
     build_zip_bytes, current_timestamp_ms, current_utc_timestamp_token, download_bytes,
-    file_to_bytes, normalize_export_filename_for_mime, validate_export_filename_for_mime,
+    normalize_export_filename_for_mime, validate_export_filename_for_mime,
 };
 use crate::mediapipe::{
     MediaPipeAssetPaths, build_load_plan, detect_browser_capabilities, evaluate_pipeline_health,

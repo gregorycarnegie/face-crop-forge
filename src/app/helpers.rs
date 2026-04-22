@@ -111,6 +111,32 @@ pub(super) fn object_url_for_file(_file: &web_sys::File) -> Option<String> {
     None
 }
 
+pub(super) fn mime_type_for_output_format(output_format: &str) -> &'static str {
+    match output_format {
+        "jpeg" | "jpg" => "image/jpeg",
+        "webp" => "image/webp",
+        _ => "image/png",
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(super) fn object_url_for_bytes(bytes: &[u8], mime_type: &str) -> Result<String, String> {
+    let array = web_sys::js_sys::Uint8Array::from(bytes);
+    let parts = web_sys::js_sys::Array::new();
+    parts.push(&array.buffer());
+    let blob_options = web_sys::BlobPropertyBag::new();
+    blob_options.set_type(mime_type);
+    let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(&parts, &blob_options)
+        .map_err(|err| format!("Failed to build preview blob: {err:?}"))?;
+    web_sys::Url::create_object_url_with_blob(&blob)
+        .map_err(|err| format!("Failed to create crop preview URL: {err:?}"))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn object_url_for_bytes(_bytes: &[u8], _mime_type: &str) -> Result<String, String> {
+    Err("Blob preview URLs are only available on wasm32".to_string())
+}
+
 #[cfg(target_arch = "wasm32")]
 pub(super) fn now_ms() -> u64 {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]

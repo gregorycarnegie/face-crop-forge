@@ -81,20 +81,6 @@ pub fn build_zip_bytes(entries: &[(String, Vec<u8>)]) -> Result<Vec<u8>, String>
 }
 
 #[cfg(target_arch = "wasm32")]
-pub async fn file_to_bytes(file: &web_sys::File) -> Result<Vec<u8>, String> {
-    let buffer = wasm_bindgen_futures::JsFuture::from(file.array_buffer())
-        .await
-        .map_err(|err| format!("Failed to read file bytes: {err:?}"))?;
-    let array = web_sys::js_sys::Uint8Array::new(&buffer);
-    Ok(array.to_vec())
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub async fn file_to_bytes(_file: &web_sys::File) -> Result<Vec<u8>, String> {
-    Err("file_to_bytes is only available on wasm32".to_string())
-}
-
-#[cfg(target_arch = "wasm32")]
 pub fn download_bytes(file_name: &str, mime_type: &str, bytes: &[u8]) -> Result<(), String> {
     use web_sys::wasm_bindgen::JsCast;
 

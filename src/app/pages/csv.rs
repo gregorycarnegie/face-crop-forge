@@ -3,13 +3,14 @@ use super::{
     BatchRuntimeStats, ClassAttribute, CollectView, CropSettingsPanel, CsvCoreState,
     CsvExportNameContext, CsvImageUploadCard, CsvUploadCard, DetectedFace, Effect, ElementChild,
     Get, GlobalAttributes, HashMap, ImageMeta, ImageValidationConfig, IntoAny, IntoView,
-    OnAttribute, OutputSettingsCsvPanel, PreprocessingSettingsPanel, RwSignal, Set, Signal,
-    StyleAttribute, Update, apply_detection_quality_filters, batch_file_label, build_zip_bytes,
-    clear_canvas, component, current_timestamp_ms, current_utc_timestamp_token,
-    decode_image_dimensions, detect_faces_with_worker, download_bytes, draw_source_image_to_canvas,
-    elapsed_ms_since, event_target_value, file_to_bytes, normalize_export_filename_for_mime,
-    now_ms, revoke_object_url, use_context, validate_export_filename_for_mime, validate_image_meta,
-    view,
+    OnAttribute, OutputSettingsCsvPanel, PreprocessingSettingsPanel, ProcessedImageOutput,
+    RwSignal, Set, Signal, StyleAttribute, Update, apply_detection_quality_filters,
+    batch_file_label, build_zip_bytes, clear_canvas, component, crop_face_bytes_from_source,
+    current_timestamp_ms, current_utc_timestamp_token, decode_image_dimensions,
+    detect_faces_with_worker, download_bytes, draw_source_image_to_canvas, elapsed_ms_since,
+    event_target_value, mime_type_for_output_format, normalize_export_filename_for_mime, now_ms,
+    object_url_for_bytes, object_url_for_file, revoke_object_url, use_context,
+    validate_export_filename_for_mime, validate_image_meta, view,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -23,6 +24,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
     let csv_queue = RwSignal::new(BatchQueueState::default());
     let csv_files_by_id = RwSignal::new(HashMap::<String, web_sys::File>::new());
     let csv_preview_urls = RwSignal::new(HashMap::<String, String>::new());
+    let csv_processed_outputs = RwSignal::new(HashMap::<String, ProcessedImageOutput>::new());
     let csv_source_name_by_id = RwSignal::new(HashMap::<String, String>::new());
     let csv_current_image_id = RwSignal::new(None::<String>);
     let csv_current_faces = RwSignal::new(Vec::<DetectedFace>::new());
@@ -216,6 +218,13 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             let files_by_id = csv_files_by_id.get();
                             let validation = ImageValidationConfig::default();
                             csv_batch_state.update(|s| selected_ids.iter().for_each(|id| s.mark_processing(id)));
+                            csv_processed_outputs.update(|outputs| {
+                                for id in &selected_ids {
+                                    if let Some(old) = outputs.remove(id) {
+                                        revoke_object_url(&old.preview_url);
+                                    }
+                                }
+                            });
                             csv_progress.update(|p| {
                                 p.start(
                                     plan.selected_total,
@@ -234,6 +243,11 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             let face_count_for_run = csv_face_count_by_id;
                             let source_name_by_id = csv_source_name_by_id.get();
                             let settings_snapshot = settings.get();
+                            let output_mime_type =
+                                mime_type_for_output_format(&settings_snapshot.output_format)
+                                    .to_string();
+                            let preview_urls_for_run = csv_preview_urls.get();
+                            let processed_outputs_for_run = csv_processed_outputs;
                             leptos::task::spawn_local(async move {
                                 let mut stopped_early = false;
                                 let total = selected_ids.len();
@@ -335,8 +349,132 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             Err(error) => last_error = error,
                                         }
                                     }
-                                    let elapsed_ms = elapsed_ms_since(start_ms);
                                     if let Some(faces) = success_faces {
+                                        let Some(face) = faces.first() else {
+                                            record_failed_image!(
+                                                progress_for_run,
+                                                stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms_since(start_ms),
+                                                format!(
+                                                    "CSV failed {}/{}: {} (No crop target)",
+                                                    index + 1,
+                                                    total,
+                                                    file_name
+                                                ),
+                                                format!("CSV found no crop target for {file_name}.")
+                                            );
+                                            face_count_for_run.update(|m| {
+                                                m.remove(&id);
+                                            });
+                                            continue;
+                                        };
+                                        let mut temporary_source_url = None;
+                                        let source_url = if let Some(url) =
+                                            preview_urls_for_run.get(&id).cloned()
+                                        {
+                                            url
+                                        } else if let Some(url) = object_url_for_file(&file) {
+                                            temporary_source_url = Some(url.clone());
+                                            url
+                                        } else {
+                                            record_failed_image!(
+                                                progress_for_run,
+                                                stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms_since(start_ms),
+                                                format!(
+                                                    "CSV failed {}/{}: {} (No source preview)",
+                                                    index + 1,
+                                                    total,
+                                                    file_name
+                                                ),
+                                                format!("CSV source preview missing for {file_name}.")
+                                            );
+                                            face_count_for_run.update(|m| {
+                                                m.remove(&id);
+                                            });
+                                            continue;
+                                        };
+                                        let crop_bytes = match crop_face_bytes_from_source(
+                                            &source_url,
+                                            face,
+                                            &settings_snapshot,
+                                            &output_mime_type,
+                                        )
+                                        .await
+                                        {
+                                            Ok(bytes) => bytes,
+                                            Err(error) => {
+                                                if let Some(url) = temporary_source_url.as_deref() {
+                                                    revoke_object_url(url);
+                                                }
+                                                record_failed_image!(
+                                                    progress_for_run,
+                                                    stats_for_run,
+                                                    batch_state_for_run,
+                                                    &id,
+                                                    elapsed_ms_since(start_ms),
+                                                    format!(
+                                                        "CSV failed {}/{}: {} ({error})",
+                                                        index + 1,
+                                                        total,
+                                                        file_name
+                                                    ),
+                                                    format!("CSV crop failed for {file_name}: {error}")
+                                                );
+                                                face_count_for_run.update(|m| {
+                                                    m.remove(&id);
+                                                });
+                                                continue;
+                                            }
+                                        };
+                                        if let Some(url) = temporary_source_url.as_deref() {
+                                            revoke_object_url(url);
+                                        }
+                                        let crop_preview_url = match object_url_for_bytes(
+                                            &crop_bytes,
+                                            &output_mime_type,
+                                        ) {
+                                            Ok(url) => url,
+                                            Err(error) => {
+                                                record_failed_image!(
+                                                    progress_for_run,
+                                                    stats_for_run,
+                                                    batch_state_for_run,
+                                                    &id,
+                                                    elapsed_ms_since(start_ms),
+                                                    format!(
+                                                        "CSV failed {}/{}: {} ({error})",
+                                                        index + 1,
+                                                        total,
+                                                        file_name
+                                                    ),
+                                                    format!(
+                                                        "CSV crop preview failed for {file_name}: {error}"
+                                                    )
+                                                );
+                                                face_count_for_run.update(|m| {
+                                                    m.remove(&id);
+                                                });
+                                                continue;
+                                            }
+                                        };
+                                        processed_outputs_for_run.update(|outputs| {
+                                            if let Some(old) = outputs.insert(
+                                                id.clone(),
+                                                ProcessedImageOutput {
+                                                    bytes: crop_bytes,
+                                                    mime_type: output_mime_type.clone(),
+                                                    preview_url: crop_preview_url,
+                                                },
+                                            ) {
+                                                revoke_object_url(&old.preview_url);
+                                            }
+                                        });
+                                        let elapsed_ms = elapsed_ms_since(start_ms);
                                         let face_count = faces.len();
                                         progress_for_run.update(|p| {
                                             p.record_result(true);
@@ -371,7 +509,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             stats_for_run,
                                             batch_state_for_run,
                                             &id,
-                                            elapsed_ms,
+                                            elapsed_ms_since(start_ms),
                                             format!(
                                                 "CSV failed {}/{}: {} ({last_error})",
                                                 index + 1,
@@ -420,6 +558,13 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             let files_by_id = csv_files_by_id.get();
                             let validation = ImageValidationConfig::default();
                             csv_batch_state.update(|s| selected_ids.iter().for_each(|id| s.mark_processing(id)));
+                            csv_processed_outputs.update(|outputs| {
+                                for id in &selected_ids {
+                                    if let Some(old) = outputs.remove(id) {
+                                        revoke_object_url(&old.preview_url);
+                                    }
+                                }
+                            });
                             csv_progress.update(|p| {
                                 p.start(
                                     plan.selected_total,
@@ -438,6 +583,11 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             let face_count_for_run = csv_face_count_by_id;
                             let source_name_by_id = csv_source_name_by_id.get();
                             let settings_snapshot = settings.get();
+                            let output_mime_type =
+                                mime_type_for_output_format(&settings_snapshot.output_format)
+                                    .to_string();
+                            let preview_urls_for_run = csv_preview_urls.get();
+                            let processed_outputs_for_run = csv_processed_outputs;
                             leptos::task::spawn_local(async move {
                                 let total = selected_ids.len();
                                 for (index, id) in selected_ids.into_iter().enumerate() {
@@ -537,8 +687,132 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             Err(error) => last_error = error,
                                         }
                                     }
-                                    let elapsed_ms = elapsed_ms_since(start_ms);
                                     if let Some(faces) = success_faces {
+                                        let Some(face) = faces.first() else {
+                                            record_failed_image!(
+                                                progress_for_run,
+                                                stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms_since(start_ms),
+                                                format!(
+                                                    "CSV selected failed {}/{}: {} (No crop target)",
+                                                    index + 1,
+                                                    total,
+                                                    file_name
+                                                ),
+                                                format!("CSV found no crop target for {file_name}.")
+                                            );
+                                            face_count_for_run.update(|m| {
+                                                m.remove(&id);
+                                            });
+                                            continue;
+                                        };
+                                        let mut temporary_source_url = None;
+                                        let source_url = if let Some(url) =
+                                            preview_urls_for_run.get(&id).cloned()
+                                        {
+                                            url
+                                        } else if let Some(url) = object_url_for_file(&file) {
+                                            temporary_source_url = Some(url.clone());
+                                            url
+                                        } else {
+                                            record_failed_image!(
+                                                progress_for_run,
+                                                stats_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms_since(start_ms),
+                                                format!(
+                                                    "CSV selected failed {}/{}: {} (No source preview)",
+                                                    index + 1,
+                                                    total,
+                                                    file_name
+                                                ),
+                                                format!("CSV source preview missing for {file_name}.")
+                                            );
+                                            face_count_for_run.update(|m| {
+                                                m.remove(&id);
+                                            });
+                                            continue;
+                                        };
+                                        let crop_bytes = match crop_face_bytes_from_source(
+                                            &source_url,
+                                            face,
+                                            &settings_snapshot,
+                                            &output_mime_type,
+                                        )
+                                        .await
+                                        {
+                                            Ok(bytes) => bytes,
+                                            Err(error) => {
+                                                if let Some(url) = temporary_source_url.as_deref() {
+                                                    revoke_object_url(url);
+                                                }
+                                                record_failed_image!(
+                                                    progress_for_run,
+                                                    stats_for_run,
+                                                    batch_state_for_run,
+                                                    &id,
+                                                    elapsed_ms_since(start_ms),
+                                                    format!(
+                                                        "CSV selected failed {}/{}: {} ({error})",
+                                                        index + 1,
+                                                        total,
+                                                        file_name
+                                                    ),
+                                                    format!("CSV crop failed for {file_name}: {error}")
+                                                );
+                                                face_count_for_run.update(|m| {
+                                                    m.remove(&id);
+                                                });
+                                                continue;
+                                            }
+                                        };
+                                        if let Some(url) = temporary_source_url.as_deref() {
+                                            revoke_object_url(url);
+                                        }
+                                        let crop_preview_url = match object_url_for_bytes(
+                                            &crop_bytes,
+                                            &output_mime_type,
+                                        ) {
+                                            Ok(url) => url,
+                                            Err(error) => {
+                                                record_failed_image!(
+                                                    progress_for_run,
+                                                    stats_for_run,
+                                                    batch_state_for_run,
+                                                    &id,
+                                                    elapsed_ms_since(start_ms),
+                                                    format!(
+                                                        "CSV selected failed {}/{}: {} ({error})",
+                                                        index + 1,
+                                                        total,
+                                                        file_name
+                                                    ),
+                                                    format!(
+                                                        "CSV crop preview failed for {file_name}: {error}"
+                                                    )
+                                                );
+                                                face_count_for_run.update(|m| {
+                                                    m.remove(&id);
+                                                });
+                                                continue;
+                                            }
+                                        };
+                                        processed_outputs_for_run.update(|outputs| {
+                                            if let Some(old) = outputs.insert(
+                                                id.clone(),
+                                                ProcessedImageOutput {
+                                                    bytes: crop_bytes,
+                                                    mime_type: output_mime_type.clone(),
+                                                    preview_url: crop_preview_url,
+                                                },
+                                            ) {
+                                                revoke_object_url(&old.preview_url);
+                                            }
+                                        });
+                                        let elapsed_ms = elapsed_ms_since(start_ms);
                                         let face_count = faces.len();
                                         progress_for_run.update(|p| {
                                             p.record_result(true);
@@ -573,7 +847,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             stats_for_run,
                                             batch_state_for_run,
                                             &id,
-                                            elapsed_ms,
+                                            elapsed_ms_since(start_ms),
                                             format!(
                                                 "CSV selected failed {}/{}: {} ({last_error})",
                                                 index + 1,
@@ -609,6 +883,10 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                 revoke_object_url(url);
                             }
                             csv_preview_urls.set(HashMap::new());
+                            for output in csv_processed_outputs.get().values() {
+                                revoke_object_url(&output.preview_url);
+                            }
+                            csv_processed_outputs.set(HashMap::new());
                             csv_source_name_by_id.set(HashMap::new());
                             csv_current_image_id.set(None);
                             csv_current_faces.set(Vec::new());
@@ -645,12 +923,23 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             });
                             let batch = csv_batch_state.get();
                             let source_ids = if batch.has_selected_images() {
-                                batch.selected_ids()
+                                batch
+                                    .selected_ids()
+                                    .into_iter()
+                                    .filter(|id| {
+                                        batch.images.get(id).is_some_and(|img| img.processed)
+                                    })
+                                    .collect::<Vec<_>>()
                             } else {
-                                batch.images.values().map(|img| img.id.clone()).collect::<Vec<_>>()
+                                batch
+                                    .images
+                                    .values()
+                                    .filter(|img| img.processed)
+                                    .map(|img| img.id.clone())
+                                    .collect::<Vec<_>>()
                             };
                             if source_ids.is_empty() {
-                                csv_progress.update(|p| p.complete("No mapped images to export"));
+                                csv_progress.update(|p| p.complete("No processed CSV crops to export"));
                                 return;
                             }
 
@@ -658,7 +947,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             let source_name_by_id = csv_source_name_by_id.get();
                             let timestamp_ms = current_timestamp_ms();
                             let export_settings = settings.get();
-                            let file_map = csv_files_by_id.get();
+                            let processed_outputs = csv_processed_outputs.get();
                             let entries = source_ids
                                 .iter()
                                 .enumerate()
@@ -692,40 +981,32 @@ pub(crate) fn CsvPage() -> impl IntoView {
                             leptos::task::spawn_local(async move {
                                 let mut zip_entries = Vec::new();
                                 for (id, generated_name, source_name) in entries {
-                                    let Some(file) = file_map.get(&id).cloned() else {
+                                    let Some(output) = processed_outputs.get(&id).cloned() else {
+                                        stats_for_download.update(|s| {
+                                            s.push_log(format!(
+                                                "CSV ZIP skipped {source_name}: no cropped output available."
+                                            ));
+                                        });
                                         continue;
-                                    };
-                                    let mime_type = file.type_();
-                                    let bytes = match file_to_bytes(&file).await {
-                                        Ok(bytes) => bytes,
-                                        Err(error) => {
-                                            progress_for_download
-                                                .update(|p| p.complete(format!("CSV ZIP failed: {error}")));
-                                            stats_for_download.update(|s| {
-                                                s.push_log(format!(
-                                                    "CSV ZIP read failed for {source_name}: {error}"
-                                                ));
-                                            });
-                                            return;
-                                        }
                                     };
                                     let final_name = normalize_export_filename_for_mime(
                                         &generated_name,
-                                        &mime_type,
+                                        &output.mime_type,
                                     );
-                                    if !validate_export_filename_for_mime(&final_name, &mime_type) {
+                                    if !validate_export_filename_for_mime(&final_name, &output.mime_type) {
                                         stats_for_download.update(|s| {
                                             s.push_log(format!(
-                                                "CSV ZIP skipped invalid filename/mime pair: {final_name} ({mime_type})"
+                                                "CSV ZIP skipped invalid filename/mime pair: {final_name} ({})",
+                                                output.mime_type
                                             ));
                                         });
                                         continue;
                                     }
-                                    zip_entries.push((final_name, bytes));
+                                    zip_entries.push((final_name, output.bytes));
                                 }
                                 if zip_entries.is_empty() {
                                     progress_for_download
-                                        .update(|p| p.complete("No mapped binary outputs available for ZIP export"));
+                                        .update(|p| p.complete("No mapped cropped outputs available for ZIP export"));
                                     return;
                                 }
                                 let zip_bytes = match build_zip_bytes(&zip_entries) {
@@ -943,14 +1224,14 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                         .map(|img| img.id.clone())
                                         .collect::<Vec<_>>();
                                     processed_ids.sort();
-                                    let previews = csv_preview_urls.get();
+                                    let outputs = csv_processed_outputs.get();
                                     let source_names = csv_source_name_by_id.get();
                                     let face_counts = csv_face_count_by_id.get();
                                     let csv = csv_state.get();
                                     processed_ids
                                         .into_iter()
                                         .map(|id| {
-                                            let src = previews.get(&id).cloned();
+                                            let src = outputs.get(&id).map(|output| output.preview_url.clone());
                                             let source_name = source_names
                                                 .get(&id)
                                                 .cloned()

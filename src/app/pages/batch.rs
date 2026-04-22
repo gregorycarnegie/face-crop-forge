@@ -4,15 +4,16 @@ use super::{
     DetectedFace, DetectionRetryPolicy, ElementChild, Get, GlobalAttributes, HashMap,
     HtmlInputElement, ImageMeta, ImageValidationConfig, IntoAny, IntoView, JsFuture,
     MemoryIndicatorLevel, OnAttribute, OutputSettingsBatchPanel, PreprocessingSettingsPanel,
-    PropAttribute, RwSignal, Set, Signal, Update, apply_detection_quality_filters,
-    batch_file_label, build_memory_indicator, build_zip_bytes, click_element_by_id, component,
-    current_timestamp_ms, current_utc_timestamp_token, decode_image_dimensions,
-    detect_faces_with_worker, download_bytes, elapsed_ms_since, event_target, event_target_checked,
-    event_target_value, export_saved_settings_json, file_to_bytes, import_saved_settings_json,
-    list_saved_setting_names, load_named_processing_settings, normalize_export_filename_for_mime,
-    now_ms, parse_max_retries, render_naming_template, revoke_object_url,
-    save_named_processing_settings, use_context, validate_export_filename_for_mime,
-    validate_image_meta, view,
+    ProcessedImageOutput, PropAttribute, RwSignal, Set, Signal, Update,
+    apply_detection_quality_filters, batch_file_label, build_memory_indicator, build_zip_bytes,
+    click_element_by_id, component, crop_face_bytes_from_source, current_timestamp_ms,
+    current_utc_timestamp_token, decode_image_dimensions, detect_faces_with_worker, download_bytes,
+    elapsed_ms_since, event_target, event_target_checked, event_target_value,
+    export_saved_settings_json, import_saved_settings_json, list_saved_setting_names,
+    load_named_processing_settings, mime_type_for_output_format,
+    normalize_export_filename_for_mime, now_ms, object_url_for_bytes, object_url_for_file,
+    parse_max_retries, render_naming_template, revoke_object_url, save_named_processing_settings,
+    use_context, validate_export_filename_for_mime, validate_image_meta, view,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -25,6 +26,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
     let batch_queue = RwSignal::new(BatchQueueState::default());
     let batch_files_by_id = RwSignal::new(HashMap::<String, web_sys::File>::new());
     let batch_preview_urls = RwSignal::new(HashMap::<String, String>::new());
+    let batch_processed_outputs = RwSignal::new(HashMap::<String, ProcessedImageOutput>::new());
     let batch_progress = RwSignal::new(BatchProgress::default());
     let batch_perf = RwSignal::new(BatchRuntimeStats::default());
     let batch_preview_filename = RwSignal::new(String::new());
@@ -138,6 +140,13 @@ pub(crate) fn BatchPage() -> impl IntoView {
                             let selected_ids = batch_state.get().selected_ids();
                             let files_by_id = batch_files_by_id.get();
                             batch_state.update(|s| selected_ids.iter().for_each(|id| s.mark_processing(id)));
+                            batch_processed_outputs.update(|outputs| {
+                                for id in &selected_ids {
+                                    if let Some(old) = outputs.remove(id) {
+                                        revoke_object_url(&old.preview_url);
+                                    }
+                                }
+                            });
                             batch_progress.update(|p| {
                                 p.start(
                                     plan.selected_total,
@@ -153,6 +162,11 @@ pub(crate) fn BatchPage() -> impl IntoView {
                             let batch_progress_for_run = batch_progress;
                             let batch_perf_for_run = batch_perf;
                             let settings_snapshot = settings.get();
+                            let output_mime_type =
+                                mime_type_for_output_format(&settings_snapshot.output_format)
+                                    .to_string();
+                            let preview_urls_for_run = batch_preview_urls.get();
+                            let processed_outputs_for_run = batch_processed_outputs;
                             leptos::task::spawn_local(async move {
                                 let mut stopped_early = false;
                                 let total = selected_ids.len();
@@ -272,9 +286,136 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                             }
                                         }
                                     }
-                                    let elapsed_ms = elapsed_ms_since(run_start_ms);
-
                                     if let Some(faces) = success_faces {
+                                        let Some(face) = faces.first() else {
+                                            record_failed_image!(
+                                                batch_progress_for_run,
+                                                batch_perf_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms_since(run_start_ms),
+                                                format!(
+                                                    "Batch failed {}/{}: {} (No crop target)",
+                                                    index + 1,
+                                                    total,
+                                                    file_name
+                                                ),
+                                                format!("No crop target found for {file_name}.")
+                                            );
+                                            if !policy.continue_on_error {
+                                                stopped_early = true;
+                                                break;
+                                            }
+                                            continue;
+                                        };
+                                        let mut temporary_source_url = None;
+                                        let source_url = if let Some(url) =
+                                            preview_urls_for_run.get(&id).cloned()
+                                        {
+                                            url
+                                        } else if let Some(url) = object_url_for_file(&file) {
+                                            temporary_source_url = Some(url.clone());
+                                            url
+                                        } else {
+                                            record_failed_image!(
+                                                batch_progress_for_run,
+                                                batch_perf_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms_since(run_start_ms),
+                                                format!(
+                                                    "Batch failed {}/{}: {} (No source preview)",
+                                                    index + 1,
+                                                    total,
+                                                    file_name
+                                                ),
+                                                format!("No source preview URL available for {file_name}.")
+                                            );
+                                            if !policy.continue_on_error {
+                                                stopped_early = true;
+                                                break;
+                                            }
+                                            continue;
+                                        };
+                                        let crop_bytes = match crop_face_bytes_from_source(
+                                            &source_url,
+                                            face,
+                                            &settings_snapshot,
+                                            &output_mime_type,
+                                        )
+                                        .await
+                                        {
+                                            Ok(bytes) => bytes,
+                                            Err(error) => {
+                                                if let Some(url) = temporary_source_url.as_deref() {
+                                                    revoke_object_url(url);
+                                                }
+                                                record_failed_image!(
+                                                    batch_progress_for_run,
+                                                    batch_perf_for_run,
+                                                    batch_state_for_run,
+                                                    &id,
+                                                    elapsed_ms_since(run_start_ms),
+                                                    format!(
+                                                        "Batch failed {}/{}: {} ({error})",
+                                                        index + 1,
+                                                        total,
+                                                        file_name
+                                                    ),
+                                                    format!("Crop failed for {file_name}: {error}")
+                                                );
+                                                if !policy.continue_on_error {
+                                                    stopped_early = true;
+                                                    break;
+                                                }
+                                                continue;
+                                            }
+                                        };
+                                        if let Some(url) = temporary_source_url.as_deref() {
+                                            revoke_object_url(url);
+                                        }
+                                        let crop_preview_url = match object_url_for_bytes(
+                                            &crop_bytes,
+                                            &output_mime_type,
+                                        ) {
+                                            Ok(url) => url,
+                                            Err(error) => {
+                                                record_failed_image!(
+                                                    batch_progress_for_run,
+                                                    batch_perf_for_run,
+                                                    batch_state_for_run,
+                                                    &id,
+                                                    elapsed_ms_since(run_start_ms),
+                                                    format!(
+                                                        "Batch failed {}/{}: {} ({error})",
+                                                        index + 1,
+                                                        total,
+                                                        file_name
+                                                    ),
+                                                    format!(
+                                                        "Crop preview failed for {file_name}: {error}"
+                                                    )
+                                                );
+                                                if !policy.continue_on_error {
+                                                    stopped_early = true;
+                                                    break;
+                                                }
+                                                continue;
+                                            }
+                                        };
+                                        processed_outputs_for_run.update(|outputs| {
+                                            if let Some(old) = outputs.insert(
+                                                id.clone(),
+                                                ProcessedImageOutput {
+                                                    bytes: crop_bytes,
+                                                    mime_type: output_mime_type.clone(),
+                                                    preview_url: crop_preview_url,
+                                                },
+                                            ) {
+                                                revoke_object_url(&old.preview_url);
+                                            }
+                                        });
+                                        let elapsed_ms = elapsed_ms_since(run_start_ms);
                                         #[allow(clippy::cast_possible_truncation)]
                                         let face_count = faces.len() as u32;
                                         batch_progress_for_run.update(|p| {
@@ -306,7 +447,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                             batch_perf_for_run,
                                             batch_state_for_run,
                                             &id,
-                                            elapsed_ms,
+                                            elapsed_ms_since(run_start_ms),
                                             format!(
                                                 "Batch failed {}/{}: {} ({last_error})",
                                                 index + 1,
@@ -363,6 +504,13 @@ pub(crate) fn BatchPage() -> impl IntoView {
                             let selected_ids = batch_state.get().selected_ids();
                             let files_by_id = batch_files_by_id.get();
                             batch_state.update(|s| selected_ids.iter().for_each(|id| s.mark_processing(id)));
+                            batch_processed_outputs.update(|outputs| {
+                                for id in &selected_ids {
+                                    if let Some(old) = outputs.remove(id) {
+                                        revoke_object_url(&old.preview_url);
+                                    }
+                                }
+                            });
                             batch_progress.update(|p| {
                                 p.start(
                                     plan.selected_total,
@@ -377,6 +525,11 @@ pub(crate) fn BatchPage() -> impl IntoView {
                             let batch_progress_for_run = batch_progress;
                             let batch_perf_for_run = batch_perf;
                             let settings_snapshot = settings.get();
+                            let output_mime_type =
+                                mime_type_for_output_format(&settings_snapshot.output_format)
+                                    .to_string();
+                            let preview_urls_for_run = batch_preview_urls.get();
+                            let processed_outputs_for_run = batch_processed_outputs;
                             leptos::task::spawn_local(async move {
                                 let mut stopped_early = false;
                                 let total = selected_ids.len();
@@ -496,9 +649,136 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                             }
                                         }
                                     }
-                                    let elapsed_ms = elapsed_ms_since(run_start_ms);
-
                                     if let Some(faces) = success_faces {
+                                        let Some(face) = faces.first() else {
+                                            record_failed_image!(
+                                                batch_progress_for_run,
+                                                batch_perf_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms_since(run_start_ms),
+                                                format!(
+                                                    "Batch selected failed {}/{}: {} (No crop target)",
+                                                    index + 1,
+                                                    total,
+                                                    file_name
+                                                ),
+                                                format!("No crop target found for {file_name}.")
+                                            );
+                                            if !policy.continue_on_error {
+                                                stopped_early = true;
+                                                break;
+                                            }
+                                            continue;
+                                        };
+                                        let mut temporary_source_url = None;
+                                        let source_url = if let Some(url) =
+                                            preview_urls_for_run.get(&id).cloned()
+                                        {
+                                            url
+                                        } else if let Some(url) = object_url_for_file(&file) {
+                                            temporary_source_url = Some(url.clone());
+                                            url
+                                        } else {
+                                            record_failed_image!(
+                                                batch_progress_for_run,
+                                                batch_perf_for_run,
+                                                batch_state_for_run,
+                                                &id,
+                                                elapsed_ms_since(run_start_ms),
+                                                format!(
+                                                    "Batch selected failed {}/{}: {} (No source preview)",
+                                                    index + 1,
+                                                    total,
+                                                    file_name
+                                                ),
+                                                format!("No source preview URL available for {file_name}.")
+                                            );
+                                            if !policy.continue_on_error {
+                                                stopped_early = true;
+                                                break;
+                                            }
+                                            continue;
+                                        };
+                                        let crop_bytes = match crop_face_bytes_from_source(
+                                            &source_url,
+                                            face,
+                                            &settings_snapshot,
+                                            &output_mime_type,
+                                        )
+                                        .await
+                                        {
+                                            Ok(bytes) => bytes,
+                                            Err(error) => {
+                                                if let Some(url) = temporary_source_url.as_deref() {
+                                                    revoke_object_url(url);
+                                                }
+                                                record_failed_image!(
+                                                    batch_progress_for_run,
+                                                    batch_perf_for_run,
+                                                    batch_state_for_run,
+                                                    &id,
+                                                    elapsed_ms_since(run_start_ms),
+                                                    format!(
+                                                        "Batch selected failed {}/{}: {} ({error})",
+                                                        index + 1,
+                                                        total,
+                                                        file_name
+                                                    ),
+                                                    format!("Crop failed for {file_name}: {error}")
+                                                );
+                                                if !policy.continue_on_error {
+                                                    stopped_early = true;
+                                                    break;
+                                                }
+                                                continue;
+                                            }
+                                        };
+                                        if let Some(url) = temporary_source_url.as_deref() {
+                                            revoke_object_url(url);
+                                        }
+                                        let crop_preview_url = match object_url_for_bytes(
+                                            &crop_bytes,
+                                            &output_mime_type,
+                                        ) {
+                                            Ok(url) => url,
+                                            Err(error) => {
+                                                record_failed_image!(
+                                                    batch_progress_for_run,
+                                                    batch_perf_for_run,
+                                                    batch_state_for_run,
+                                                    &id,
+                                                    elapsed_ms_since(run_start_ms),
+                                                    format!(
+                                                        "Batch selected failed {}/{}: {} ({error})",
+                                                        index + 1,
+                                                        total,
+                                                        file_name
+                                                    ),
+                                                    format!(
+                                                        "Crop preview failed for {file_name}: {error}"
+                                                    )
+                                                );
+                                                if !policy.continue_on_error {
+                                                    stopped_early = true;
+                                                    break;
+                                                }
+                                                continue;
+                                            }
+                                        };
+                                        processed_outputs_for_run.update(|outputs| {
+                                            if let Some(old) = outputs.insert(
+                                                id.clone(),
+                                                ProcessedImageOutput {
+                                                    bytes: crop_bytes,
+                                                    mime_type: output_mime_type.clone(),
+                                                    preview_url: crop_preview_url,
+                                                },
+                                            ) {
+                                                revoke_object_url(&old.preview_url);
+                                            }
+                                        });
+                                        let elapsed_ms = elapsed_ms_since(run_start_ms);
                                         #[allow(clippy::cast_possible_truncation)]
                                         let face_count = faces.len() as u32;
                                         batch_progress_for_run.update(|p| {
@@ -524,7 +804,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                             batch_perf_for_run,
                                             batch_state_for_run,
                                             &id,
-                                            elapsed_ms,
+                                            elapsed_ms_since(run_start_ms),
                                             format!(
                                                 "Batch selected failed {}/{}: {} ({last_error})",
                                                 index + 1,
@@ -569,6 +849,10 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                 revoke_object_url(url);
                             }
                             batch_preview_urls.set(HashMap::new());
+                            for output in batch_processed_outputs.get().values() {
+                                revoke_object_url(&output.preview_url);
+                            }
+                            batch_processed_outputs.set(HashMap::new());
                             batch_progress.update(crate::batch_export::BatchProgress::reset);
                             batch_perf.update(crate::batch_core::BatchRuntimeStats::reset);
                             batch_preview_filename.set(String::new());
@@ -587,16 +871,28 @@ pub(crate) fn BatchPage() -> impl IntoView {
                             let source_ids = {
                                 let batch = batch_state.get();
                                 if batch.has_selected_images() {
-                                    batch.selected_ids()
+                                    batch
+                                        .selected_ids()
+                                        .into_iter()
+                                        .filter(|id| {
+                                            batch.images.get(id).is_some_and(|img| img.processed)
+                                        })
+                                        .collect::<Vec<_>>()
                                 } else {
-                                    batch.images.values().map(|img| img.id.clone()).collect::<Vec<_>>()
+                                    batch
+                                        .images
+                                        .values()
+                                        .filter(|img| img.processed)
+                                        .map(|img| img.id.clone())
+                                        .collect::<Vec<_>>()
                                 }
                             };
                             if source_ids.is_empty() {
-                                batch_progress.update(|p| p.complete("No images available for export"));
+                                batch_progress.update(|p| p.complete("No processed crops available for export"));
                                 return;
                             }
                             let file_map = batch_files_by_id.get();
+                            let processed_outputs = batch_processed_outputs.get();
                             let export_settings = settings.get();
                             let timestamp_ms = current_timestamp_ms();
                             let zip_name =
@@ -610,17 +906,14 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     let Some(file) = file_map.get(id).cloned() else {
                                         continue;
                                     };
-                                    let bytes = match file_to_bytes(&file).await {
-                                        Ok(bytes) => bytes,
-                                        Err(error) => {
-                                            progress_for_download.update(|p| {
-                                                p.complete(format!("Batch ZIP failed: {error}"));
-                                            });
-                                            stats_for_download.update(|s| {
-                                                s.push_log(format!("Batch ZIP read failed for {}: {error}", file.name()));
-                                            });
-                                            return;
-                                        }
+                                    let Some(output) = processed_outputs.get(id).cloned() else {
+                                        stats_for_download.update(|s| {
+                                            s.push_log(format!(
+                                                "Batch ZIP skipped {}: no cropped output available.",
+                                                file.name()
+                                            ));
+                                        });
+                                        continue;
                                     };
                                     let entry_name = render_naming_template(
                                         &export_settings.naming_template,
@@ -630,22 +923,22 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         export_settings.output_height,
                                         timestamp_ms,
                                     );
-                                    let mime_type = file.type_();
                                     let final_name =
-                                        normalize_export_filename_for_mime(&entry_name, &mime_type);
-                                    if !validate_export_filename_for_mime(&final_name, &mime_type) {
+                                        normalize_export_filename_for_mime(&entry_name, &output.mime_type);
+                                    if !validate_export_filename_for_mime(&final_name, &output.mime_type) {
                                         stats_for_download.update(|s| {
                                             s.push_log(format!(
-                                                "Batch ZIP skipped invalid filename/mime pair: {final_name} ({mime_type})"
+                                                "Batch ZIP skipped invalid filename/mime pair: {final_name} ({})",
+                                                output.mime_type
                                             ));
                                         });
                                         continue;
                                     }
-                                    zip_entries.push((final_name, bytes));
+                                    zip_entries.push((final_name, output.bytes));
                                 }
                                 if zip_entries.is_empty() {
                                     progress_for_download
-                                        .update(|p| p.complete("No binary outputs available for ZIP export"));
+                                        .update(|p| p.complete("No cropped outputs available for ZIP export"));
                                     return;
                                 }
                                 let first_name = zip_entries[0].0.clone();
@@ -1058,7 +1351,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                             <h3>"Cropped Faces:"</h3>
                             <div id="croppedContainer">
                                 {move || {
-                                    let urls = batch_preview_urls.get();
+                                    let outputs = batch_processed_outputs.get();
                                     let mut processed_ids = batch_state
                                         .get()
                                         .images
@@ -1071,7 +1364,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                         .into_iter()
                                         .map(|id| {
                                             let label = batch_file_label(&id).to_string();
-                                            let url = urls.get(&id).cloned();
+                                            let url = outputs.get(&id).map(|output| output.preview_url.clone());
                                             view! {
                                                 <div class="cropped-face">
                                                     {url.map(|src| {
