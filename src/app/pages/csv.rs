@@ -1,17 +1,16 @@
 use super::{
     AppShell, AppState, BatchCoreState, BatchImageGalleryPanel, BatchProgress, BatchQueueState,
-    BatchRuntimeStats, ClassAttribute, CollectView, Collapsible, CollapsibleSubsection,
+    BatchRuntimeStats, ClassAttribute, Collapsible, CollapsibleSubsection, CollectView,
     CropSettingsPanel, CsvCoreState, CsvExportNameContext, CsvImageUploadCard, CsvUploadCard,
-    DetectedFace, Effect, ElementChild,
-    Get, GlobalAttributes, HashMap, ImageMeta, ImageValidationConfig, IntoAny, IntoView,
-    OnAttribute, OutputSettingsCsvPanel, PreprocessingSettingsPanel, ProcessedImageOutput,
-    RwSignal, Set, Signal, StyleAttribute, Update, apply_detection_quality_filters,
-    batch_file_label, build_zip_bytes, clear_canvas, component, crop_face_bytes_from_source,
-    current_timestamp_ms, current_utc_timestamp_token, decode_image_dimensions,
-    detect_faces_with_worker, download_bytes, draw_source_image_to_canvas, elapsed_ms_since,
-    event_target_value, mime_type_for_output_format, normalize_export_filename_for_mime, now_ms,
-    object_url_for_bytes, object_url_for_file, revoke_object_url, use_context,
-    validate_export_filename_for_mime, validate_image_meta, view,
+    DetectedFace, Effect, ElementChild, Get, GlobalAttributes, HashMap, ImageMeta,
+    ImageValidationConfig, IntoAny, IntoView, OnAttribute, OutputSettingsCsvPanel,
+    PreprocessingSettingsPanel, ProcessedImageOutput, RwSignal, Set, Signal, StyleAttribute,
+    Update, apply_detection_quality_filters, batch_file_label, build_zip_bytes, clear_canvas,
+    component, crop_face_bytes_from_source, current_timestamp_ms, current_utc_timestamp_token,
+    decode_image_dimensions, detect_faces_with_worker, download_bytes, draw_source_image_to_canvas,
+    elapsed_ms_since, event_target_value, mime_type_for_output_format,
+    normalize_export_filename_for_mime, now_ms, object_url_for_bytes, object_url_for_file,
+    revoke_object_url, use_context, validate_export_filename_for_mime, validate_image_meta, view,
 };
 
 #[allow(clippy::too_many_lines)]
