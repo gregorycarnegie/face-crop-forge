@@ -1,6 +1,110 @@
 use crate::state::AppState;
 use leptos::prelude::*;
 
+#[component]
+pub fn Collapsible(
+    #[prop(into)] title: String,
+    #[prop(optional)] start_collapsed: bool,
+    children: Children,
+) -> impl IntoView {
+    let collapsed = RwSignal::new(start_collapsed);
+    let header_class = move || {
+        if collapsed.get() {
+            "collapsible-header collapsed"
+        } else {
+            "collapsible-header"
+        }
+    };
+    let content_class = move || {
+        if collapsed.get() {
+            "collapsible-content collapsed"
+        } else {
+            "collapsible-content"
+        }
+    };
+    let aria_expanded = move || (!collapsed.get()).to_string();
+    view! {
+        <h3
+            class=header_class
+            role="button"
+            tabindex="0"
+            aria-expanded=aria_expanded
+            on:click=move |_| collapsed.update(|c| *c = !*c)
+            on:keydown=move |ev: web_sys::KeyboardEvent| {
+                let key = ev.key();
+                if key == "Enter" || key == " " {
+                    ev.prevent_default();
+                    collapsed.update(|c| *c = !*c);
+                }
+            }
+        >
+            {title}
+            <span class="collapse-icon" aria-hidden="true">"▼"</span>
+        </h3>
+        <div class=content_class>
+            {children()}
+        </div>
+    }
+}
+
+#[component]
+pub fn CollapsibleSubsection(
+    #[prop(into)] title: String,
+    #[prop(optional, into)] header_extra_class: String,
+    #[prop(optional, into)] content_extra_class: String,
+    #[prop(optional)] start_collapsed: bool,
+    children: Children,
+) -> impl IntoView {
+    let collapsed = RwSignal::new(start_collapsed);
+    let header_extra = header_extra_class;
+    let content_extra = content_extra_class;
+    let header_class = move || {
+        let mut classes = String::from("collapsible-header");
+        if !header_extra.is_empty() {
+            classes.push(' ');
+            classes.push_str(&header_extra);
+        }
+        if collapsed.get() {
+            classes.push_str(" collapsed");
+        }
+        classes
+    };
+    let content_class = move || {
+        let mut classes = String::from("collapsible-content");
+        if !content_extra.is_empty() {
+            classes.push(' ');
+            classes.push_str(&content_extra);
+        }
+        if collapsed.get() {
+            classes.push_str(" collapsed");
+        }
+        classes
+    };
+    let aria_expanded = move || (!collapsed.get()).to_string();
+    view! {
+        <h4
+            class=header_class
+            role="button"
+            tabindex="0"
+            aria-expanded=aria_expanded
+            on:click=move |_| collapsed.update(|c| *c = !*c)
+            on:keydown=move |ev: web_sys::KeyboardEvent| {
+                let key = ev.key();
+                if key == "Enter" || key == " " {
+                    ev.prevent_default();
+                    collapsed.update(|c| *c = !*c);
+                }
+            }
+        >
+            {title}
+            <span class="collapse-icon" aria-hidden="true">"▼"</span>
+        </h4>
+        <div class=content_class>
+            {children()}
+        </div>
+    }
+}
+
 fn preset_value_for_dimensions(width: u32, height: u32) -> &'static str {
     match (width, height) {
         (400, 400) => "linkedin",
@@ -33,11 +137,7 @@ pub fn CropSettingsPanel() -> impl IntoView {
         .settings;
     view! {
         <div class="crop-settings">
-            <h3 class="collapsible-header">
-                "Smart Cropping Settings"
-                <span class="collapse-icon">"▼"</span>
-            </h3>
-            <div class="collapsible-content">
+            <Collapsible title="Smart Cropping Settings">
                 <div class="preset-controls">
                     <div class="setting-group full-width">
                         <label for="sizePreset">"Size Presets"</label>
@@ -207,7 +307,7 @@ pub fn CropSettingsPanel() -> impl IntoView {
                         }}
                     </span>
                 </div>
-            </div>
+            </Collapsible>
         </div>
     }
 }
@@ -220,11 +320,7 @@ pub fn PreprocessingSettingsPanel() -> impl IntoView {
         .settings;
     view! {
         <div class="preprocessing-settings">
-            <h3 class="collapsible-header">
-                "Image Preprocessing"
-                <span class="collapse-icon">"▼"</span>
-            </h3>
-            <div class="collapsible-content">
+            <Collapsible title="Image Preprocessing" start_collapsed=true>
                 <div class="preprocessing-controls">
                     <div class="setting-group">
                         <label>
@@ -337,7 +433,7 @@ pub fn PreprocessingSettingsPanel() -> impl IntoView {
                     <span>"Preview: "</span>
                     <span id="enhancementSummary">"No enhancements applied"</span>
                 </div>
-            </div>
+            </Collapsible>
         </div>
     }
 }
@@ -366,11 +462,7 @@ fn OutputSettingsPanel(
         .settings;
     view! {
         <div class="output-settings">
-            <h3 class="collapsible-header">
-                "Output Settings"
-                <span class="collapse-icon">"▼"</span>
-            </h3>
-            <div class="collapsible-content">
+            <Collapsible title="Output Settings">
                 <div class="settings-grid">
                     <div class="setting-group">
                         <label for="outputFormat">"Output Format"</label>
@@ -415,7 +507,7 @@ fn OutputSettingsPanel(
                         <label for="individualDownload">"Show individual download buttons"</label>
                     </div>
                 </div>
-            </div>
+            </Collapsible>
         </div>
     }
 }

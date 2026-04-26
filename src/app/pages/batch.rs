@@ -1,7 +1,8 @@
 use super::{
     AppShell, AppState, BatchCoreState, BatchImageGalleryPanel, BatchProgress, BatchQueueState,
-    BatchRuntimeStats, BatchUploadCard, ClassAttribute, CollectView, CropSettingsPanel,
-    DetectedFace, DetectionRetryPolicy, ElementChild, Get, GlobalAttributes, HashMap,
+    BatchRuntimeStats, BatchUploadCard, ClassAttribute, CollectView, Collapsible,
+    CollapsibleSubsection, CropSettingsPanel, DetectedFace, DetectionRetryPolicy, ElementChild,
+    Get, GlobalAttributes, HashMap,
     HtmlInputElement, ImageMeta, ImageValidationConfig, IntoAny, IntoView, JsFuture,
     MemoryIndicatorLevel, OnAttribute, OutputSettingsBatchPanel, PreprocessingSettingsPanel,
     ProcessedImageOutput, PropAttribute, RwSignal, Set, Signal, Update,
@@ -989,11 +990,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                 <aside class="control-panel">
                     <div class="control-scroll">
                         <div class="workflow-tools">
-                            <h3 class="collapsible-header">
-                                "Professional Workflow Tools"
-                                <span class="collapse-icon">"▼"</span>
-                            </h3>
-                            <div class="collapsible-content">
+                            <Collapsible title="Professional Workflow Tools">
                                 <div class="workflow-section">
                                     <h4>"Processing Statistics"</h4>
                                     <div class="stats-grid">
@@ -1230,6 +1227,39 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     </div>
                                 </div>
                                 <div class="workflow-section">
+                                    <CollapsibleSubsection
+                                        title="Error Details"
+                                        header_extra_class="error-log-header"
+                                        content_extra_class="error-log-panel"
+                                        start_collapsed=true
+                                    >
+                                        <div class="error-log" id="errorLog">
+                                            {move || {
+                                                let errors = batch_error_logs.get();
+                                                if errors.is_empty() {
+                                                    view! { <div class="log-entry">"No errors detected"</div> }
+                                                        .into_any()
+                                                } else {
+                                                    errors
+                                                        .into_iter()
+                                                        .map(|entry| view! { <div class="log-entry">{entry}</div> })
+                                                        .collect_view()
+                                                        .into_any()
+                                                }
+                                            }}
+                                        </div>
+                                        <div class="error-actions">
+                                            <button type="button" id="clearErrorsBtn" class="reset-button">"Clear Errors"</button>
+                                            <button type="button" id="exportErrorsBtn" class="export-btn">"Export Error Log"</button>
+                                        </div>
+                                    </CollapsibleSubsection>
+                                </div>
+                            </Collapsible>
+                        </div>
+
+                        <div class="workflow-tools">
+                            <Collapsible title="Diagnostics" start_collapsed=true>
+                                <div class="workflow-section">
                                     <h4>"Rust Progress Status"</h4>
                                     <div class="stats-grid">
                                         <div class="stat-item">
@@ -1271,35 +1301,7 @@ pub(crate) fn BatchPage() -> impl IntoView {
                                     </div>
                                     <div class="setting-help">{rust_progress_status}</div>
                                 </div>
-
-                                <div class="workflow-section">
-                                    <h4 class="collapsible-header error-log-header">
-                                        "Error Details"
-                                        <span class="collapse-icon">"▼"</span>
-                                    </h4>
-                                    <div class="collapsible-content error-log-panel">
-                                        <div class="error-log" id="errorLog">
-                                            {move || {
-                                                let errors = batch_error_logs.get();
-                                                if errors.is_empty() {
-                                                    view! { <div class="log-entry">"No errors detected"</div> }
-                                                        .into_any()
-                                                } else {
-                                                    errors
-                                                        .into_iter()
-                                                        .map(|entry| view! { <div class="log-entry">{entry}</div> })
-                                                        .collect_view()
-                                                        .into_any()
-                                                }
-                                            }}
-                                        </div>
-                                        <div class="error-actions">
-                                            <button type="button" id="clearErrorsBtn" class="reset-button">"Clear Errors"</button>
-                                            <button type="button" id="exportErrorsBtn" class="export-btn">"Export Error Log"</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            </Collapsible>
                         </div>
 
                         <CropSettingsPanel />

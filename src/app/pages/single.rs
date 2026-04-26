@@ -1,11 +1,12 @@
 use super::{
-    AppShell, AppState, ClassAttribute, CollectView, CropSettingsPanel, DetectedFace, Effect,
-    ElementChild, FaceWorkerBridgeState, Get, GlobalAttributes, IntoAny, IntoView,
+    AppShell, AppState, ClassAttribute, CollectView, Collapsible, CropSettingsPanel, DetectedFace,
+    Effect, ElementChild, FaceWorkerBridgeState, Get, GlobalAttributes, IntoAny, IntoView,
     MediaPipeAssetPaths, OnAttribute, OutputSettingsBatchPanel, PreprocessingSettingsPanel,
     RwSignal, Set, Signal, SingleCoreState, SingleRuntimeState, SingleUploadCard, StyleAttribute,
     Update, apply_detection_quality_filters, build_export_plan, build_load_plan,
     capture_webcam_frame_to_file, clear_canvas, clear_last_detection_backend, clear_video_source,
-    component, compute_display_size, crop_face_bytes_from_source, current_timestamp_ms,
+    click_element_by_id, component, compute_display_size, crop_face_bytes_from_source,
+    current_timestamp_ms,
     detect_browser_capabilities, detect_faces_with_worker, download_bytes,
     draw_source_image_to_canvas, evaluate_pipeline_health, last_detection_backend_label,
     list_video_input_devices, normalize_export_filename_for_mime, object_url_for_file,
@@ -246,11 +247,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                 <aside class="control-panel">
                     <div class="control-scroll">
                         <div class="workflow-tools">
-                            <h3 class="collapsible-header">
-                                "Processing Status"
-                                <span class="collapse-icon">"▼"</span>
-                            </h3>
-                            <div class="collapsible-content">
+                            <Collapsible title="Processing Status">
                                 <div class="workflow-section">
                                     <h4>"Current Image Stats"</h4>
                                     <div class="stats-grid">
@@ -294,6 +291,17 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                     </div>
                                 </div>
 
+                                <div class="workflow-section">
+                                    <h4>"Processing Log"</h4>
+                                    <div class="processing-log" id="processingLog">
+                                        {move || runtime_logs.get().into_iter().map(|entry| view! { <div class="log-entry">{entry}</div> }).collect_view()}
+                                    </div>
+                                </div>
+                            </Collapsible>
+                        </div>
+
+                        <div class="workflow-tools">
+                            <Collapsible title="Diagnostics" start_collapsed=true>
                                 <div class="workflow-section">
                                     <h4>"MediaPipe Load Strategy"</h4>
                                     <div class="stats-grid">
@@ -365,14 +373,7 @@ pub(crate) fn SinglePage() -> impl IntoView {
                                         }).collect_view()}
                                     </div>
                                 </div>
-
-                                <div class="workflow-section">
-                                    <h4>"Processing Log"</h4>
-                                    <div class="processing-log" id="processingLog">
-                                        {move || runtime_logs.get().into_iter().map(|entry| view! { <div class="log-entry">{entry}</div> }).collect_view()}
-                                    </div>
-                                </div>
-                            </div>
+                            </Collapsible>
                         </div>
 
                         <CropSettingsPanel />
@@ -383,6 +384,32 @@ pub(crate) fn SinglePage() -> impl IntoView {
 
                 <main class="workspace">
                     <div class="workspace-scroll">
+                        <div class="workspace-toolbar">
+                            <button
+                                type="button"
+                                class="primary-btn"
+                                disabled=move || !has_source_image.get() || single_busy.get()
+                                on:click=move |_| { click_element_by_id("detectFacesBtn"); }
+                            >
+                                "Detect Faces"
+                            </button>
+                            <button
+                                type="button"
+                                class="primary-btn"
+                                disabled=move || !can_download.get() || single_busy.get()
+                                on:click=move |_| { click_element_by_id("downloadResultsBtn"); }
+                            >
+                                "Download Results"
+                            </button>
+                            <button
+                                type="button"
+                                class="ghost-btn"
+                                disabled=move || !has_source_image.get() || single_busy.get()
+                                on:click=move |_| { click_element_by_id("clearImageBtn"); }
+                            >
+                                "Clear Image"
+                            </button>
+                        </div>
                         <div class="side-by-side-container">
                             <div class=move || {
                                 if has_source_image.get() {

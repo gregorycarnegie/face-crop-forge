@@ -1,7 +1,8 @@
 use super::{
     AppShell, AppState, BatchCoreState, BatchImageGalleryPanel, BatchProgress, BatchQueueState,
-    BatchRuntimeStats, ClassAttribute, CollectView, CropSettingsPanel, CsvCoreState,
-    CsvExportNameContext, CsvImageUploadCard, CsvUploadCard, DetectedFace, Effect, ElementChild,
+    BatchRuntimeStats, ClassAttribute, CollectView, Collapsible, CollapsibleSubsection,
+    CropSettingsPanel, CsvCoreState, CsvExportNameContext, CsvImageUploadCard, CsvUploadCard,
+    DetectedFace, Effect, ElementChild,
     Get, GlobalAttributes, HashMap, ImageMeta, ImageValidationConfig, IntoAny, IntoView,
     OnAttribute, OutputSettingsCsvPanel, PreprocessingSettingsPanel, ProcessedImageOutput,
     RwSignal, Set, Signal, StyleAttribute, Update, apply_detection_quality_filters,
@@ -1055,11 +1056,7 @@ pub(crate) fn CsvPage() -> impl IntoView {
                 <aside class="control-panel">
                     <div class="control-scroll">
                         <div class="workflow-tools">
-                            <h3 class="collapsible-header">
-                                "CSV Processing Status"
-                                <span class="collapse-icon">"▼"</span>
-                            </h3>
-                            <div class="collapsible-content">
+                            <Collapsible title="CSV Processing Status">
                                 <div class="workflow-section">
                                     <h4>"CSV Statistics"</h4>
                                     <div class="stats-grid">
@@ -1079,17 +1076,6 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                     </div>
                                 </div>
                                 <div class="workflow-section">
-                                    <h4>"Rust CSV Runtime"</h4>
-                                    <div class="stats-grid">
-                                        <div class="stat-item"><span class="stat-label">"Running"</span><span class="stat-value">{move || if csv_progress_running.get() { "Yes" } else { "No" }}</span></div>
-                                        <div class="stat-item"><span class="stat-label">"Progress"</span><span class="stat-value">{move || format!("{}%", csv_progress_percent.get())}</span></div>
-                                        <div class="stat-item"><span class="stat-label">"Preview Export Name"</span><span class="stat-value">{move || csv_preview_filename.get()}</span></div>
-                                        <div class="stat-item"><span class="stat-label">"Queued Pages"</span><span class="stat-value">{move || csv_queue.get().queued_pages_count().to_string()}</span></div>
-                                        <div class="stat-item"><span class="stat-label">"Queued Files"</span><span class="stat-value">{move || csv_queue.get().queued_files_count().to_string()}</span></div>
-                                    </div>
-                                    <div class="setting-help">{csv_progress_status}</div>
-                                </div>
-                                <div class="workflow-section">
                                     <h4>"File Loading Log"</h4>
                                     <div class="processing-log" id="loadingLog"><div class="log-entry">"Ready to process CSV..."</div></div>
                                 </div>
@@ -1100,11 +1086,12 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                     </div>
                                 </div>
                                 <div class="workflow-section">
-                                    <h4 class="collapsible-header error-log-header">
-                                        "Error Details"
-                                        <span class="collapse-icon">"▼"</span>
-                                    </h4>
-                                    <div class="collapsible-content error-log-panel">
+                                    <CollapsibleSubsection
+                                        title="Error Details"
+                                        header_extra_class="error-log-header"
+                                        content_extra_class="error-log-panel"
+                                        start_collapsed=true
+                                    >
                                         <div class="error-log" id="errorLog">
                                             {move || {
                                                 let errors = csv_error_logs.get();
@@ -1124,9 +1111,25 @@ pub(crate) fn CsvPage() -> impl IntoView {
                                             <button type="button" id="clearErrorsBtn" class="reset-button">"Clear Errors"</button>
                                             <button type="button" id="exportErrorsBtn" class="export-btn">"Export Error Log"</button>
                                         </div>
-                                    </div>
+                                    </CollapsibleSubsection>
                                 </div>
-                            </div>
+                            </Collapsible>
+                        </div>
+
+                        <div class="workflow-tools">
+                            <Collapsible title="Diagnostics" start_collapsed=true>
+                                <div class="workflow-section">
+                                    <h4>"Rust CSV Runtime"</h4>
+                                    <div class="stats-grid">
+                                        <div class="stat-item"><span class="stat-label">"Running"</span><span class="stat-value">{move || if csv_progress_running.get() { "Yes" } else { "No" }}</span></div>
+                                        <div class="stat-item"><span class="stat-label">"Progress"</span><span class="stat-value">{move || format!("{}%", csv_progress_percent.get())}</span></div>
+                                        <div class="stat-item"><span class="stat-label">"Preview Export Name"</span><span class="stat-value">{move || csv_preview_filename.get()}</span></div>
+                                        <div class="stat-item"><span class="stat-label">"Queued Pages"</span><span class="stat-value">{move || csv_queue.get().queued_pages_count().to_string()}</span></div>
+                                        <div class="stat-item"><span class="stat-label">"Queued Files"</span><span class="stat-value">{move || csv_queue.get().queued_files_count().to_string()}</span></div>
+                                    </div>
+                                    <div class="setting-help">{csv_progress_status}</div>
+                                </div>
+                            </Collapsible>
                         </div>
 
                         <CropSettingsPanel />

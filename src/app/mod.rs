@@ -19,7 +19,8 @@ use crate::mediapipe::{
     revalidate_browser_fallbacks,
 };
 use crate::panels::{
-    CropSettingsPanel, OutputSettingsBatchPanel, OutputSettingsCsvPanel, PreprocessingSettingsPanel,
+    Collapsible, CollapsibleSubsection, CropSettingsPanel, OutputSettingsBatchPanel,
+    OutputSettingsCsvPanel, PreprocessingSettingsPanel,
 };
 use crate::single_core::{
     SingleCoreState, SingleRuntimeState, build_export_plan, compute_display_size,

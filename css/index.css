@@ -1,6 +1,8 @@
-/* Landing page — home-container fills app-main width (padding comes from app-main) */
+/* Landing page — capped to match inner pages (.app-body max-width: 1680px) */
 .home-container {
     width: 100%;
+    max-width: 1680px;
+    margin: 0 auto;
     position: relative;
     z-index: 1;
     display: flex;
