@@ -1,3 +1,4 @@
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryIndicatorLevel {
     Hidden,
@@ -6,6 +7,7 @@ pub enum MemoryIndicatorLevel {
     Critical,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MemoryIndicator {
     pub images: usize,
@@ -68,6 +70,7 @@ pub struct ImageMeta<'a> {
     pub dimensions: Dimensions,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DetectionRetryPolicy {
     pub max_retries: u32,
@@ -104,6 +107,7 @@ pub struct FaceRect {
     pub height: f32,
 }
 
+#[cfg(test)]
 pub fn build_memory_indicator(images: usize, processed: usize, errors: usize) -> MemoryIndicator {
     let score = images.saturating_mul(10) + processed.saturating_mul(5);
     let level = if score > 200 {
@@ -154,6 +158,7 @@ pub fn retry_delay_ms(attempt: u32) -> u64 {
     (attempt as u64).saturating_mul(1000)
 }
 
+#[cfg(test)]
 pub fn parse_max_retries(raw_value: Option<&str>) -> u32 {
     raw_value
         .and_then(|value| value.trim().parse::<u32>().ok())

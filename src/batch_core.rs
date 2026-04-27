@@ -39,6 +39,7 @@ pub struct BatchQueueState {
     pub queued_pages: Vec<Vec<String>>,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BatchWorkPlan {
     pub selected_total: usize,
@@ -93,6 +94,7 @@ impl BatchRuntimeStats {
         }
     }
 
+    #[cfg(test)]
     pub fn success_rate_pct(&self) -> u32 {
         if self.images_processed == 0 {
             return 0;
@@ -152,12 +154,14 @@ impl BatchCoreState {
         }
     }
 
+    #[cfg(test)]
     pub fn select_all(&mut self) {
         for image in self.images.values_mut() {
             image.selected = true;
         }
     }
 
+    #[cfg(test)]
     pub fn select_none(&mut self) {
         for image in self.images.values_mut() {
             image.selected = false;
@@ -198,6 +202,7 @@ impl BatchCoreState {
         self.images.len()
     }
 
+    #[cfg(test)]
     pub fn has_selected_images(&self) -> bool {
         self.selected_count() > 0
     }
@@ -213,6 +218,7 @@ impl BatchCoreState {
         ids
     }
 
+    #[cfg(test)]
     pub fn build_work_plan(&self, preferred_chunk_size: usize) -> BatchWorkPlan {
         let selected_ids = self.selected_ids();
         let selected_total = selected_ids.len();
@@ -229,6 +235,7 @@ impl BatchCoreState {
         }
     }
 
+    #[cfg(test)]
     pub fn estimate_preview_memory_bytes(
         preview_width: usize,
         preview_height: usize,
@@ -281,6 +288,7 @@ impl BatchQueueState {
         }
     }
 
+    #[cfg(test)]
     pub fn queued_pages_count(&self) -> usize {
         self.queued_pages.len()
     }

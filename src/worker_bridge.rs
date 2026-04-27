@@ -26,8 +26,8 @@ pub fn last_detection_backend_label() -> &'static str {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 pub fn clear_last_detection_backend() {
-    #[cfg(target_arch = "wasm32")]
     LAST_DETECTION_BACKEND.with(|slot| {
         *slot.borrow_mut() = None;
     });
@@ -47,6 +47,7 @@ pub enum FaceWorkerStatus {
     Starting,
     Ready,
     Error,
+    #[cfg(any(target_arch = "wasm32", test))]
     Stopped,
 }
 
@@ -76,20 +77,18 @@ impl Default for FaceWorkerBridgeState {
 }
 
 impl FaceWorkerBridgeState {
-    pub fn status_label(&self) -> &'static str {
-        match self.status {
-            FaceWorkerStatus::Unsupported => "Unsupported",
-            FaceWorkerStatus::Starting => "Starting",
-            FaceWorkerStatus::Ready => "Ready",
-            FaceWorkerStatus::Error => "Error",
-            FaceWorkerStatus::Stopped => "Stopped",
+    pub fn can_start(&self) -> bool {
+        #[cfg(any(target_arch = "wasm32", test))]
+        {
+            matches!(self.status, FaceWorkerStatus::Stopped)
+        }
+        #[cfg(not(any(target_arch = "wasm32", test)))]
+        {
+            false
         }
     }
 
-    pub fn can_start(&self) -> bool {
-        matches!(self.status, FaceWorkerStatus::Stopped)
-    }
-
+    #[cfg(test)]
     pub fn can_stop(&self) -> bool {
         matches!(
             self.status,
@@ -132,6 +131,7 @@ pub fn start_face_worker(state: &mut FaceWorkerBridgeState) {
     }
 }
 
+#[cfg(test)]
 pub fn stop_face_worker(state: &mut FaceWorkerBridgeState) {
     if !state.can_stop() {
         return;

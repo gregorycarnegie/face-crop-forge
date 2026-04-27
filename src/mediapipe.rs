@@ -1,9 +1,11 @@
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DelegatePreference {
     Gpu,
     Cpu,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WasmVariant {
     SimdThreaded,
@@ -11,16 +13,7 @@ pub enum WasmVariant {
     NoSimd,
 }
 
-impl WasmVariant {
-    pub fn label(self) -> &'static str {
-        match self {
-            WasmVariant::SimdThreaded => "SIMD+threads",
-            WasmVariant::SimdSingleThread => "SIMD",
-            WasmVariant::NoSimd => "no-SIMD",
-        }
-    }
-}
-
+#[cfg(test)]
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BrowserCapabilities {
@@ -30,18 +23,7 @@ pub struct BrowserCapabilities {
     pub image_bitmap: bool,
 }
 
-impl BrowserCapabilities {
-    #[cfg(not(target_arch = "wasm32"))]
-    pub const fn baseline() -> Self {
-        Self {
-            simd: true,
-            threads: true,
-            offscreen_canvas: true,
-            image_bitmap: true,
-        }
-    }
-}
-
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PipelineState {
     Ready,
@@ -49,6 +31,7 @@ pub enum PipelineState {
     Unavailable,
 }
 
+#[cfg(test)]
 impl PipelineState {
     pub fn label(self) -> &'static str {
         match self {
@@ -59,6 +42,7 @@ impl PipelineState {
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PipelineHealth {
     pub offscreen_canvas: bool,
@@ -67,12 +51,14 @@ pub struct PipelineHealth {
     pub state: PipelineState,
 }
 
+#[cfg(test)]
 impl PipelineHealth {
     pub fn summary(self) -> &'static str {
         self.state.label()
     }
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MediaPipeAssetPaths {
     pub wasm_root: String,
@@ -81,6 +67,7 @@ pub struct MediaPipeAssetPaths {
     pub landmarker_model_url: String,
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
 impl Default for MediaPipeAssetPaths {
     fn default() -> Self {
         Self {
@@ -92,6 +79,7 @@ impl Default for MediaPipeAssetPaths {
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MediaPipeLoadPlan {
     pub assets: MediaPipeAssetPaths,
@@ -101,27 +89,7 @@ pub struct MediaPipeLoadPlan {
     pub use_worker_pipeline: bool,
 }
 
-impl MediaPipeLoadPlan {
-    pub fn summary(&self) -> String {
-        let wasm = self.wasm_variant.label();
-        let delegate = match self.delegate {
-            DelegatePreference::Gpu => "GPU",
-            DelegatePreference::Cpu => "CPU",
-        };
-        let landmarker = if self.enable_landmarker {
-            "landmarker+detector"
-        } else {
-            "detector-only"
-        };
-        let pipeline = if self.use_worker_pipeline {
-            "worker pipeline"
-        } else {
-            "main-thread fallback"
-        };
-        format!("{wasm}, {delegate}, {landmarker}, {pipeline}")
-    }
-}
-
+#[cfg(test)]
 pub fn choose_wasm_variant(capabilities: BrowserCapabilities) -> WasmVariant {
     if capabilities.simd && capabilities.threads {
         WasmVariant::SimdThreaded
@@ -132,6 +100,7 @@ pub fn choose_wasm_variant(capabilities: BrowserCapabilities) -> WasmVariant {
     }
 }
 
+#[cfg(test)]
 pub fn build_load_plan(
     capabilities: BrowserCapabilities,
     prefer_gpu: bool,
@@ -159,6 +128,7 @@ pub fn validate_asset_path(path: &str) -> bool {
     !path.is_empty() && !path.contains("..")
 }
 
+#[cfg(test)]
 pub fn evaluate_pipeline_health(capabilities: BrowserCapabilities) -> PipelineHealth {
     let worker_transfer = capabilities.offscreen_canvas && capabilities.image_bitmap;
     let state = if worker_transfer {
@@ -177,12 +147,14 @@ pub fn evaluate_pipeline_health(capabilities: BrowserCapabilities) -> PipelineHe
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BrowserValidationProfile {
     pub browser: &'static str,
     pub capabilities: BrowserCapabilities,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BrowserFallbackValidation {
     pub browser: &'static str,
@@ -192,6 +164,7 @@ pub struct BrowserFallbackValidation {
     pub fallback_reason: &'static str,
 }
 
+#[cfg(test)]
 pub fn browser_validation_profiles() -> [BrowserValidationProfile; 6] {
     [
         BrowserValidationProfile {
@@ -251,6 +224,7 @@ pub fn browser_validation_profiles() -> [BrowserValidationProfile; 6] {
     ]
 }
 
+#[cfg(test)]
 pub fn revalidate_browser_fallbacks(
     prefer_gpu: bool,
     prefer_landmarker: bool,
@@ -288,34 +262,6 @@ pub fn revalidate_browser_fallbacks(
             }
         })
         .collect()
-}
-
-#[cfg(target_arch = "wasm32")]
-pub fn detect_browser_capabilities() -> BrowserCapabilities {
-    use js_sys::Reflect;
-    use wasm_bindgen::JsValue;
-
-    let global = js_sys::global();
-    let has = |name: &str| Reflect::has(&global, &JsValue::from_str(name)).unwrap_or(false);
-
-    let offscreen_canvas = has("OffscreenCanvas");
-    let image_bitmap = has("ImageBitmap") || has("createImageBitmap");
-    // Robust SIMD/thread probing is browser/runtime-specific; keep optimistic defaults and
-    // fall back to no-SIMD assets as needed at runtime.
-    let simd = has("WebAssembly");
-    let threads = has("SharedArrayBuffer");
-
-    BrowserCapabilities {
-        simd,
-        threads,
-        offscreen_canvas,
-        image_bitmap,
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn detect_browser_capabilities() -> BrowserCapabilities {
-    BrowserCapabilities::baseline()
 }
 
 #[cfg(test)]

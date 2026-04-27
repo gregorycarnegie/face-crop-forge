@@ -33,18 +33,17 @@ fn App() -> impl IntoView {
 
     // Apply the body class based on the current route
     Effect::new(move |_| {
-        if let Some(window) = web_sys::window() {
-            if let Some(document) = window.document() {
-                if let Some(body) = document.body() {
-                    let path_class = match route.get() {
-                        Route::Home => "home-page",
-                        Route::Batch => "batch-page",
-                        Route::Single => "single-page",
-                        Route::Csv => "csv-page",
-                    };
-                    body.set_class_name(path_class);
-                }
-            }
+        if let Some(window) = web_sys::window()
+            && let Some(document) = window.document()
+            && let Some(body) = document.body()
+        {
+            let path_class = match route.get() {
+                Route::Home => "home-page",
+                Route::Batch => "batch-page",
+                Route::Single => "single-page",
+                Route::Csv => "csv-page",
+            };
+            body.set_class_name(path_class);
         }
     });
 

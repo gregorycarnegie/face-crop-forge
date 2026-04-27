@@ -122,7 +122,7 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 class="btn btn-danger"
                 style="margin-left:auto"
                 disabled=move || busy.get()
-                on:click=move |_| clear_batch(batch_state, batch_queue, files_by_id, preview_urls, outputs, progress, progress_pct, stats)
+                on:click=move |_| clear_batch(BatchProcessCtx { progress, stats, batch_state, progress_pct }, batch_queue, files_by_id, preview_urls, outputs)
             >"Clear queue"</button>
             <div class="status-mini">
                 <span class="live"></span>
@@ -503,21 +503,18 @@ fn process_batch(
     });
 
     spawn_local(async move {
+        let ctx = BatchProcessCtx {
+            progress,
+            stats,
+            batch_state,
+            progress_pct,
+        };
         let total = selected_ids.len();
         let validation = ImageValidationConfig::default();
         for (index, id) in selected_ids.into_iter().enumerate() {
             let start_ms = crate::runtime::now_ms();
             let Some(file) = files.get(&id).cloned() else {
-                record_batch_failure(
-                    progress,
-                    stats,
-                    batch_state,
-                    progress_pct,
-                    &id,
-                    0,
-                    "Missing source file.",
-                    "Missing source file.",
-                );
+                record_batch_failure(ctx, &id, 0, "Missing source file.", "Missing source file.");
                 if !continue_on_error {
                     break;
                 }
@@ -531,10 +528,7 @@ fn process_batch(
                 Ok(dimensions) => dimensions,
                 Err(error) => {
                     record_batch_failure(
-                        progress,
-                        stats,
-                        batch_state,
-                        progress_pct,
+                        ctx,
                         &id,
                         elapsed_ms_since(start_ms),
                         format!("Decode failed: {file_name}"),
@@ -556,10 +550,7 @@ fn process_batch(
                 validation,
             ) {
                 record_batch_failure(
-                    progress,
-                    stats,
-                    batch_state,
-                    progress_pct,
+                    ctx,
                     &id,
                     elapsed_ms_since(start_ms),
                     format!("Validation failed: {file_name}"),
@@ -576,10 +567,7 @@ fn process_batch(
                 Ok(faces) => apply_detection_quality_filters(faces, &settings_snapshot),
                 Err(error) => {
                     record_batch_failure(
-                        progress,
-                        stats,
-                        batch_state,
-                        progress_pct,
+                        ctx,
                         &id,
                         elapsed_ms_since(start_ms),
                         format!("Detection failed: {file_name}"),
@@ -593,10 +581,7 @@ fn process_batch(
             };
             let Some(face) = faces.first() else {
                 record_batch_failure(
-                    progress,
-                    stats,
-                    batch_state,
-                    progress_pct,
+                    ctx,
                     &id,
                     elapsed_ms_since(start_ms),
                     format!("No face found: {file_name}"),
@@ -616,10 +601,7 @@ fn process_batch(
             });
             let Some(source_url) = source_url else {
                 record_batch_failure(
-                    progress,
-                    stats,
-                    batch_state,
-                    progress_pct,
+                    ctx,
                     &id,
                     elapsed_ms_since(start_ms),
                     format!("Preview URL failed: {file_name}"),
@@ -645,10 +627,7 @@ fn process_batch(
                         revoke_object_url(url);
                     }
                     record_batch_failure(
-                        progress,
-                        stats,
-                        batch_state,
-                        progress_pct,
+                        ctx,
                         &id,
                         elapsed_ms_since(start_ms),
                         format!("Crop failed: {file_name}"),
@@ -668,10 +647,7 @@ fn process_batch(
                 Ok(url) => url,
                 Err(error) => {
                     record_batch_failure(
-                        progress,
-                        stats,
-                        batch_state,
-                        progress_pct,
+                        ctx,
                         &id,
                         elapsed_ms_since(start_ms),
                         format!("Preview failed: {file_name}"),
@@ -726,16 +702,27 @@ fn process_batch(
     });
 }
 
-fn record_batch_failure(
+#[derive(Clone, Copy)]
+struct BatchProcessCtx {
     progress: RwSignal<BatchProgress>,
     stats: RwSignal<BatchRuntimeStats>,
     batch_state: RwSignal<BatchCoreState>,
     progress_pct: RwSignal<u32>,
+}
+
+fn record_batch_failure(
+    ctx: BatchProcessCtx,
     id: &str,
     elapsed_ms: u64,
     status: impl Into<String>,
     log: impl Into<String>,
 ) {
+    let BatchProcessCtx {
+        progress,
+        stats,
+        batch_state,
+        progress_pct,
+    } = ctx;
     progress.update(|p| {
         p.record_result(false);
         p.status = status.into();
@@ -823,15 +810,18 @@ fn download_batch_zip(
 }
 
 fn clear_batch(
-    batch_state: RwSignal<BatchCoreState>,
+    ctx: BatchProcessCtx,
     batch_queue: RwSignal<BatchQueueState>,
     files_by_id: RwSignal<HashMap<String, web_sys::File>>,
     preview_urls: RwSignal<HashMap<String, String>>,
     outputs: RwSignal<HashMap<String, ProcessedImageOutput>>,
-    progress: RwSignal<BatchProgress>,
-    progress_pct: RwSignal<u32>,
-    stats: RwSignal<BatchRuntimeStats>,
 ) {
+    let BatchProcessCtx {
+        progress,
+        stats,
+        batch_state,
+        progress_pct,
+    } = ctx;
     revoke_preview_urls(&preview_urls.get());
     for output in outputs.get().values() {
         revoke_object_url(&output.preview_url);

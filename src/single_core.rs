@@ -69,12 +69,9 @@ impl SingleRuntimeState {
             self.logs.drain(0..overflow);
         }
     }
-
-    pub fn reset(&mut self) {
-        *self = Self::default();
-    }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DisplaySize {
     pub width: f32,
@@ -107,10 +104,12 @@ impl SingleCoreState {
         }
     }
 
+    #[cfg(test)]
     pub fn select_all_faces(&mut self) {
         self.selected_face_ids = self.all_face_ids.iter().cloned().collect();
     }
 
+    #[cfg(test)]
     pub fn select_none_faces(&mut self) {
         self.selected_face_ids.clear();
     }
@@ -123,21 +122,10 @@ impl SingleCoreState {
         self.all_face_ids.len()
     }
 
-    /// Rotates by +/-90 style increments, normalized to [0, 359].
-    /// Mirrors TS logic: `(angle + degrees + 360) % 360`.
+    #[cfg(test)]
     pub fn rotate_by(&mut self, delta_degrees: i16) {
         let raw = i32::from(self.rotation_degrees) + i32::from(delta_degrees) + 3600;
         self.rotation_degrees = (raw % 360) as i16;
-    }
-
-    /// Single-processor clears face selection after rotation before redetection.
-    pub fn clear_faces_after_rotation(&mut self) {
-        self.all_face_ids.clear();
-        self.selected_face_ids.clear();
-    }
-
-    pub fn reset_rotation_after_reencode(&mut self) {
-        self.rotation_degrees = 0;
     }
 
     pub fn open_webcam_modal(&mut self) {
@@ -148,12 +136,14 @@ impl SingleCoreState {
         self.webcam_modal_open = false;
     }
 
+    #[cfg(test)]
     pub fn active_camera_name(&self) -> &str {
         self.cameras
             .get(self.active_camera_index)
             .map_or("Unknown Camera", String::as_str)
     }
 
+    #[cfg(test)]
     pub fn switch_camera(&mut self) {
         if self.cameras.is_empty() {
             return;
@@ -162,7 +152,7 @@ impl SingleCoreState {
     }
 }
 
-/// Port of single-page preview sizing behavior (`maxWidth=600`, `maxHeight=400`).
+#[cfg(test)]
 pub fn compute_display_size(
     image_width: f32,
     image_height: f32,

@@ -10,6 +10,7 @@ pub enum SizePresetName {
     Custom,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ThemeMode {
     Light,
@@ -95,6 +96,7 @@ pub fn preview_text(width: u32, height: u32, face_height_pct: u8, output_format:
     )
 }
 
+#[cfg(test)]
 pub fn toggle_theme(mode: ThemeMode) -> ThemeMode {
     match mode {
         ThemeMode::Light => ThemeMode::Dark,

@@ -710,21 +710,18 @@ fn process_csv_batch(
     });
 
     spawn_local(async move {
+        let ctx = BatchProcessCtx {
+            progress,
+            stats,
+            batch_state,
+            progress_pct,
+        };
         let total = selected_ids.len();
         let validation = ImageValidationConfig::default();
         for (index, id) in selected_ids.into_iter().enumerate() {
             let start_ms = crate::runtime::now_ms();
             let Some(file) = files.get(&id).cloned() else {
-                record_csv_failure(
-                    progress,
-                    stats,
-                    batch_state,
-                    progress_pct,
-                    &id,
-                    0,
-                    "Missing source file.",
-                    "Missing source file.",
-                );
+                record_csv_failure(ctx, &id, 0, "Missing source file.", "Missing source file.");
                 continue;
             };
             let source_name = source_names
@@ -739,10 +736,7 @@ fn process_csv_batch(
                 Ok(dimensions) => dimensions,
                 Err(error) => {
                     record_csv_failure(
-                        progress,
-                        stats,
-                        batch_state,
-                        progress_pct,
+                        ctx,
                         &id,
                         elapsed_ms_since(start_ms),
                         format!("Decode failed: {source_name}"),
@@ -761,10 +755,7 @@ fn process_csv_batch(
                 validation,
             ) {
                 record_csv_failure(
-                    progress,
-                    stats,
-                    batch_state,
-                    progress_pct,
+                    ctx,
                     &id,
                     elapsed_ms_since(start_ms),
                     format!("Validation failed: {source_name}"),
@@ -778,10 +769,7 @@ fn process_csv_batch(
                 Ok(faces) => apply_detection_quality_filters(faces, &settings_snapshot),
                 Err(error) => {
                     record_csv_failure(
-                        progress,
-                        stats,
-                        batch_state,
-                        progress_pct,
+                        ctx,
                         &id,
                         elapsed_ms_since(start_ms),
                         format!("Detection failed: {source_name}"),
@@ -792,10 +780,7 @@ fn process_csv_batch(
             };
             let Some(face) = faces.first() else {
                 record_csv_failure(
-                    progress,
-                    stats,
-                    batch_state,
-                    progress_pct,
+                    ctx,
                     &id,
                     elapsed_ms_since(start_ms),
                     format!("No face found: {source_name}"),
@@ -812,10 +797,7 @@ fn process_csv_batch(
             });
             let Some(source_url) = source_url else {
                 record_csv_failure(
-                    progress,
-                    stats,
-                    batch_state,
-                    progress_pct,
+                    ctx,
                     &id,
                     elapsed_ms_since(start_ms),
                     format!("Preview URL failed: {source_name}"),
@@ -838,10 +820,7 @@ fn process_csv_batch(
                         revoke_object_url(url);
                     }
                     record_csv_failure(
-                        progress,
-                        stats,
-                        batch_state,
-                        progress_pct,
+                        ctx,
                         &id,
                         elapsed_ms_since(start_ms),
                         format!("Crop failed: {source_name}"),
@@ -858,10 +837,7 @@ fn process_csv_batch(
                 Ok(url) => url,
                 Err(error) => {
                     record_csv_failure(
-                        progress,
-                        stats,
-                        batch_state,
-                        progress_pct,
+                        ctx,
                         &id,
                         elapsed_ms_since(start_ms),
                         format!("Preview failed: {source_name}"),
@@ -918,16 +894,27 @@ fn process_csv_batch(
     });
 }
 
-fn record_csv_failure(
+#[derive(Clone, Copy)]
+struct BatchProcessCtx {
     progress: RwSignal<BatchProgress>,
     stats: RwSignal<BatchRuntimeStats>,
     batch_state: RwSignal<BatchCoreState>,
     progress_pct: RwSignal<u32>,
+}
+
+fn record_csv_failure(
+    ctx: BatchProcessCtx,
     id: &str,
     elapsed_ms: u64,
     status: impl Into<String>,
     log: impl Into<String>,
 ) {
+    let BatchProcessCtx {
+        progress,
+        stats,
+        batch_state,
+        progress_pct,
+    } = ctx;
     progress.update(|p| {
         p.record_result(false);
         p.status = status.into();

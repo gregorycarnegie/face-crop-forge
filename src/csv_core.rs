@@ -89,7 +89,7 @@ impl CsvCoreState {
             let row_map = headers
                 .iter()
                 .cloned()
-                .zip(values.into_iter())
+                .zip(values)
                 .collect::<HashMap<_, _>>();
             rows.push(CsvRow(row_map));
         }
@@ -247,6 +247,7 @@ impl CsvCoreState {
         format!("{stem}.{extension}")
     }
 
+    #[cfg(test)]
     pub fn preview_rows(&self, max_rows: usize) -> Vec<Vec<String>> {
         self.rows
             .iter()

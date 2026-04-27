@@ -28,23 +28,3 @@ pub fn LogCard(
         </div>
     }
 }
-
-#[component]
-pub fn LogLine(
-    #[prop(into)] time: String,
-    #[prop(into)] message: String,
-    #[prop(optional, into)] variant: String, // "ok", "warn", "err", or empty
-) -> impl IntoView {
-    let line_class = if variant.is_empty() {
-        "line".to_string()
-    } else {
-        format!("line {}", variant)
-    };
-
-    view! {
-        <div class=line_class>
-            <span class="t">{time}</span>
-            <span class="m">{message}</span>
-        </div>
-    }
-}
