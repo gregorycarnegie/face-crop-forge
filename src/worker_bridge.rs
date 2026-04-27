@@ -185,15 +185,12 @@ pub async fn detect_faces_with_worker(
 
 #[cfg(target_arch = "wasm32")]
 async fn detect_faces_with_browser_api(file: web_sys::File) -> Result<Vec<DetectedFace>, String> {
-    use web_sys::js_sys::{Array, Function, Object, Promise, Reflect};
-    use web_sys::wasm_bindgen::JsCast;
-    use web_sys::wasm_bindgen::JsValue;
+    use js_sys::{Array, Function, Object, Promise, Reflect};
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen::JsValue;
 
-    let face_detector_ctor = Reflect::get(
-        &web_sys::js_sys::global(),
-        &JsValue::from_str("FaceDetector"),
-    )
-    .map_err(|err| format!("FaceDetector lookup failed: {err:?}"))?;
+    let face_detector_ctor = Reflect::get(&js_sys::global(), &JsValue::from_str("FaceDetector"))
+        .map_err(|err| format!("FaceDetector lookup failed: {err:?}"))?;
     if face_detector_ctor.is_null() || face_detector_ctor.is_undefined() {
         return Err("FaceDetector API unavailable in this browser".to_string());
     }
@@ -283,9 +280,9 @@ async fn detect_faces_with_browser_api(file: web_sys::File) -> Result<Vec<Detect
 #[cfg(target_arch = "wasm32")]
 #[allow(clippy::too_many_lines)]
 async fn detect_faces_with_mediapipe(file: web_sys::File) -> Result<Vec<DetectedFace>, String> {
-    use web_sys::js_sys::{Array, Function, Object, Reflect};
-    use web_sys::wasm_bindgen::JsCast;
-    use web_sys::wasm_bindgen::JsValue;
+    use js_sys::{Array, Function, Object, Reflect};
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen::JsValue;
 
     let assets = crate::mediapipe::MediaPipeAssetPaths::default();
     let module = import_js_module(&assets.vision_bundle_url).await?;
@@ -425,9 +422,9 @@ async fn detect_faces_with_mediapipe(file: web_sys::File) -> Result<Vec<Detected
 }
 
 #[cfg(target_arch = "wasm32")]
-fn first_number_property(value: &web_sys::wasm_bindgen::JsValue, keys: &[&str]) -> Option<f64> {
-    use web_sys::js_sys::Reflect;
-    use web_sys::wasm_bindgen::JsValue;
+fn first_number_property(value: &wasm_bindgen::JsValue, keys: &[&str]) -> Option<f64> {
+    use js_sys::Reflect;
+    use wasm_bindgen::JsValue;
 
     keys.iter().find_map(|key| {
         Reflect::get(value, &JsValue::from_str(key))
@@ -437,10 +434,8 @@ fn first_number_property(value: &web_sys::wasm_bindgen::JsValue, keys: &[&str]) 
 }
 
 #[cfg(target_arch = "wasm32")]
-async fn resolve_js_value(
-    value: web_sys::wasm_bindgen::JsValue,
-) -> Result<web_sys::wasm_bindgen::JsValue, String> {
-    use web_sys::js_sys::Promise;
+async fn resolve_js_value(value: wasm_bindgen::JsValue) -> Result<wasm_bindgen::JsValue, String> {
+    use js_sys::Promise;
 
     wasm_bindgen_futures::JsFuture::from(Promise::resolve(&value))
         .await
@@ -448,9 +443,9 @@ async fn resolve_js_value(
 }
 
 #[cfg(target_arch = "wasm32")]
-async fn import_js_module(url: &str) -> Result<web_sys::wasm_bindgen::JsValue, String> {
-    use web_sys::js_sys::Function;
-    use web_sys::wasm_bindgen::JsValue;
+async fn import_js_module(url: &str) -> Result<wasm_bindgen::JsValue, String> {
+    use js_sys::Function;
+    use wasm_bindgen::JsValue;
 
     let import_fn = Function::new_with_args("url", "return import(url);");
     let promise = import_fn

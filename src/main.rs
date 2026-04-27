@@ -1,33 +1,66 @@
-#![warn(clippy::pedantic)]
-
-mod app;
 mod base_runtime;
 mod base_ui;
 mod batch_core;
 mod batch_export;
-#[cfg(test)]
-mod crop_math;
+mod components;
 mod csv_core;
 mod export_runtime;
-#[cfg(test)]
-mod flow_tests;
 mod mediapipe;
-mod panels;
-#[cfg(test)]
-mod perf_snapshot;
-#[cfg(test)]
-mod preprocessing;
-#[cfg(test)]
-mod quality_filters;
+mod pages;
+mod router;
+mod runtime;
 mod single_core;
 mod state;
 mod worker_bridge;
 
-use app::App;
-use leptos::mount::mount_to_body;
 use leptos::prelude::*;
+use pages::batch::Batch;
+use pages::csv::Csv;
+use pages::home::Home;
+use pages::single::Single;
+use router::{Route, current_route, setup_popstate_listener};
+use state::AppState;
+
+#[component]
+fn App() -> impl IntoView {
+    provide_context(AppState::new());
+
+    // Top-level routing state
+    let (route, set_route) = signal(current_route());
+
+    // Listen to browser back/forward buttons
+    setup_popstate_listener(set_route);
+
+    // Apply the body class based on the current route
+    Effect::new(move |_| {
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                if let Some(body) = document.body() {
+                    let path_class = match route.get() {
+                        Route::Home => "home-page",
+                        Route::Batch => "batch-page",
+                        Route::Single => "single-page",
+                        Route::Csv => "csv-page",
+                    };
+                    body.set_class_name(path_class);
+                }
+            }
+        }
+    });
+
+    view! {
+        <div class="shell">
+            {move || match route.get() {
+                Route::Home => view! { <Home route=route.get() set_route=set_route /> }.into_any(),
+                Route::Batch => view! { <Batch route=route.get() set_route=set_route /> }.into_any(),
+                Route::Single => view! { <Single route=route.get() set_route=set_route /> }.into_any(),
+                Route::Csv => view! { <Csv route=route.get() set_route=set_route /> }.into_any(),
+            }}
+        </div>
+    }
+}
 
 fn main() {
     console_error_panic_hook::set_once();
-    mount_to_body(|| view! { <App /> });
+    mount_to_body(App);
 }

@@ -292,10 +292,10 @@ pub fn revalidate_browser_fallbacks(
 
 #[cfg(target_arch = "wasm32")]
 pub fn detect_browser_capabilities() -> BrowserCapabilities {
-    use web_sys::js_sys::Reflect;
-    use web_sys::wasm_bindgen::JsValue;
+    use js_sys::Reflect;
+    use wasm_bindgen::JsValue;
 
-    let global = web_sys::js_sys::global();
+    let global = js_sys::global();
     let has = |name: &str| Reflect::has(&global, &JsValue::from_str(name)).unwrap_or(false);
 
     let offscreen_canvas = has("OffscreenCanvas");

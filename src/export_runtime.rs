@@ -33,7 +33,7 @@ pub fn validate_export_filename_for_mime(file_name: &str, mime_type: &str) -> bo
 pub fn current_utc_timestamp_token() -> String {
     #[cfg(target_arch = "wasm32")]
     {
-        let iso = web_sys::js_sys::Date::new_0()
+        let iso = js_sys::Date::new_0()
             .to_iso_string()
             .as_string()
             .unwrap_or_else(|| "1970-01-01T00:00:00.000Z".to_string());
@@ -51,7 +51,7 @@ pub fn current_timestamp_ms() -> u64 {
     #[cfg(target_arch = "wasm32")]
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     {
-        web_sys::js_sys::Date::now() as u64
+        js_sys::Date::now() as u64
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -82,10 +82,10 @@ pub fn build_zip_bytes(entries: &[(String, Vec<u8>)]) -> Result<Vec<u8>, String>
 
 #[cfg(target_arch = "wasm32")]
 pub fn download_bytes(file_name: &str, mime_type: &str, bytes: &[u8]) -> Result<(), String> {
-    use web_sys::wasm_bindgen::JsCast;
+    use wasm_bindgen::JsCast;
 
-    let array = web_sys::js_sys::Uint8Array::from(bytes);
-    let parts = web_sys::js_sys::Array::new();
+    let array = js_sys::Uint8Array::from(bytes);
+    let parts = js_sys::Array::new();
     parts.push(&array.buffer());
     let blob_options = web_sys::BlobPropertyBag::new();
     blob_options.set_type(mime_type);

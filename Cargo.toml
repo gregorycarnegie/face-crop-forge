@@ -1,16 +1,18 @@
 [package]
 name = "face-crop-forge"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 [dependencies]
-leptos = { version = "=0.8.19", features = ["csr"] }
 console_error_panic_hook = "=0.1.7"
-wasm-bindgen-futures = "=0.4.68"
-zip = { version = "=8.5.1", default-features = false, features = ["deflate"] }
+js-sys = "=0.3.95"
+leptos = { version = "=0.8.19", features = ["csr"] }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.149"
-web-sys = { version = "=0.3.95", features = ["Window", "Document", "Element", "HtmlElement", "HtmlAnchorElement", "Storage", "Url", "HtmlInputElement", "FileList", "File", "FilePropertyBag", "Blob", "BlobPropertyBag", "Worker", "DragEvent", "DataTransfer", "HtmlCanvasElement", "CanvasRenderingContext2d", "HtmlImageElement", "Navigator", "MediaDevices", "MediaDeviceInfo", "MediaStream", "MediaStreamTrack", "MediaStreamConstraints", "HtmlVideoElement", "HtmlMediaElement"] }
+wasm-bindgen = "=0.2.118"
+wasm-bindgen-futures = "=0.4.68"
+web-sys = { version = "=0.3.95", features = ["Blob", "BlobPropertyBag", "CanvasRenderingContext2d", "DataTransfer", "Document", "DragEvent", "Element", "Event", "File", "FileList", "FilePropertyBag", "FileReader", "History", "HtmlAnchorElement", "HtmlCanvasElement", "HtmlCollection", "HtmlElement", "HtmlImageElement", "HtmlInputElement", "HtmlMediaElement", "HtmlVideoElement", "Location", "MediaDeviceInfo", "MediaDevices", "MediaStream", "MediaStreamConstraints", "MediaStreamTrack", "MouseEvent", "Navigator", "Storage", "Url", "Window", "Worker"] }
+zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
 
 [profile.release]
 codegen-units = 1
