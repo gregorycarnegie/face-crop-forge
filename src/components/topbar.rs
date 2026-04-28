@@ -23,15 +23,16 @@ pub fn Topbar(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 <a href="/batch" class=move || active_class(Route::Batch) on:click=move |ev| handle_nav(ev, Route::Batch)>"Batch"</a>
                 <a href="/single" class=move || active_class(Route::Single) on:click=move |ev| handle_nav(ev, Route::Single)>"Single"</a>
                 <a href="/csv" class=move || active_class(Route::Csv) on:click=move |ev| handle_nav(ev, Route::Csv)>"CSV"</a>
-                <a href="/docs">"Docs"</a>
+                <a href="/docs" class=move || active_class(Route::Docs) on:click=move |ev| handle_nav(ev, Route::Docs)>"Docs"</a>
             </nav>
             <div class="top-r">
-                <a class="ghost" href="/source">"GitHub →"</a>
+                <a class="ghost" href="https://github.com/gregorycarnegie/face-crop-forge">"GitHub ->"</a>
                 {move || {
                     let (href, label, r) = match route {
                         Route::Home | Route::Csv => ("/batch", "Open Batch", Route::Batch),
                         Route::Batch => ("/single", "Single image", Route::Single),
                         Route::Single => ("/batch", "Open Batch", Route::Batch),
+                        Route::Docs => ("/batch", "Open Batch", Route::Batch),
                     };
                     view! {
                         <a class="pri" href=href on:click=move |ev| handle_nav(ev, r)>

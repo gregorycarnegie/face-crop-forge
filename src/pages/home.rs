@@ -13,21 +13,21 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
         <section class="hero">
             <div>
                 <div class="pill-row rise">
-                    <Pill variant="peach" has_dot=true>"v0.9.2 · Now with WebGPU"</Pill>
+                    <Pill variant="peach" has_dot=true>"v0.2.0 - browser face detection"</Pill>
                     <Pill has_dot=true>"0 bytes uploaded"</Pill>
                 </div>
 
                 <h1 class="hero-h rise d1">
                     "Crop faces"<br/>
-                    "from "<span class="grad">"thousands"</span><span class="ic"></span>"of images "<br/>
+                    "from "<span class="grad">"local"</span><span class="ic"></span>"image sets "<br/>
                     <span class="squig">"without"</span>" uploading."
                 </h1>
 
                 <p class="lede rise d2">
-                    "Face Crop Forge is a "<b>"browser-native image pipeline"</b>" for dataset prep,
-                    profile photos, and ML training sets. Drop in a folder, watch the bounding
-                    boxes settle, and ship a "<span class="hl">"deterministic ZIP"</span>" — all on your
-                    machine, all on your GPU, nothing ever leaves the tab."
+                    "Face Crop Forge is a "<b>"browser-native image cropper"</b>" for dataset prep,
+                    profile photos, and CSV-named image sets. Drop in images, run local face
+                    detection, tune crop settings, and export files or a "<span class="hl">"ZIP"</span>"
+                    from your browser."
                 </p>
 
                 <div class="hero-cta rise d3">
@@ -40,22 +40,22 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 </div>
 
                 <div class="micro rise d3">
-                    <span><b>"WebGPU + WASM"</b>" runtime"</span>
+                    <span><b>"Browser"</b>" runtime"</span>
                     <span class="sep"></span>
-                    <span><b>"YuNet ONNX"</b>" model"</span>
+                    <span><b>"FaceDetector"</b>" with MediaPipe fallback"</span>
                     <span class="sep"></span>
-                    <span><b>"~28 img/sec"</b>" throughput"</span>
+                    <span><b>"JPG / PNG / WEBP"</b>" output"</span>
                     <span class="sep"></span>
-                    <span><b>"MIT"</b>" licensed"</span>
+                    <span><b>"AGPL-3.0"</b>" licensed"</span>
                 </div>
             </div>
 
 
             <div class="preview rise d2">
                 <div class="floats">
-                    <div class="float f1"><div class="k">"Backend"</div><div class="v"><em>"WebGPU"</em></div></div>
-                    <div class="float f2"><div class="k">"Throughput"</div><div class="v"><em>"28.4"</em><span style="font-size:14px;color:var(--ink-3)">" img/s"</span></div></div>
-                    <div class="float f3"><div class="k">"Detected"</div><div class="v"><em>"112"</em><span style="font-size:14px;color:var(--ink-3)">" / 117"</span></div></div>
+                    <div class="float f1"><div class="k">"Backend"</div><div class="v"><em>"Local"</em></div></div>
+                    <div class="float f2"><div class="k">"Output"</div><div class="v"><em>"ZIP"</em></div></div>
+                    <div class="float f3"><div class="k">"Formats"</div><div class="v"><em>"3"</em><span style="font-size:14px;color:var(--ink-3)">" types"</span></div></div>
                 </div>
 
                 <div class="app">
@@ -71,10 +71,10 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                             <div class="sb-item active"><span class="ico"></span>"Batch"<span class="count">"204"</span></div>
                             <div class="sb-item"><span class="ico"></span>"Single image"</div>
                             <div class="sb-item"><span class="ico"></span>"CSV-driven"<span class="count">"3"</span></div>
-                            <div class="sb-h" style="margin-top:8px">"recent runs"</div>
-                            <div class="sb-item"><span class="ico"></span>"portraits-2026"</div>
-                            <div class="sb-item"><span class="ico"></span>"headshots-q2"</div>
-                            <div class="sb-item"><span class="ico"></span>"archive-may"</div>
+                            <div class="sb-h" style="margin-top:8px">"outputs"</div>
+                            <div class="sb-item"><span class="ico"></span>"JPG"</div>
+                            <div class="sb-item"><span class="ico"></span>"PNG"</div>
+                            <div class="sb-item"><span class="ico"></span>"WEBP"</div>
                         </aside>
 
                         <div class="app-main">
@@ -107,7 +107,7 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                                     <div class="ptrack"><i></i></div>
                                 </div>
                                 <div class="actions">
-                                    <span class="ctl">"Pause"</span>
+                                    <span class="ctl">"Process"</span>
                                     <a class="pri" href="/export">"Export ZIP"</a>
                                 </div>
                             </div>
@@ -120,9 +120,9 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
 
         <section class="workflows">
             <a class="wcard batch" href="/batch" on:click=move |ev| { ev.prevent_default(); navigate(Route::Batch, set_route); }>
-                <span class="badge">"Workflow 01 · Most popular"</span>
+                <span class="badge">"Workflow 01 · Batch"</span>
                 <h3>"Process by the"<br/>"folder."</h3>
-                <p>"Drag in thousands. The forge runs YuNet on your GPU and ships a clean ZIP with a manifest."</p>
+                <p>"Drop image sets, process selected files locally, preview crops, and download the generated ZIP."</p>
                 <div class="ill">
                     <div class="chip"><svg viewBox="0 0 30 30"><rect width="30" height="30" fill="#2a1d14"/><circle cx="15" cy="13" r="5" fill="#caa888"/><ellipse cx="15" cy="26" rx="9" ry="6" fill="#caa888"/></svg><i></i></div>
                     <div class="chip"><svg viewBox="0 0 30 30"><rect width="30" height="30" fill="#1c2a32"/><circle cx="15" cy="13" r="5" fill="#dbb892"/><ellipse cx="15" cy="26" rx="9" ry="6" fill="#dbb892"/></svg><i></i></div>
@@ -134,7 +134,7 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
             <a class="wcard single" href="/single" on:click=move |ev| { ev.prevent_default(); navigate(Route::Single, set_route); }>
                 <span class="badge">"Workflow 02 · Precision"</span>
                 <h3>"Tune one shot,"<br/>"just right."</h3>
-                <p>"Manual padding, aspect lock, retina export. Built for the picture you'll actually publish."</p>
+                <p>"Load one image, select detected faces, adjust padding and size, then save JPG, PNG, or WEBP crops."</p>
                 <div class="ill">
                     <div class="chip" style="width:56px"><svg viewBox="0 0 56 30"><rect width="56" height="30" fill="#1c2a32"/><circle cx="28" cy="13" r="6" fill="#dbb892"/><ellipse cx="28" cy="26" rx="11" ry="6" fill="#dbb892"/></svg><i style="inset:14% 28%"></i></div>
                 </div>
@@ -162,10 +162,10 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                     <p>"The forge does the unglamorous middle step of every dataset workflow — finding faces, framing them, keeping them organized — "<b>"without uploading a single byte"</b>". Audit the source. Run it offline. Trust it because you can read it."</p>
                 </div>
                 <div class="stat-grid">
-                    <StatCard key="throughput" value="28" suffix="/s" sub="images per second on M-class GPU" accent="peach" />
-                    <StatCard key="accuracy" value="99.4" suffix="%" sub="precision on FDDB benchmark" accent="cyan" />
+                    <StatCard key="workflows" value="3" sub="single, batch, and CSV routes" accent="peach" />
+                    <StatCard key="detection" value="2" sub="native FaceDetector plus MediaPipe fallback" accent="cyan" />
                     <StatCard key="privacy" value="0" sub="bytes leave your device" accent="lime" />
-                    <StatCard key="formats" value="JPG · PNG · WEBP" sub="EXIF preserved through pipeline" accent="rose" custom_value_size=true />
+                    <StatCard key="formats" value="JPG / PNG / WEBP" sub="crop export formats" accent="rose" custom_value_size=true />
                 </div>
             </div>
         </section>
@@ -188,7 +188,7 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 <div class="cap cyan">
                     <div class="icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9h12M9 3v12M3 3l12 12M15 3L3 15"/></svg></div>
                     <h4>"Built for batches"</h4>
-                    <p>"Tens of thousands of images in one session. Resume on crash, skip duplicates."</p>
+                    <p>"Queue image files, process selected items, keep going past failures, and download completed crops as a ZIP."</p>
                 </div>
                 <div class="cap lime">
                     <div class="icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="14" height="11" rx="1.5"/><path d="M2 8h14M6 4v11"/></svg></div>
@@ -198,7 +198,7 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 <div class="cap rose">
                     <div class="icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 2v14M2 9h14" stroke-linecap="round"/><circle cx="9" cy="9" r="6"/></svg></div>
                     <h4>"Reproducible by design"</h4>
-                    <p>"Same model weights, same parameters, same crops. Every run produces a manifest."</p>
+                    <p>"Shared crop settings and filename templates keep output dimensions and names consistent across exports."</p>
                 </div>
             </div>
         </section>
@@ -213,27 +213,27 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 <div class="pcol">
                     <div class="n">"stage 01 · ingest"</div>
                     <h4>"Drop, paste, or pair"</h4>
-                    <p>"FileSystemAccess reads up to 100k files. No upload, no temp directory."</p>
+                    <p>"Choose image files or drop a folder where the browser exposes folder entries."</p>
                 </div>
                 <div class="pcol run">
                     <div class="n">"stage 02 · running"</div>
-                    <h4>"Detect with YuNet"</h4>
-                    <p>"WebGPU runs the ONNX model. Falls back to WASM SIMD on older hardware."</p>
+                    <h4>"Detect faces"</h4>
+                    <p>"Uses the browser FaceDetector API first, then MediaPipe Tasks when needed."</p>
                 </div>
                 <div class="pcol">
                     <div class="n">"stage 03 · frame"</div>
                     <h4>"Pad & lock aspect"</h4>
-                    <p>"Optionally aligns by eye landmarks. Rejects below confidence threshold."</p>
+                    <p>"Apply padding, target aspect ratio, output dimensions, and the confidence threshold."</p>
                 </div>
                 <div class="pcol">
                     <div class="n">"stage 04 · render"</div>
-                    <h4>"Resample on GPU"</h4>
-                    <p>"Lanczos · bicubic · nearest. JPG, PNG, or WEBP output, EXIF preserved."</p>
+                    <h4>"Render crops"</h4>
+                    <p>"Canvas export creates the selected JPG, PNG, or WEBP crop bytes."</p>
                 </div>
                 <div class="pcol">
                     <div class="n">"stage 05 · export"</div>
-                    <h4>"Deterministic ZIP"</h4>
-                    <p>"Writes manifest.csv alongside crops. Same params, same bytes, every run."</p>
+                    <h4>"Download output"</h4>
+                    <p>"Save a single crop or download batch and CSV outputs as a ZIP."</p>
                 </div>
             </div>
         </section>

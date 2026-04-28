@@ -16,6 +16,7 @@ mod worker_bridge;
 use leptos::prelude::*;
 use pages::batch::Batch;
 use pages::csv::Csv;
+use pages::docs::Docs;
 use pages::home::Home;
 use pages::single::Single;
 use router::{Route, current_route, setup_popstate_listener};
@@ -42,6 +43,7 @@ fn App() -> impl IntoView {
                 Route::Batch => "batch-page",
                 Route::Single => "single-page",
                 Route::Csv => "csv-page",
+                Route::Docs => "docs-page",
             };
             body.set_class_name(path_class);
         }
@@ -54,6 +56,7 @@ fn App() -> impl IntoView {
                 Route::Batch => view! { <Batch route=route.get() set_route=set_route /> }.into_any(),
                 Route::Single => view! { <Single route=route.get() set_route=set_route /> }.into_any(),
                 Route::Csv => view! { <Csv route=route.get() set_route=set_route /> }.into_any(),
+                Route::Docs => view! { <Docs route=route.get() set_route=set_route /> }.into_any(),
             }}
         </div>
     }

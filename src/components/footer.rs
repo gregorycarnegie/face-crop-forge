@@ -16,25 +16,22 @@ pub fn Footer() -> impl IntoView {
                     <a href="/batch">"Batch"</a>
                     <a href="/single">"Single image"</a>
                     <a href="/csv">"CSV-driven"</a>
-                    <a href="/api">"Headless"</a>
                 </div>
                 <div>
                     <h6>"Resources"</h6>
                     <a href="/docs">"Documentation"</a>
-                    <a href="/changelog">"Changelog"</a>
-                    <a href="/benchmarks">"Benchmarks"</a>
-                    <a href="/source">"Source"</a>
+                    <a href="https://github.com/gregorycarnegie/face-crop-forge">"Source"</a>
+                    <a href="https://github.com/gregorycarnegie/face-crop-forge/issues">"Issues"</a>
                 </div>
                 <div>
-                    <h6>"Contact"</h6>
-                    <a href="#">"github / facecropforge"</a>
-                    <a href="#">"hello@facecropforge"</a>
-                    <a href="#">"issues"</a>
+                    <h6>"Project"</h6>
+                    <a href="https://github.com/gregorycarnegie/face-crop-forge">"github / face-crop-forge"</a>
+                    <a href="https://github.com/gregorycarnegie/face-crop-forge/blob/main/LICENSE">"AGPL-3.0 license"</a>
                 </div>
             </div>
             <div class="copyrow">
-                <span>"© 2026 "<b>"Face Crop Forge"</b>" · Zero data retention · MIT licensed"</span>
-                <span>"Build "<b>"a3f9c"</b>" · WebGPU + WASM SIMD"</span>
+                <span>"(c) 2026 "<b>"Face Crop Forge"</b>" - local browser processing - AGPL-3.0"</span>
+                <span>"Rust + Leptos + MediaPipe fallback"</span>
             </div>
         </footer>
     }

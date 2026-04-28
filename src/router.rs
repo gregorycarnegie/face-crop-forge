@@ -7,6 +7,7 @@ pub enum Route {
     Batch,
     Single,
     Csv,
+    Docs,
 }
 
 impl Route {
@@ -16,6 +17,7 @@ impl Route {
             Route::Batch => "/batch",
             Route::Single => "/single",
             Route::Csv => "/csv",
+            Route::Docs => "/docs",
         }
     }
 }
@@ -25,6 +27,7 @@ pub fn route_from_path(path: &str) -> Route {
         "batch" => Route::Batch,
         "single" => Route::Single,
         "csv" => Route::Csv,
+        "docs" => Route::Docs,
         _ => Route::Home,
     }
 }
