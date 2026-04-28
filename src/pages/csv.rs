@@ -44,6 +44,8 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
     let file_name_column = RwSignal::new(String::new());
     let mapping_confirmed = RwSignal::new(false);
     let match_filter = RwSignal::new(CsvMatchFilter::All);
+    let padding_pct = RwSignal::new(15_i32);
+    let continue_on_error = RwSignal::new(true);
 
     let busy = Signal::derive(move || progress.get().running);
     let rows = Signal::derive(move || csv_state.get().rows.len());
@@ -147,6 +149,7 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                         progress,
                         progress_pct,
                         stats,
+                        continue_on_error.get(),
                     )
                 >{move || format!("Process all ({})", matched_images.get())}</button>
             </div>
@@ -192,7 +195,55 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                         </div>
                     </Panel>
 
-                    <Panel title="Output naming" num="02" initially_open=true accent="lime">
+                    <Panel title="Crop framing" num="02" initially_open=true accent="lime">
+                        <div class="field">
+                            <label>"Aspect ratio"</label>
+                            <div class="seg cols-4">
+                                <button class=move || csv_aspect_class(&settings.get(), 512, 512) on:click=move |_| settings.update(|s| { s.output_width = 512; s.output_height = 512; })>"1:1"</button>
+                                <button class=move || csv_aspect_class(&settings.get(), 640, 800) on:click=move |_| settings.update(|s| { s.output_width = 640; s.output_height = 800; })>"4:5"</button>
+                                <button class=move || csv_aspect_class(&settings.get(), 600, 800) on:click=move |_| settings.update(|s| { s.output_width = 600; s.output_height = 800; })>"3:4"</button>
+                                <button class=move || csv_aspect_class(&settings.get(), 768, 512) on:click=move |_| settings.update(|s| { s.output_width = 768; s.output_height = 512; })>"3:2"</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>"Padding - " {move || padding_pct.get().to_string()} "%"</label>
+                            <div class="slider-row">
+                                <input
+                                    type="range"
+                                    class="slider"
+                                    min="0"
+                                    max="45"
+                                    prop:value=move || padding_pct.get().to_string()
+                                    on:input=move |ev| {
+                                        if let Ok(value) = event_target_value(&ev).parse::<i32>() {
+                                            padding_pct.set(value);
+                                            settings.update(|s| {
+                                                s.face_height_pct = (100 - value.saturating_mul(2)).clamp(10, 95) as u8;
+                                            });
+                                        }
+                                    }
+                                />
+                                <span class="num">{move || format!("{}%", padding_pct.get())}</span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>"Confidence threshold"</label>
+                            <input
+                                type="range"
+                                class="slider"
+                                min="0"
+                                max="99"
+                                prop:value=move || (settings.get().min_confidence * 100.0).round().to_string()
+                                on:input=move |ev| {
+                                    if let Ok(value) = event_target_value(&ev).parse::<f32>() {
+                                        settings.update(|s| s.min_confidence = (value / 100.0).clamp(0.0, 0.99));
+                                    }
+                                }
+                            />
+                        </div>
+                    </Panel>
+
+                    <Panel title="Output naming" num="03" initially_open=true accent="lime">
                         <div class="field">
                             <label>"Format"</label>
                             <div class="seg cols-3">
@@ -206,6 +257,39 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                             <input class="input" prop:value=move || csv_template_display(&settings.get().naming_template) on:change=move |ev| settings.update(|s| s.naming_template = event_target_value(&ev)) />
                             <div class="hint">"Use {csv_name}, {original}, {index}, {width}, {height}, or {timestamp}."</div>
                         </div>
+                        <div class="field row2">
+                            <div>
+                                <label>"Width"</label>
+                                <input
+                                    class="input"
+                                    prop:value=move || settings.get().output_width.to_string()
+                                    on:change=move |ev| {
+                                        if let Ok(value) = event_target_value(&ev).parse::<u32>() {
+                                            settings.update(|s| s.output_width = value.max(1));
+                                        }
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label>"Height"</label>
+                                <input
+                                    class="input"
+                                    prop:value=move || settings.get().output_height.to_string()
+                                    on:change=move |ev| {
+                                        if let Ok(value) = event_target_value(&ev).parse::<u32>() {
+                                            settings.update(|s| s.output_height = value.max(1));
+                                        }
+                                    }
+                                />
+                            </div>
+                        </div>
+                    </Panel>
+
+                    <Panel title="Performance" num="04" initially_open=false accent="lime">
+                        <label class="toggle-row">
+                            <span><span>"Continue on error"</span><span class="desc">"Skip failures and keep processing"</span></span>
+                            <input type="checkbox" prop:checked=move || continue_on_error.get() on:change=move |ev| continue_on_error.set(event_target_checked(&ev)) />
+                        </label>
                     </Panel>
                 </div>
             </aside>
@@ -678,6 +762,7 @@ fn process_csv_batch(
     progress: RwSignal<BatchProgress>,
     progress_pct: RwSignal<u32>,
     stats: RwSignal<BatchRuntimeStats>,
+    continue_on_error: bool,
 ) {
     if csv_state.get().mapping.is_none() {
         progress.update(|p| p.status = "Confirm CSV mapping first.".to_string());
@@ -734,6 +819,9 @@ fn process_csv_batch(
             let start_ms = crate::runtime::now_ms();
             let Some(file) = files.get(&id).cloned() else {
                 record_csv_failure(ctx, &id, 0, "Missing source file.", "Missing source file.");
+                if !continue_on_error {
+                    break;
+                }
                 continue;
             };
             let source_name = source_names
@@ -754,6 +842,9 @@ fn process_csv_batch(
                         format!("Decode failed: {source_name}"),
                         format!("Decode failed for {source_name}: {error}"),
                     );
+                    if !continue_on_error {
+                        break;
+                    }
                     continue;
                 }
             };
@@ -773,6 +864,9 @@ fn process_csv_batch(
                     format!("Validation failed: {source_name}"),
                     format!("Validation failed for {source_name}: {error}"),
                 );
+                if !continue_on_error {
+                    break;
+                }
                 continue;
             }
 
@@ -787,6 +881,9 @@ fn process_csv_batch(
                         format!("Detection failed: {source_name}"),
                         format!("Detection failed for {source_name}: {error}"),
                     );
+                    if !continue_on_error {
+                        break;
+                    }
                     continue;
                 }
             };
@@ -798,6 +895,9 @@ fn process_csv_batch(
                     format!("No face found: {source_name}"),
                     format!("CSV found no crop target for {source_name}."),
                 );
+                if !continue_on_error {
+                    break;
+                }
                 continue;
             };
 
@@ -815,6 +915,9 @@ fn process_csv_batch(
                     format!("Preview URL failed: {source_name}"),
                     format!("Could not create source URL for {source_name}."),
                 );
+                if !continue_on_error {
+                    break;
+                }
                 continue;
             };
 
@@ -838,6 +941,9 @@ fn process_csv_batch(
                         format!("Crop failed: {source_name}"),
                         format!("CSV crop failed for {source_name}: {error}"),
                     );
+                    if !continue_on_error {
+                        break;
+                    }
                     continue;
                 }
             };
@@ -855,6 +961,9 @@ fn process_csv_batch(
                         format!("Preview failed: {source_name}"),
                         format!("CSV crop preview failed for {source_name}: {error}"),
                     );
+                    if !continue_on_error {
+                        break;
+                    }
                     continue;
                 }
             };
@@ -1115,6 +1224,14 @@ fn csv_format_class(current: &str, expected: &str) -> String {
         "on lime".to_string()
     } else {
         String::new()
+    }
+}
+
+fn csv_aspect_class(settings: &ProcessingSettings, width: u32, height: u32) -> &'static str {
+    if settings.output_width == width && settings.output_height == height {
+        "on lime"
+    } else {
+        ""
     }
 }
 
