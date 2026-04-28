@@ -71,10 +71,10 @@ pub struct MediaPipeAssetPaths {
 impl Default for MediaPipeAssetPaths {
     fn default() -> Self {
         Self {
-            wasm_root: "/models/wasm".to_string(),
-            vision_bundle_url: "/models/vision_bundle.mjs".to_string(),
-            detector_model_url: "/models/blaze_face_short_range.tflite".to_string(),
-            landmarker_model_url: "/models/face_landmarker.task".to_string(),
+            wasm_root: crate::router::app_url("/models/wasm"),
+            vision_bundle_url: crate::router::app_url("/models/vision_bundle.mjs"),
+            detector_model_url: crate::router::app_url("/models/blaze_face_short_range.tflite"),
+            landmarker_model_url: crate::router::app_url("/models/face_landmarker.task"),
         }
     }
 }

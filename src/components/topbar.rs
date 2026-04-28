@@ -1,4 +1,4 @@
-use crate::router::{Route, navigate};
+use crate::router::{Route, navigate, route_href};
 use leptos::prelude::*;
 use web_sys::MouseEvent;
 
@@ -15,27 +15,27 @@ pub fn Topbar(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
 
     view! {
         <header class="topbar">
-            <a class="brand" href="/" on:click=move |ev| handle_nav(ev, Route::Home)>
+            <a class="brand" href=route_href(Route::Home) on:click=move |ev| handle_nav(ev, Route::Home)>
                 <span class="logo"></span>"Face Crop Forge"
             </a>
             <nav class="nav" aria-label="primary">
-                <a href="/" class=move || active_class(Route::Home) on:click=move |ev| handle_nav(ev, Route::Home)>"Home"</a>
-                <a href="/batch" class=move || active_class(Route::Batch) on:click=move |ev| handle_nav(ev, Route::Batch)>"Batch"</a>
-                <a href="/single" class=move || active_class(Route::Single) on:click=move |ev| handle_nav(ev, Route::Single)>"Single"</a>
-                <a href="/csv" class=move || active_class(Route::Csv) on:click=move |ev| handle_nav(ev, Route::Csv)>"CSV"</a>
-                <a href="/docs" class=move || active_class(Route::Docs) on:click=move |ev| handle_nav(ev, Route::Docs)>"Docs"</a>
+                <a href=route_href(Route::Home) class=move || active_class(Route::Home) on:click=move |ev| handle_nav(ev, Route::Home)>"Home"</a>
+                <a href=route_href(Route::Batch) class=move || active_class(Route::Batch) on:click=move |ev| handle_nav(ev, Route::Batch)>"Batch"</a>
+                <a href=route_href(Route::Single) class=move || active_class(Route::Single) on:click=move |ev| handle_nav(ev, Route::Single)>"Single"</a>
+                <a href=route_href(Route::Csv) class=move || active_class(Route::Csv) on:click=move |ev| handle_nav(ev, Route::Csv)>"CSV"</a>
+                <a href=route_href(Route::Docs) class=move || active_class(Route::Docs) on:click=move |ev| handle_nav(ev, Route::Docs)>"Docs"</a>
             </nav>
             <div class="top-r">
                 <a class="ghost" href="https://github.com/gregorycarnegie/face-crop-forge">"GitHub ->"</a>
                 {move || {
-                    let (href, label, r) = match route {
-                        Route::Home | Route::Csv => ("/batch", "Open Batch", Route::Batch),
-                        Route::Batch => ("/single", "Single image", Route::Single),
-                        Route::Single => ("/batch", "Open Batch", Route::Batch),
-                        Route::Docs => ("/batch", "Open Batch", Route::Batch),
+                    let (label, r) = match route {
+                        Route::Home | Route::Csv => ("Open Batch", Route::Batch),
+                        Route::Batch => ("Single image", Route::Single),
+                        Route::Single => ("Open Batch", Route::Batch),
+                        Route::Docs => ("Open Batch", Route::Batch),
                     };
                     view! {
-                        <a class="pri" href=href on:click=move |ev| handle_nav(ev, r)>
+                        <a class="pri" href=route_href(r) on:click=move |ev| handle_nav(ev, r)>
                             {label}
                         </a>
                     }

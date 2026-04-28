@@ -1,6 +1,7 @@
 [build]
 target = "index.html"
 dist = "dist"
+public_url = "/face-crop-forge/"
 
 [serve]
 port = 3000

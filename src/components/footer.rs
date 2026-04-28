@@ -1,3 +1,4 @@
+use crate::router::{Route, route_href};
 use leptos::prelude::*;
 
 #[component]
@@ -6,20 +7,20 @@ pub fn Footer() -> impl IntoView {
         <footer>
             <div class="ft">
                 <div class="ft-brand">
-                    <a class="brand" href="/" style="font-size:18px">
+                    <a class="brand" href=route_href(Route::Home) style="font-size:18px">
                         <span class="logo"></span>"Face Crop Forge"
                     </a>
                     <p>"A browser-native image pipeline. Built for designers, ML engineers, and operators who'd rather not upload a face to a stranger's server."</p>
                 </div>
                 <div>
                     <h6>"Workflows"</h6>
-                    <a href="/batch">"Batch"</a>
-                    <a href="/single">"Single image"</a>
-                    <a href="/csv">"CSV-driven"</a>
+                    <a href=route_href(Route::Batch)>"Batch"</a>
+                    <a href=route_href(Route::Single)>"Single image"</a>
+                    <a href=route_href(Route::Csv)>"CSV-driven"</a>
                 </div>
                 <div>
                     <h6>"Resources"</h6>
-                    <a href="/docs">"Documentation"</a>
+                    <a href=route_href(Route::Docs)>"Documentation"</a>
                     <a href="https://github.com/gregorycarnegie/face-crop-forge">"Source"</a>
                     <a href="https://github.com/gregorycarnegie/face-crop-forge/issues">"Issues"</a>
                 </div>

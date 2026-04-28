@@ -11,7 +11,7 @@ pub enum Route {
 }
 
 impl Route {
-    pub fn path(self) -> &'static str {
+    pub const fn path(self) -> &'static str {
         match self {
             Route::Home => "/",
             Route::Batch => "/batch",
@@ -22,8 +22,55 @@ impl Route {
     }
 }
 
+pub const GITHUB_PAGES_BASE_PATH: &str = "/face-crop-forge";
+
+#[cfg(target_arch = "wasm32")]
+pub fn app_base_path() -> String {
+    let Some(window) = web_sys::window() else {
+        return String::new();
+    };
+    let location = window.location();
+    let hostname = location.hostname().unwrap_or_default();
+    let pathname = location.pathname().unwrap_or_default();
+
+    if hostname.ends_with("github.io") || pathname.starts_with(GITHUB_PAGES_BASE_PATH) {
+        GITHUB_PAGES_BASE_PATH.to_string()
+    } else {
+        String::new()
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn app_base_path() -> String {
+    String::new()
+}
+
+pub fn app_url(path: &str) -> String {
+    let base = app_base_path();
+    let path = if path == "/" { "" } else { path };
+    if base.is_empty() {
+        if path.is_empty() {
+            "/".to_string()
+        } else {
+            path.to_string()
+        }
+    } else if path.is_empty() {
+        format!("{base}/")
+    } else {
+        format!("{base}{path}")
+    }
+}
+
+pub fn route_href(route: Route) -> String {
+    app_url(route.path())
+}
+
+fn strip_app_base(path: &str) -> &str {
+    path.strip_prefix(GITHUB_PAGES_BASE_PATH).unwrap_or(path)
+}
+
 pub fn route_from_path(path: &str) -> Route {
-    match path.trim_matches('/') {
+    match strip_app_base(path).trim_matches('/') {
         "batch" => Route::Batch,
         "single" => Route::Single,
         "csv" => Route::Csv,
@@ -43,7 +90,7 @@ pub fn push_route(route: Route) {
     if let Some(window) = web_sys::window()
         && let Ok(history) = window.history()
     {
-        let _ = history.push_state_with_url(&JsValue::NULL, "", Some(route.path()));
+        let _ = history.push_state_with_url(&JsValue::NULL, "", Some(&route_href(route)));
     }
 }
 

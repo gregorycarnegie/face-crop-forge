@@ -2,7 +2,7 @@ use crate::components::footer::Footer;
 use crate::components::pill::Pill;
 use crate::components::stat_card::StatCard;
 use crate::components::topbar::Topbar;
-use crate::router::{Route, navigate};
+use crate::router::{Route, navigate, route_href};
 use leptos::prelude::*;
 
 #[component]
@@ -31,10 +31,10 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 </p>
 
                 <div class="hero-cta rise d3">
-                    <a class="btn-primary" href="/batch" on:click=move |ev| { ev.prevent_default(); navigate(Route::Batch, set_route); }>
+                    <a class="btn-primary" href=route_href(Route::Batch) on:click=move |ev| { ev.prevent_default(); navigate(Route::Batch, set_route); }>
                         "Start with Batch "<span class="arr">"→"</span>
                     </a>
-                    <a class="btn-ghost" href="/single" on:click=move |ev| { ev.prevent_default(); navigate(Route::Single, set_route); }>
+                    <a class="btn-ghost" href=route_href(Route::Single) on:click=move |ev| { ev.prevent_default(); navigate(Route::Single, set_route); }>
                         "Try a single image"
                     </a>
                 </div>
@@ -119,7 +119,7 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
 
 
         <section class="workflows">
-            <a class="wcard batch" href="/batch" on:click=move |ev| { ev.prevent_default(); navigate(Route::Batch, set_route); }>
+            <a class="wcard batch" href=route_href(Route::Batch) on:click=move |ev| { ev.prevent_default(); navigate(Route::Batch, set_route); }>
                 <span class="badge">"Workflow 01 · Batch"</span>
                 <h3>"Process by the"<br/>"folder."</h3>
                 <p>"Drop image sets, process selected files locally, preview crops, and download the generated ZIP."</p>
@@ -131,7 +131,7 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 <span class="arrow">"→"</span>
             </a>
 
-            <a class="wcard single" href="/single" on:click=move |ev| { ev.prevent_default(); navigate(Route::Single, set_route); }>
+            <a class="wcard single" href=route_href(Route::Single) on:click=move |ev| { ev.prevent_default(); navigate(Route::Single, set_route); }>
                 <span class="badge">"Workflow 02 · Precision"</span>
                 <h3>"Tune one shot,"<br/>"just right."</h3>
                 <p>"Load one image, select detected faces, adjust padding and size, then save JPG, PNG, or WEBP crops."</p>
@@ -141,7 +141,7 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 <span class="arrow">"→"</span>
             </a>
 
-            <a class="wcard csv" href="/csv" on:click=move |ev| { ev.prevent_default(); navigate(Route::Csv, set_route); }>
+            <a class="wcard csv" href=route_href(Route::Csv) on:click=move |ev| { ev.prevent_default(); navigate(Route::Csv, set_route); }>
                 <span class="badge">"Workflow 03 · Pipeline"</span>
                 <h3>"Driven by your"<br/>"CSV."</h3>
                 <p>"Pair filenames with IDs. Outputs are named exactly the way your training pipeline expects."</p>

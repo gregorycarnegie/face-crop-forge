@@ -1,6 +1,6 @@
 use crate::components::footer::Footer;
 use crate::components::topbar::Topbar;
-use crate::router::{Route, navigate};
+use crate::router::{Route, navigate, route_href};
 use leptos::prelude::*;
 
 #[component]
@@ -15,10 +15,10 @@ pub fn Docs(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                     <h1>"Use Face Crop Forge without uploading images."</h1>
                     <p>"Face Crop Forge runs in the browser. It detects faces locally, crops selected images with your settings, and exports individual files or ZIP archives."</p>
                     <div class="hero-cta">
-                        <a class="btn-primary" href="/batch" on:click=move |ev| { ev.prevent_default(); navigate(Route::Batch, set_route); }>
+                        <a class="btn-primary" href=route_href(Route::Batch) on:click=move |ev| { ev.prevent_default(); navigate(Route::Batch, set_route); }>
                             "Open Batch"
                         </a>
-                        <a class="btn-ghost" href="/single" on:click=move |ev| { ev.prevent_default(); navigate(Route::Single, set_route); }>
+                        <a class="btn-ghost" href=route_href(Route::Single) on:click=move |ev| { ev.prevent_default(); navigate(Route::Single, set_route); }>
                             "Open Single"
                         </a>
                     </div>
