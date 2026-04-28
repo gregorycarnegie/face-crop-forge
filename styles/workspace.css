@@ -51,7 +51,7 @@ body.batch-page {
 .runbar .top .pct{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
 .runbar .top .pct b{color:var(--peach);font-size:18px;font-weight:600}
 .ptrack{height:8px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;position:relative}
-.ptrack i{display:block;height:100%;background:linear-gradient(90deg,var(--peach),var(--rose));border-radius:999px;width:57%;box-shadow:0 0 14px rgba(255,184,154,.4);transition:width .4s}
+.ptrack i{display:block;height:100%;background:linear-gradient(90deg,var(--peach),var(--rose));border-radius:999px;width:57%;box-shadow:0 0 14px rgba(255,184,154,.4);transition:width .4s;animation:none}
 .runbar .meta{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--ink-3);flex-wrap:wrap;gap:8px}
 .runbar .meta b{color:var(--ink-2)}
 

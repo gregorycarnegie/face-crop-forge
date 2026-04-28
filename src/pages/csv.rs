@@ -43,6 +43,7 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
     let file_path_column = RwSignal::new(String::new());
     let file_name_column = RwSignal::new(String::new());
     let mapping_confirmed = RwSignal::new(false);
+    let match_filter = RwSignal::new(CsvMatchFilter::All);
 
     let busy = Signal::derive(move || progress.get().running);
     let rows = Signal::derive(move || csv_state.get().rows.len());
@@ -56,6 +57,7 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
             .filter(|image| image.processed)
             .count()
     });
+    let failed_count = Signal::derive(move || progress.get().failed);
     let missing_rows = Signal::derive(move || rows.get().saturating_sub(mapped_rows.get()));
     let mapping_status = Signal::derive(move || {
         if mapping_confirmed.get() {
@@ -444,8 +446,9 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                     <div class="match-head">
                         <h3>"Row "<b>"matches"</b>" - "{move || batch_state.get().total_count().to_string()}" entries"</h3>
                         <div class="filter-tabs cyan">
-                            <button class="on">"All "<span class="n">{move || batch_state.get().total_count().to_string()}</span></button>
-                            <button>"Done "<span class="n">{move || processed.get().to_string()}</span></button>
+                            <button class=move || csv_filter_tab_class(match_filter.get(), CsvMatchFilter::All) on:click=move |_| match_filter.set(CsvMatchFilter::All)>"All "<span class="n">{move || batch_state.get().total_count().to_string()}</span></button>
+                            <button class=move || csv_filter_tab_class(match_filter.get(), CsvMatchFilter::Done) on:click=move |_| match_filter.set(CsvMatchFilter::Done)>"Done "<span class="n">{move || processed.get().to_string()}</span></button>
+                            <button class=move || csv_filter_tab_class(match_filter.get(), CsvMatchFilter::Failed) on:click=move |_| match_filter.set(CsvMatchFilter::Failed)>"Failed "<span class="n">{move || failed_count.get().to_string()}</span></button>
                         </div>
                     </div>
                     <table class="match-table">
@@ -459,17 +462,21 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                                 let source_names = source_name_by_id.get();
                                 let csv = csv_state.get();
                                 let face_counts = face_count_by_id.get();
+                                let active_filter = match_filter.get();
                                 let mut ids = state.images.keys().cloned().collect::<Vec<_>>();
                                 ids.sort();
-                                ids.into_iter().map(|id| {
+                                let rows = ids.into_iter().filter_map(|id| {
                                     let source_name = source_names.get(&id).cloned().unwrap_or_else(|| batch_file_label(&id).to_string());
                                     let output_name = csv.output_name_for_file(&source_name).unwrap_or_else(|| source_name.clone());
                                     let preview = previews.get(&id).cloned();
                                     let image = state.images.get(&id).cloned();
                                     let status = image.as_ref().map(|image| image.status.clone()).unwrap_or(ImageStatus::Loaded);
+                                    if !csv_filter_matches(active_filter, &status) {
+                                        return None;
+                                    }
                                     let (badge_class, badge_label) = csv_status_badge(&status);
                                     let faces = face_counts.get(&id).copied().unwrap_or(0);
-                                    view! {
+                                    Some(view! {
                                         <tr>
                                             <td><span class="thumb">{preview.map(|src| view! { <img src=src alt="CSV match preview" /> })}</span></td>
                                             <td class="filename">{source_name}</td>
@@ -477,8 +484,13 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                                             <td class="filename">{faces}</td>
                                             <td><span class=badge_class>{badge_label}</span></td>
                                         </tr>
-                                    }
-                                }).collect::<Vec<_>>()
+                                    }.into_any())
+                                }).collect::<Vec<_>>();
+                                if rows.is_empty() {
+                                    vec![view! { <tr><td colspan="5" class="filename">{csv_empty_filter_label(active_filter)}</td></tr> }.into_any()]
+                                } else {
+                                    rows
+                                }
                             }}
                         </tbody>
                     </table>
@@ -925,6 +937,33 @@ fn record_csv_failure(
         s.push_log(log);
     });
     batch_state.update(|state| state.mark_error(id));
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CsvMatchFilter {
+    All,
+    Done,
+    Failed,
+}
+
+fn csv_filter_tab_class(current: CsvMatchFilter, expected: CsvMatchFilter) -> &'static str {
+    if current == expected { "on" } else { "" }
+}
+
+fn csv_filter_matches(filter: CsvMatchFilter, status: &ImageStatus) -> bool {
+    match filter {
+        CsvMatchFilter::All => true,
+        CsvMatchFilter::Done => matches!(status, ImageStatus::Processed),
+        CsvMatchFilter::Failed => matches!(status, ImageStatus::Error),
+    }
+}
+
+fn csv_empty_filter_label(filter: CsvMatchFilter) -> &'static str {
+    match filter {
+        CsvMatchFilter::All => "No CSV matches yet.",
+        CsvMatchFilter::Done => "No processed CSV matches yet.",
+        CsvMatchFilter::Failed => "No failed CSV matches.",
+    }
 }
 
 fn download_csv_zip(

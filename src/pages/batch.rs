@@ -39,6 +39,7 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
     let stats = RwSignal::new(BatchRuntimeStats::default());
     let continue_on_error = RwSignal::new(true);
     let padding_pct = RwSignal::new(15_i32);
+    let gallery_filter = RwSignal::new(BatchGalleryFilter::All);
 
     let busy = Signal::derive(move || progress.get().running);
     let has_images = Signal::derive(move || batch_state.get().total_count() > 0);
@@ -213,10 +214,10 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                         <div class="field">
                             <label>"Aspect ratio"</label>
                             <div class="seg cols-4">
-                                <button class=move || { if settings.get().output_width == settings.get().output_height { "on" } else { "" } } on:click=move |_| settings.update(|s| { s.output_width = 512; s.output_height = 512; })>"1:1"</button>
-                                <button on:click=move |_| settings.update(|s| { s.output_width = 640; s.output_height = 800; })>"4:5"</button>
-                                <button on:click=move |_| settings.update(|s| { s.output_width = 600; s.output_height = 800; })>"3:4"</button>
-                                <button on:click=move |_| settings.update(|s| { s.output_width = 768; s.output_height = 512; })>"3:2"</button>
+                                <button class=move || batch_aspect_class(&settings.get(), 512, 512) on:click=move |_| settings.update(|s| { s.output_width = 512; s.output_height = 512; })>"1:1"</button>
+                                <button class=move || batch_aspect_class(&settings.get(), 640, 800) on:click=move |_| settings.update(|s| { s.output_width = 640; s.output_height = 800; })>"4:5"</button>
+                                <button class=move || batch_aspect_class(&settings.get(), 600, 800) on:click=move |_| settings.update(|s| { s.output_width = 600; s.output_height = 800; })>"3:4"</button>
+                                <button class=move || batch_aspect_class(&settings.get(), 768, 512) on:click=move |_| settings.update(|s| { s.output_width = 768; s.output_height = 512; })>"3:2"</button>
                             </div>
                         </div>
                         <div class="field">
@@ -316,9 +317,9 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                             <h3>"Input queue - "<b>{move || batch_state.get().total_count().to_string()}</b>" files"</h3>
                             <div class="filter-tabs">
-                                <button class="on">"All "<span class="n">{move || batch_state.get().total_count().to_string()}</span></button>
-                                <button>"Done "<span class="n">{move || processed_count.get().to_string()}</span></button>
-                                <button>"Failed "<span class="n">{move || failed_count.get().to_string()}</span></button>
+                                <button class=move || filter_tab_class(gallery_filter.get(), BatchGalleryFilter::All) on:click=move |_| gallery_filter.set(BatchGalleryFilter::All)>"All "<span class="n">{move || batch_state.get().total_count().to_string()}</span></button>
+                                <button class=move || filter_tab_class(gallery_filter.get(), BatchGalleryFilter::Done) on:click=move |_| gallery_filter.set(BatchGalleryFilter::Done)>"Done "<span class="n">{move || processed_count.get().to_string()}</span></button>
+                                <button class=move || filter_tab_class(gallery_filter.get(), BatchGalleryFilter::Failed) on:click=move |_| gallery_filter.set(BatchGalleryFilter::Failed)>"Failed "<span class="n">{move || failed_count.get().to_string()}</span></button>
                             </div>
                         </div>
                     </div>
@@ -326,21 +327,22 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                         {move || {
                             let state = batch_state.get();
                             let previews = preview_urls.get();
+                            let active_filter = gallery_filter.get();
                             let mut ids = state.images.keys().cloned().collect::<Vec<_>>();
                             ids.sort();
-                            if ids.is_empty() {
-                                return vec![view! { <div class="empty-gallery">"Drop images to populate the queue."</div> }.into_any()];
-                            }
-                            ids.into_iter().map(|id| {
+                            let cells = ids.into_iter().filter_map(|id| {
                                 let image = state.images.get(&id).cloned();
                                 let selected = image.as_ref().is_some_and(|img| img.selected);
                                 let status = image.as_ref().map(|img| img.status.clone()).unwrap_or(ImageStatus::Loaded);
+                                if !batch_filter_matches(active_filter, &status) {
+                                    return None;
+                                }
                                 let (badge_class, badge_label) = status_badge(&status);
                                 let class_name = gallery_cell_class(selected, &status);
                                 let preview = previews.get(&id).cloned();
                                 let label = batch_file_label(&id).to_string();
                                 let id_for_click = id.clone();
-                                view! {
+                                Some(view! {
                                     <button
                                         type="button"
                                         class=class_name
@@ -352,8 +354,13 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                                         <span class="name">{label}</span>
                                         <span class=badge_class>{badge_label}</span>
                                     </button>
-                                }.into_any()
-                            }).collect::<Vec<_>>()
+                                }.into_any())
+                            }).collect::<Vec<_>>();
+                            if cells.is_empty() {
+                                vec![view! { <div class="empty-gallery">{batch_empty_filter_label(active_filter)}</div> }.into_any()]
+                            } else {
+                                cells
+                            }
                         }}
                     </div>
                 </div>
@@ -836,6 +843,33 @@ fn clear_batch(
     stats.set(BatchRuntimeStats::default());
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BatchGalleryFilter {
+    All,
+    Done,
+    Failed,
+}
+
+fn filter_tab_class(current: BatchGalleryFilter, expected: BatchGalleryFilter) -> &'static str {
+    if current == expected { "on" } else { "" }
+}
+
+fn batch_filter_matches(filter: BatchGalleryFilter, status: &ImageStatus) -> bool {
+    match filter {
+        BatchGalleryFilter::All => true,
+        BatchGalleryFilter::Done => matches!(status, ImageStatus::Processed),
+        BatchGalleryFilter::Failed => matches!(status, ImageStatus::Error),
+    }
+}
+
+fn batch_empty_filter_label(filter: BatchGalleryFilter) -> &'static str {
+    match filter {
+        BatchGalleryFilter::All => "Drop images to populate the queue.",
+        BatchGalleryFilter::Done => "No processed images yet.",
+        BatchGalleryFilter::Failed => "No failed images.",
+    }
+}
+
 fn status_badge(status: &ImageStatus) -> (&'static str, &'static str) {
     match status {
         ImageStatus::Loaded => ("badge queued", "queued"),
@@ -865,5 +899,13 @@ fn batch_format_class(current: &str, expected: &str) -> String {
         "on".to_string()
     } else {
         String::new()
+    }
+}
+
+fn batch_aspect_class(settings: &ProcessingSettings, width: u32, height: u32) -> &'static str {
+    if settings.output_width == width && settings.output_height == height {
+        "on"
+    } else {
+        ""
     }
 }
