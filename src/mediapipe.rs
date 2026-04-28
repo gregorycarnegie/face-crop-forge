@@ -71,10 +71,10 @@ pub struct MediaPipeAssetPaths {
 impl Default for MediaPipeAssetPaths {
     fn default() -> Self {
         Self {
-            wasm_root: "./models/wasm".to_string(),
-            vision_bundle_url: "./models/vision_bundle.mjs".to_string(),
-            detector_model_url: "./models/blaze_face_short_range.tflite".to_string(),
-            landmarker_model_url: "./models/face_landmarker.task".to_string(),
+            wasm_root: "/models/wasm".to_string(),
+            vision_bundle_url: "/models/vision_bundle.mjs".to_string(),
+            detector_model_url: "/models/blaze_face_short_range.tflite".to_string(),
+            landmarker_model_url: "/models/face_landmarker.task".to_string(),
         }
     }
 }
@@ -330,13 +330,13 @@ mod tests {
     #[test]
     fn default_asset_paths_are_relative_url_specifiers() {
         let assets = MediaPipeAssetPaths::default();
-        assert_eq!(assets.wasm_root, "./models/wasm");
-        assert_eq!(assets.vision_bundle_url, "./models/vision_bundle.mjs");
+        assert_eq!(assets.wasm_root, "/models/wasm");
+        assert_eq!(assets.vision_bundle_url, "/models/vision_bundle.mjs");
         assert_eq!(
             assets.detector_model_url,
-            "./models/blaze_face_short_range.tflite"
+            "/models/blaze_face_short_range.tflite"
         );
-        assert_eq!(assets.landmarker_model_url, "./models/face_landmarker.task");
+        assert_eq!(assets.landmarker_model_url, "/models/face_landmarker.task");
 
         for path in [
             assets.wasm_root,
@@ -345,8 +345,8 @@ mod tests {
             assets.landmarker_model_url,
         ] {
             assert!(
-                path.starts_with("./"),
-                "{path} must be an explicit relative URL for browser dynamic import/fetch"
+                path.starts_with("/models/"),
+                "{path} must be rooted at the Trunk-copied models directory"
             );
         }
     }
