@@ -108,7 +108,7 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                                 </div>
                                 <div class="actions">
                                     <span class="ctl">"Process"</span>
-                                    <a class="pri" href="/export">"Export ZIP"</a>
+                                    <span class="pri">"Export ZIP"</span>
                                 </div>
                             </div>
                         </div>

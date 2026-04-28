@@ -72,6 +72,7 @@ h1.hero-h .ic::after{
   z-index:-1;
 }
 .app{
+  position:relative;z-index:1;
   background:var(--surface);border:1px solid var(--rule);border-radius:22px;
   overflow:hidden;box-shadow:
     0 30px 80px -30px rgba(0,0,0,.7),
@@ -161,7 +162,7 @@ h1.hero-h .ic::after{
 .am-foot .actions .pri{padding:8px 14px;font-size:12px;font-weight:600}
 
 /* floating callouts around the app */
-.floats{position:absolute;inset:0;pointer-events:none}
+.floats{position:absolute;inset:0;pointer-events:none;z-index:2}
 .float{
   position:absolute;background:var(--surface);border:1px solid var(--rule);border-radius:14px;
   padding:14px 16px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 18px 40px -18px rgba(0,0,0,.6);
