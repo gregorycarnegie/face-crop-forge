@@ -36,6 +36,7 @@ pub fn Single(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
     let source_file = RwSignal::new(None::<web_sys::File>);
     let source_url = RwSignal::new(None::<String>);
     let source_dimensions = RwSignal::new((0.0_f64, 0.0_f64));
+    let raw_detected_faces = RwSignal::new(Vec::<DetectedFace>::new());
     let detected_faces = RwSignal::new(Vec::<DetectedFace>::new());
     let output_preview = RwSignal::new(None::<ProcessedImageOutput>);
     let output_preview_name = RwSignal::new(String::new());
@@ -72,11 +73,20 @@ pub fn Single(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
             source_file,
             source_url,
             source_dimensions,
+            raw_detected_faces,
             detected_faces,
             output_preview,
             output_preview_name,
         );
     };
+
+    Effect::new(move |_| {
+        let raw_faces = raw_detected_faces.get();
+        if raw_faces.is_empty() {
+            return;
+        }
+        refresh_single_filtered_faces(settings.get(), single_state, raw_faces, detected_faces);
+    });
 
     view! {
         <Topbar route set_route />
@@ -190,13 +200,10 @@ pub fn Single(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                         <div class="field">
                             <label>"Aspect ratio"</label>
                             <div class="seg cols-4">
-                                <button
-                                    class=move || { if settings.get().output_width == settings.get().output_height { "on cyan" } else { "" } }
-                                    on:click=move |_| settings.update(|s| { s.output_width = 512; s.output_height = 512; })
-                                >"1:1"</button>
-                                <button on:click=move |_| settings.update(|s| { s.output_width = 640; s.output_height = 800; })>"4:5"</button>
-                                <button on:click=move |_| settings.update(|s| { s.output_width = 600; s.output_height = 800; })>"3:4"</button>
-                                <button on:click=move |_| settings.update(|s| { s.output_width = 768; s.output_height = 512; })>"3:2"</button>
+                                <button class=move || single_aspect_class(&settings.get(), 512, 512) on:click=move |_| settings.update(|s| { s.output_width = 512; s.output_height = 512; })>"1:1"</button>
+                                <button class=move || single_aspect_class(&settings.get(), 640, 800) on:click=move |_| settings.update(|s| { s.output_width = 640; s.output_height = 800; })>"4:5"</button>
+                                <button class=move || single_aspect_class(&settings.get(), 600, 800) on:click=move |_| settings.update(|s| { s.output_width = 600; s.output_height = 800; })>"3:4"</button>
+                                <button class=move || single_aspect_class(&settings.get(), 768, 512) on:click=move |_| settings.update(|s| { s.output_width = 768; s.output_height = 512; })>"3:2"</button>
                             </div>
                         </div>
                         <div class="field">
@@ -219,6 +226,21 @@ pub fn Single(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                                 />
                                 <span class="num">{move || format!("{}%", padding_pct.get())}</span>
                             </div>
+                        </div>
+                        <div class="field">
+                            <label>"Confidence threshold"</label>
+                            <input
+                                type="range"
+                                class="slider"
+                                min="0"
+                                max="99"
+                                prop:value=move || (settings.get().min_confidence * 100.0).round().to_string()
+                                on:input=move |ev| {
+                                    if let Ok(value) = event_target_value(&ev).parse::<f32>() {
+                                        settings.update(|s| s.min_confidence = (value / 100.0).clamp(0.0, 0.99));
+                                    }
+                                }
+                            />
                         </div>
                     </Panel>
 
@@ -463,6 +485,7 @@ pub fn Single(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                                                 source_file,
                                                 source_url,
                                                 source_dimensions,
+                                                raw_detected_faces,
                                                 detected_faces,
                                                 output_preview,
                                                 output_preview_name,
@@ -491,6 +514,7 @@ fn load_single_file(
     source_file: RwSignal<Option<web_sys::File>>,
     source_url: RwSignal<Option<String>>,
     source_dimensions: RwSignal<(f64, f64)>,
+    raw_detected_faces: RwSignal<Vec<DetectedFace>>,
     detected_faces: RwSignal<Vec<DetectedFace>>,
     output_preview: RwSignal<Option<ProcessedImageOutput>>,
     output_preview_name: RwSignal<String>,
@@ -511,6 +535,7 @@ fn load_single_file(
     source_file.set(Some(file.clone()));
     source_url.set(Some(url));
     source_dimensions.set((0.0, 0.0));
+    raw_detected_faces.set(Vec::new());
     detected_faces.set(Vec::new());
     output_preview.set(None);
     output_preview_name.set(String::new());
@@ -533,6 +558,7 @@ fn load_single_file(
 
         match detect_faces_with_worker("browser-face-detector", file).await {
             Ok(faces) => {
+                raw_detected_faces.set(faces.clone());
                 let filtered = apply_detection_quality_filters(faces, &settings.get());
                 let ids = filtered
                     .iter()
@@ -675,6 +701,32 @@ fn dimensions_label(dimensions: (f64, f64)) -> String {
     }
 }
 
+fn refresh_single_filtered_faces(
+    settings: ProcessingSettings,
+    single_state: RwSignal<SingleCoreState>,
+    raw_faces: Vec<DetectedFace>,
+    detected_faces: RwSignal<Vec<DetectedFace>>,
+) {
+    let filtered = apply_detection_quality_filters(raw_faces, &settings);
+    let ids = filtered
+        .iter()
+        .map(|face| face.id.clone())
+        .collect::<Vec<_>>();
+    detected_faces.set(filtered);
+    single_state.update(|state| {
+        let previous_selection = state.selected_face_ids.clone();
+        state.all_face_ids.clone_from(&ids);
+        state.selected_face_ids = ids
+            .iter()
+            .filter(|id| previous_selection.contains(*id))
+            .cloned()
+            .collect();
+        if state.selected_face_ids.is_empty() {
+            state.selected_face_ids = ids.into_iter().collect();
+        }
+    });
+}
+
 fn format_button_class(current: &str, expected: &str, accent: &str) -> String {
     if current.eq_ignore_ascii_case(expected)
         || (expected == "jpeg" && current.eq_ignore_ascii_case("jpg"))
@@ -682,6 +734,14 @@ fn format_button_class(current: &str, expected: &str, accent: &str) -> String {
         format!("on {accent}")
     } else {
         String::new()
+    }
+}
+
+fn single_aspect_class(settings: &ProcessingSettings, width: u32, height: u32) -> &'static str {
+    if settings.output_width == width && settings.output_height == height {
+        "on cyan"
+    } else {
+        ""
     }
 }
 
