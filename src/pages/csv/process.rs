@@ -8,9 +8,9 @@ use crate::export_runtime::{
 };
 use crate::runtime::{
     ProcessedImageOutput, apply_detection_quality_filters, batch_file_label,
-    crop_face_bytes_from_source, decode_image_dimensions, elapsed_ms_since,
-    is_probably_image_file, make_file_id, mime_type_for_output_format, object_url_for_bytes,
-    object_url_for_file, revoke_object_url, revoke_preview_urls,
+    crop_face_bytes_from_source, decode_image_dimensions, elapsed_ms_since, is_probably_image_file,
+    make_file_id, mime_type_for_output_format, object_url_for_bytes, object_url_for_file,
+    revoke_object_url, revoke_preview_urls,
 };
 use crate::state::ProcessingSettings;
 use crate::worker_bridge::detect_faces_with_worker;

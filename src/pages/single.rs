@@ -42,7 +42,6 @@ pub fn Single(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
     let output_preview_name = RwSignal::new(String::new());
     let webcam_stream = RwSignal::new(None::<web_sys::MediaStream>);
     let webcam_device_ids = RwSignal::new(Vec::<String>::new());
-    let padding_pct = RwSignal::new(15_i32);
 
     Effect::new(move |_| {
         if worker_state.get().can_start() {
@@ -207,24 +206,23 @@ pub fn Single(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                             </div>
                         </div>
                         <div class="field">
-                            <label>"Padding - " {move || padding_pct.get().to_string()} "%"</label>
+                            <label>"Face size - " {move || settings.get().face_height_pct.to_string()} "%"</label>
                             <div class="slider-row">
                                 <input
                                     type="range"
                                     class="slider"
-                                    min="0"
-                                    max="45"
-                                    prop:value=move || padding_pct.get().to_string()
+                                    min="10"
+                                    max="95"
+                                    prop:value=move || settings.get().face_height_pct.to_string()
                                     on:input=move |ev| {
-                                        if let Ok(value) = event_target_value(&ev).parse::<i32>() {
-                                            padding_pct.set(value);
+                                        if let Ok(value) = event_target_value(&ev).parse::<u8>() {
                                             settings.update(|s| {
-                                                s.face_height_pct = (100 - value.saturating_mul(2)).clamp(10, 95) as u8;
+                                                s.face_height_pct = value.clamp(10, 95);
                                             });
                                         }
                                     }
                                 />
-                                <span class="num">{move || format!("{}%", padding_pct.get())}</span>
+                                <span class="num">{move || format!("{}%", settings.get().face_height_pct)}</span>
                             </div>
                         </div>
                         <div class="field">

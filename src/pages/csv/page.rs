@@ -41,7 +41,6 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
     let file_name_column = RwSignal::new(String::new());
     let mapping_confirmed = RwSignal::new(false);
     let match_filter = RwSignal::new(CsvMatchFilter::All);
-    let padding_pct = RwSignal::new(15_i32);
     let continue_on_error = RwSignal::new(true);
 
     let busy = Signal::derive(move || progress.get().running);
@@ -203,24 +202,23 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                             </div>
                         </div>
                         <div class="field">
-                            <label>"Padding - " {move || padding_pct.get().to_string()} "%"</label>
+                            <label>"Face size - " {move || settings.get().face_height_pct.to_string()} "%"</label>
                             <div class="slider-row">
                                 <input
                                     type="range"
                                     class="slider"
-                                    min="0"
-                                    max="45"
-                                    prop:value=move || padding_pct.get().to_string()
+                                    min="10"
+                                    max="95"
+                                    prop:value=move || settings.get().face_height_pct.to_string()
                                     on:input=move |ev| {
-                                        if let Ok(value) = event_target_value(&ev).parse::<i32>() {
-                                            padding_pct.set(value);
+                                        if let Ok(value) = event_target_value(&ev).parse::<u8>() {
                                             settings.update(|s| {
-                                                s.face_height_pct = (100 - value.saturating_mul(2)).clamp(10, 95) as u8;
+                                                s.face_height_pct = value.clamp(10, 95);
                                             });
                                         }
                                     }
                                 />
-                                <span class="num">{move || format!("{}%", padding_pct.get())}</span>
+                                <span class="num">{move || format!("{}%", settings.get().face_height_pct)}</span>
                             </div>
                         </div>
                         <div class="field">

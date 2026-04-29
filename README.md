@@ -13,7 +13,8 @@ Client-side face detection and cropping app running as a Leptos (WASM) SPA.
 - Runtime: Rust + Leptos CSR (`wasm32-unknown-unknown`)
 - Entry point: `index.html` (Trunk)
 - App router/UI: `src/router.rs`
-- Worker bridge/runtime protocol: `src/worker_bridge.rs`
+- Detection bridge/browser API fallback: `src/worker_bridge.rs`
+- MediaPipe asset paths and fallback planning tests: `src/mediapipe.rs`
 - Shared state and settings: `src/state.rs`
 - Runtime abstractions: `src/runtime.rs`, `src/base_runtime.rs`
 - Core processing modules:
@@ -35,7 +36,10 @@ Primary routes:
 ## Runtime Status
 
 - Single, Batch, and CSV flows run on real image inputs end-to-end.
-- Worker detection drives real status/progress updates and error reporting.
+- Detection runs locally through browser APIs. The runtime tries the native browser
+  `FaceDetector` first, then falls back to bundled MediaPipe Tasks assets when
+  the native detector is unavailable or fails.
+- Detection status, progress updates, and errors are surfaced in the UI.
 - Exports generate real output files and ZIP artifacts with validated names/extensions.
 - No user-visible route depends on simulated placeholders.
 
@@ -102,18 +106,36 @@ Recommended headers for best WASM/MediaPipe performance:
 
 ## Performance
 
-### Worker Pipeline
+### Detection Pipeline
 
-Detection and heavy processing run in a Web Worker managed by `src/worker_bridge.rs`, keeping the main thread responsive during batch jobs. Worker lifecycle transitions and errors are surfaced in the UI status/log panels.
+The current runtime does not load a standalone JavaScript worker script. The
+`src/worker_bridge.rs` name is legacy; it now acts as the browser detection
+bridge and status abstraction.
 
-### Browser/WASM Execution Paths
+Detection order:
 
-`src/mediapipe.rs` checks browser capabilities at startup:
+1. Native browser `FaceDetector`
+   - Uses `fastMode: true` and `maxDetectedFaces: 32`.
+   - The underlying model is browser/platform defined. Chrome and Edge do not
+     expose a stable model name or weights for this path.
+2. MediaPipe Tasks fallback
+   - Dynamically imports `models/vision_bundle.mjs`.
+   - Loads MediaPipe WASM support files from `models/wasm`.
+   - Creates a MediaPipe `FaceDetector` with `delegate: "GPU"`,
+     `runningMode: "IMAGE"`, and `minDetectionConfidence: 0.25`.
+   - Uses `models/blaze_face_short_range.tflite` as the fallback detector model.
 
-- OffscreenCanvas + ImageBitmap → worker transfer path
-- Otherwise → compatible fallback path
+Bundled model assets:
 
-Pipeline health is visible in the Single route diagnostics panel.
+- `models/blaze_face_short_range.tflite` - active MediaPipe fallback face detector.
+- `models/face_landmarker.task` - bundled in the asset path set, but not used by
+  the current face detection flow.
+
+### Browser And WASM Assets
+
+`src/mediapipe.rs` centralizes MediaPipe asset URLs. Its browser capability
+matrix is currently covered by tests; runtime fallback behavior is decided in
+`src/worker_bridge.rs` from native `FaceDetector` and MediaPipe success/failure.
 
 ### Export Runtime
 
@@ -121,14 +143,14 @@ All export work is real artifact generation in `src/export_runtime.rs`:
 
 - Binary crop output creation and download
 - ZIP generation for Batch/CSV exports
-- MIME/extension normalization for output filenames (`png`, `jpeg` → `jpg`, `webp`)
+- MIME/extension normalization for output filenames (`png`, `jpeg` -> `jpg`, `webp`)
 
 ### Regression Guards
 
 Output format and naming behavior is enforced by:
 
-- `src/single_core.rs` — `export_filename_format_mapping_matches_legacy_behavior`
-- `src/csv_core.rs` — `export_filename_preserves_output_format_extensions`
+- `src/single_core.rs` - `export_filename_format_mapping_matches_legacy_behavior`
+- `src/csv_core.rs` - `export_filename_preserves_output_format_extensions`
 
 ## Third-Party Notices
 

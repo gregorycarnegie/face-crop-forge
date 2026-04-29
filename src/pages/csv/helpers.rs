@@ -8,7 +8,10 @@ pub(super) enum CsvMatchFilter {
     Failed,
 }
 
-pub(super) fn csv_filter_tab_class(current: CsvMatchFilter, expected: CsvMatchFilter) -> &'static str {
+pub(super) fn csv_filter_tab_class(
+    current: CsvMatchFilter,
+    expected: CsvMatchFilter,
+) -> &'static str {
     if current == expected { "on" } else { "" }
 }
 
@@ -60,7 +63,11 @@ pub(super) fn csv_format_class(current: &str, expected: &str) -> String {
     }
 }
 
-pub(super) fn csv_aspect_class(settings: &ProcessingSettings, width: u32, height: u32) -> &'static str {
+pub(super) fn csv_aspect_class(
+    settings: &ProcessingSettings,
+    width: u32,
+    height: u32,
+) -> &'static str {
     if settings.output_width == width && settings.output_height == height {
         "on lime"
     } else {
