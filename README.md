@@ -88,7 +88,7 @@ just test    # cargo test
 just clean   # cargo clean
 ```
 
-## Deployment (Trunk Artifacts)
+## Deployment (Trunk Artefacts)
 
 Release build output:
 
@@ -134,20 +134,20 @@ Bundled model assets:
 ### Browser And WASM Assets
 
 `src/mediapipe.rs` centralizes MediaPipe asset URLs. Its browser capability
-matrix is currently covered by tests; runtime fallback behavior is decided in
+matrix is currently covered by tests; runtime fallback behaviour is decided in
 `src/worker_bridge.rs` from native `FaceDetector` and MediaPipe success/failure.
 
 ### Export Runtime
 
-All export work is real artifact generation in `src/export_runtime.rs`:
+All export work is real artefact generation in `src/export_runtime.rs`:
 
 - Binary crop output creation and download
 - ZIP generation for Batch/CSV exports
-- MIME/extension normalization for output filenames (`png`, `jpeg` -> `jpg`, `webp`)
+- MIME/extension normalisation for output filenames (`png`, `jpeg` -> `jpg`, `webp`)
 
 ### Regression Guards
 
-Output format and naming behavior is enforced by:
+Output format and naming behaviour is enforced by:
 
 - `src/single_core.rs` - `export_filename_format_mapping_matches_legacy_behavior`
 - `src/csv_core.rs` - `export_filename_preserves_output_format_extensions`
@@ -156,10 +156,10 @@ Output format and naming behavior is enforced by:
 
 ### MediaPipe
 
-- **License**: Apache License 2.0
+- **Licence**: Apache Licence 2.0
 - **Copyright**: Copyright 2019 The MediaPipe Authors
 - **Project URL**: <https://github.com/google/mediapipe>
-- **Description**: Cross-platform, customizable ML solutions for live and streaming media
+- **Description**: Cross-platform, customisable ML solutions for live and streaming media
 
 ```text
 Copyright 2019 The MediaPipe Authors.
@@ -168,7 +168,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+    https://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,

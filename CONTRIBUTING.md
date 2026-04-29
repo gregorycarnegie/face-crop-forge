@@ -26,20 +26,20 @@ just perf      # runtime performance snapshot
 
 ## Project Layout
 
-| Path | Purpose |
-|---|---|
-| `src/app/` | Leptos router, pages, components |
-| `src/worker_bridge.rs` | Web Worker lifecycle and message protocol |
-| `src/mediapipe.rs` | MediaPipe JS bridge and capability detection |
-| `src/single_core.rs` | Single-image detection/crop/export flow |
-| `src/batch_core.rs` | Batch processing loop and retry policy |
-| `src/csv_core.rs` | CSV parse, map, and export flow |
-| `src/crop_math.rs` | Crop region geometry |
-| `src/preprocessing.rs` | Exposure/contrast/sharpness adjustments |
-| `src/quality_filters.rs` | Blur and confidence threshold gates |
-| `src/export_runtime.rs` | Artifact generation and ZIP export |
-| `assets/workers/` | Web Worker JS entry point |
-| `deploy/` | Nginx config and deployment notes |
+| Path                     | Purpose                                      |
+|--------------------------|----------------------------------------------|
+| `src/app/`               | Leptos router, pages, components             |
+| `src/worker_bridge.rs`   | Web Worker lifecycle and message protocol    |
+| `src/mediapipe.rs`       | MediaPipe JS bridge and capability detection |
+| `src/single_core.rs`     | Single-image detection/crop/export flow      |
+| `src/batch_core.rs`      | Batch processing loop and retry policy       |
+| `src/csv_core.rs`        | CSV parse, map, and export flow              |
+| `src/crop_math.rs`       | Crop region geometry                         |
+| `src/preprocessing.rs`   | Exposure/contrast/sharpness adjustments      |
+| `src/quality_filters.rs` | Blur and confidence threshold gates          |
+| `src/export_runtime.rs`  | Artifact generation and ZIP export           |
+| `assets/workers/`        | Web Worker JS entry point                    |
+| `deploy/`                | Nginx config and deployment notes            |
 
 ## Guidelines
 
