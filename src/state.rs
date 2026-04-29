@@ -11,13 +11,6 @@ pub struct ProcessingSettings {
     pub output_format: String,
     pub jpeg_quality: f32,
     pub naming_template: String,
-    pub auto_color_correction: bool,
-    pub exposure_adjustment: f32,
-    pub contrast_adjustment: f32,
-    pub sharpness: f32,
-    pub skin_smoothing: f32,
-    pub red_eye_removal: bool,
-    pub background_blur: f32,
     pub min_confidence: f32,
 }
 
@@ -32,14 +25,7 @@ impl Default for ProcessingSettings {
             output_format: "png".to_string(),
             jpeg_quality: 0.85,
             naming_template: "face_{original}_{index}".to_string(),
-            auto_color_correction: true,
-            exposure_adjustment: 0.0,
-            contrast_adjustment: 1.0,
-            sharpness: 0.0,
-            skin_smoothing: 0.0,
-            red_eye_removal: false,
-            background_blur: 0.0,
-            min_confidence: 0.0,
+            min_confidence: 0.5,
         }
     }
 }

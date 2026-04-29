@@ -309,13 +309,6 @@ pub async fn crop_face_bytes_from_source(
         f64::from(image.natural_height()),
         settings,
     );
-    let filter = format!(
-        "brightness({:.0}%) contrast({:.0}%) blur({:.2}px)",
-        (100.0 + f64::from(settings.exposure_adjustment) * 50.0).clamp(50.0, 200.0),
-        (f64::from(settings.contrast_adjustment) * 100.0).clamp(50.0, 200.0),
-        f64::from(settings.background_blur) + f64::from(settings.skin_smoothing) * 0.2
-    );
-    context.set_filter(&filter);
     context
         .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
             &image,
