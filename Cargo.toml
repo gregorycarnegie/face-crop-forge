@@ -14,6 +14,9 @@ wasm-bindgen-futures = "=0.4.70"
 web-sys = { version = "=0.3.97", features = ["Blob", "BlobPropertyBag", "CanvasRenderingContext2d", "DataTransfer", "Document", "DragEvent", "Element", "Event", "File", "FileList", "FilePropertyBag", "FileReader", "History", "HtmlAnchorElement", "HtmlCanvasElement", "HtmlCollection", "HtmlElement", "HtmlImageElement", "HtmlInputElement", "HtmlMediaElement", "HtmlVideoElement", "Location", "MediaDeviceInfo", "MediaDevices", "MediaStream", "MediaStreamConstraints", "MediaStreamTrack", "MouseEvent", "Navigator", "Storage", "Url", "Window", "Worker"] }
 zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
 
+[dev-dependencies]
+wasm-bindgen-test = "0.3.70"
+
 [profile.release]
 codegen-units = 1
 lto = true

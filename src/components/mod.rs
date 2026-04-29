@@ -5,3 +5,6 @@ pub mod pill;
 pub mod progress_bar;
 pub mod stat_card;
 pub mod topbar;
+
+#[cfg(test)]
+mod tests;

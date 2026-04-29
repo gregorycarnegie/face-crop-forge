@@ -47,6 +47,22 @@ jobs:
       - name: Run tests
         run: cargo test
 
+  component-tests:
+    name: Component Tests (WASM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust toolchain
+        run: rustup show
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Run component tests
+        run: wasm-pack test --headless --chrome
+        env:
+          WASM_BINDGEN_TEST_TIMEOUT: 60
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -86,7 +102,7 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: [fmt, lint, test, build]
+    needs: [fmt, lint, test, component-tests, build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     permissions:
