@@ -12,14 +12,16 @@
 
 ## Assets / git hygiene
 
-- [x] `dist/` is already excluded by `.gitignore` and not tracked — no action needed
-- [ ] **Manual:** Move binary model files (`models/*.tflite`, `models/vision_bundle.mjs`, `models/wasm/*`) out of git — host as GitHub Release assets or a CDN, fetch at runtime or build time
+- [x] Move binary model files (`models/*.tflite`, `models/vision_bundle.mjs`, `models/wasm/*`) out of git — hosted as GitHub Release assets (`models-v1`), downloaded at build time in CI; `models/` excluded via `.gitignore`
 
 ## Testing
 
-- [ ] **Manual:** Add component-level or integration tests for the Leptos UI layer (requires wasm-bindgen-test or a browser test harness)
+- [x] Add component-level tests for the Leptos UI layer — 23 WASM tests across 6 components in `src/components/tests.rs`
 
 ## Housekeeping
 
 - [x] Add `CHANGELOG.md` for v0.2.0
-- [ ] **Manual:** Rename the repo/folder from `opencv-face-crop` to `face-crop-forge` on GitHub (Settings → Repository name)
+- [x] Fix stale `CONTRIBUTING.md` — updated to match actual file structure and removed references to deleted modules
+- [x] Remove broken `just perf` recipe — `src/perf_snapshot.rs` no longer exists
+- [x] Add `Default` impl to `AppState`
+- [x] Rename the repo/folder from `opencv-face-crop` to `face-crop-forge` on GitHub (Settings → Repository name) (only called `opencv-face-crop` on local disk - we can ignore this)

@@ -35,10 +35,16 @@ pub struct AppState {
     pub settings: RwSignal<ProcessingSettings>,
 }
 
-impl AppState {
-    pub fn new() -> Self {
+impl Default for AppState {
+    fn default() -> Self {
         Self {
             settings: RwSignal::new(ProcessingSettings::default()),
         }
+    }
+}
+
+impl AppState {
+    pub fn new() -> Self {
+        Self::default()
     }
 }

@@ -21,8 +21,5 @@ lint:
 test:
   cargo test
 
-perf:
-  cargo test perf_snapshot -- --nocapture
-
 clean:
   cargo clean
