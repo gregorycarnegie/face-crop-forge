@@ -60,8 +60,9 @@ jobs:
             --repo ${{ github.repository }} \
             --pattern "models.zip" \
             --output models.zip
-          unzip models.zip
+          unzip models.zip || true
           rm models.zip
+          test -f models/blaze_face_short_range.tflite
       - name: Install Rust toolchain
         run: rustup show
       - name: Cache
