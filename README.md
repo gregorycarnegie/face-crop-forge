@@ -50,6 +50,8 @@ Prerequisites:
 - Rust stable
 - `wasm32-unknown-unknown` target
 - Trunk
+- wasm-pack
+- Firefox for the local browser test recipe; CI runs the same WASM tests in Chrome
 - `just` (optional)
 
 No Node/Bun toolchain is required.
@@ -59,6 +61,7 @@ Setup:
 ```bash
 rustup target add wasm32-unknown-unknown
 cargo install trunk
+cargo install wasm-pack
 cargo install just
 ```
 
@@ -85,6 +88,7 @@ just check   # cargo check --target wasm32-unknown-unknown
 just fmt     # cargo fmt
 just lint    # cargo clippy --target wasm32-unknown-unknown -- -D warnings
 just test    # cargo test
+just browser-test # wasm-pack test --headless --firefox
 just clean   # cargo clean
 ```
 
@@ -151,6 +155,7 @@ Output format and naming behaviour is enforced by:
 
 - `src/single_core.rs` - `export_filename_format_mapping_matches_legacy_behavior`
 - `src/csv_core.rs` - `export_filename_preserves_output_format_extensions`
+- `src/e2e_tests.rs` - browser-level single-image detect, crop, and export flow
 
 ## Third-Party Notices
 

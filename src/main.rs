@@ -13,6 +13,9 @@ mod single_core;
 mod state;
 mod worker_bridge;
 
+#[cfg(test)]
+mod e2e_tests;
+
 use leptos::prelude::*;
 use pages::batch::Batch;
 use pages::csv::Csv;

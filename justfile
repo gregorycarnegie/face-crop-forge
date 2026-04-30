@@ -21,5 +21,11 @@ lint:
 test:
   cargo test
 
+browser-test:
+  wasm-pack test --headless --firefox
+
+browser-test-chrome:
+  wasm-pack test --headless --chrome
+
 clean:
   cargo clean

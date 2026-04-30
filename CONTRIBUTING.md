@@ -5,11 +5,14 @@
 - Rust stable
 - `wasm32-unknown-unknown` target
 - Trunk
+- wasm-pack
+- Firefox for the local browser test recipe; CI runs the same WASM tests in Chrome
 - `just` (optional but recommended)
 
 ```bash
 rustup target add wasm32-unknown-unknown
 cargo install trunk
+cargo install wasm-pack
 cargo install just
 ```
 
@@ -21,6 +24,7 @@ just check     # cargo check --target wasm32-unknown-unknown
 just fmt       # cargo fmt
 just lint      # cargo clippy --target wasm32-unknown-unknown -- -D warnings
 just test      # cargo test
+just browser-test # wasm-pack test --headless --firefox
 ```
 
 ## Project Layout
@@ -53,7 +57,7 @@ just test      # cargo test
 - Detection runs through the browser `FaceDetector` API first, then falls back to the bundled MediaPipe Tasks assets. New detection logic belongs in `src/worker_bridge.rs`.
 - New export logic goes through `src/export_runtime.rs` so the unit tests there cover it.
 - Run `just lint` before submitting — clippy warnings are treated as errors.
-- Run `just test` to verify unit tests pass, and `wasm-pack test --headless --chrome` to run WASM component tests.
+- Run `just test` to verify unit tests pass, and `just browser-test` to run WASM browser tests locally.
 
 ## License
 
