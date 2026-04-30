@@ -8,7 +8,7 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [ ] Measure single-image detection time.
   - [ ] Measure 10-image, 100-image, and 500-image batch runs.
   - [ ] Record browser, device, image sizes, output format, and detection backend.
-  - [ ] Add a simple developer-only timing panel or console timing output.
+  - [x] Add a simple developer-only timing panel or console timing output.
 
 - [ ] Move batch detection, cropping, and export work into a real Web Worker.
   - [ ] Keep the main thread focused on UI, file selection, previews, and progress display.
@@ -17,24 +17,24 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [ ] Keep detection, crop generation, and ZIP creation off the UI thread where possible.
   - [ ] Rename or split `worker_bridge.rs` so the name reflects the actual architecture.
 
-- [ ] Cache the MediaPipe detector instance.
-  - [ ] Avoid dynamically importing the MediaPipe bundle for every image.
-  - [ ] Avoid resolving the vision fileset repeatedly.
-  - [ ] Avoid creating a new detector for every detection request.
-  - [ ] Create one detector per worker/session and reuse it across batch jobs.
-  - [ ] Add safe fallback/reinitialisation if the cached detector fails.
+- [x] Cache the MediaPipe detector instance.
+  - [x] Avoid dynamically importing the MediaPipe bundle for every image.
+  - [x] Avoid resolving the vision fileset repeatedly.
+  - [x] Avoid creating a new detector for every detection request.
+  - [x] Create one detector per worker/session and reuse it across batch jobs.
+  - [x] Add safe fallback/reinitialisation if the cached detector fails.
 
-- [ ] Detect on a downscaled image, then crop from the original.
-  - [ ] Decode or render a detection-sized version of the image.
-  - [ ] Cap detection input to a sensible max dimension, for example 1024–1600 px.
-  - [ ] Run face detection on the smaller image.
-  - [ ] Scale the detected face box back to original image coordinates.
-  - [ ] Crop/export from the original-resolution image to preserve quality.
-  - [ ] Add tests for coordinate scaling.
+- [x] Detect on a downscaled image, then crop from the original.
+  - [x] Decode or render a detection-sized version of the image.
+  - [x] Cap detection input to a sensible max dimension, for example 1024–1600 px.
+  - [x] Run face detection on the smaller image.
+  - [x] Scale the detected face box back to original image coordinates.
+  - [x] Crop/export from the original-resolution image to preserve quality.
+  - [x] Add tests for coordinate scaling.
 
-- [ ] Change ZIP export to use stored files by default.
-  - [ ] Review current `Deflated` ZIP compression.
-  - [ ] Use `Stored` for already-compressed image outputs such as JPG, PNG, and WebP.
+- [x] Change ZIP export to use stored files by default.
+  - [x] Review current `Deflated` ZIP compression.
+  - [x] Use `Stored` for already-compressed image outputs such as JPG, PNG, and WebP.
   - [ ] Optionally add an advanced setting: `Fast ZIP` vs `Smaller ZIP`.
   - [ ] Benchmark export time and ZIP size difference.
 
@@ -136,10 +136,10 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 
 ## Suggested implementation order
 
-- [ ] Add timing instrumentation.
-- [ ] Change ZIP default from deflated to stored and benchmark it.
-- [ ] Cache the MediaPipe detector.
-- [ ] Add detection downscaling and coordinate remapping.
+- [x] Add timing instrumentation.
+- [x] Change ZIP default from deflated to stored and benchmark it.
+- [x] Cache the MediaPipe detector.
+- [x] Add detection downscaling and coordinate remapping.
 - [ ] Add controlled batch concurrency.
 - [ ] Move batch work into a real Web Worker.
 - [ ] Add `OffscreenCanvas` support inside the worker.

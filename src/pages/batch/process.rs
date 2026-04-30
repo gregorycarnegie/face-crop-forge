@@ -6,10 +6,10 @@ use crate::export_runtime::{
     normalize_export_filename_for_mime, validate_export_filename_for_mime,
 };
 use crate::runtime::{
-    ProcessedImageOutput, apply_detection_quality_filters, batch_file_label,
+    MAX_DETECTION_SIDE, ProcessedImageOutput, apply_detection_quality_filters, batch_file_label,
     crop_face_bytes_from_source, decode_image_dimensions, elapsed_ms_since, is_probably_image_file,
-    make_file_id, mime_type_for_output_format, object_url_for_bytes, object_url_for_file,
-    revoke_object_url, revoke_preview_urls,
+    make_file_id, maybe_downscale_for_detection, mime_type_for_output_format, object_url_for_bytes,
+    object_url_for_file, revoke_object_url, revoke_preview_urls, scale_detected_faces,
 };
 use crate::single_core::generate_face_filename;
 use crate::state::ProcessingSettings;
@@ -175,6 +175,8 @@ pub(super) fn process_batch(
             progress
                 .update(|p| p.status = format!("Processing {}/{}: {file_name}", index + 1, total));
 
+            #[cfg(target_arch = "wasm32")]
+            let decode_start = crate::runtime::now_ms();
             let dimensions = match decode_image_dimensions(&file).await {
                 Ok(dimensions) => dimensions,
                 Err(error) => {
@@ -191,6 +193,8 @@ pub(super) fn process_batch(
                     continue;
                 }
             };
+            #[cfg(target_arch = "wasm32")]
+            let decode_ms = elapsed_ms_since(decode_start);
             if let Err(error) = validate_image_meta(
                 ImageMeta {
                     file_name: &file_name,
@@ -213,9 +217,25 @@ pub(super) fn process_batch(
                 continue;
             }
 
-            let faces = match detect_faces_with_worker("browser-face-detector", file.clone()).await
+            let (detection_file, detection_scale) = match maybe_downscale_for_detection(
+                &file,
+                dimensions,
+                MAX_DETECTION_SIDE,
+            )
+            .await
             {
-                Ok(faces) => apply_detection_quality_filters(faces, &settings_snapshot),
+                Ok(pair) => pair,
+                Err(_) => (file.clone(), 1.0),
+            };
+
+            #[cfg(target_arch = "wasm32")]
+            let detect_start = crate::runtime::now_ms();
+            let faces = match detect_faces_with_worker("browser-face-detector", detection_file).await
+            {
+                Ok(raw) => {
+                    let scaled = scale_detected_faces(raw, 1.0 / detection_scale, 1.0 / detection_scale);
+                    apply_detection_quality_filters(scaled, &settings_snapshot)
+                }
                 Err(error) => {
                     record_batch_failure(
                         ctx,
@@ -230,6 +250,8 @@ pub(super) fn process_batch(
                     continue;
                 }
             };
+            #[cfg(target_arch = "wasm32")]
+            let detect_ms = elapsed_ms_since(detect_start);
             let Some(face) = faces.first() else {
                 record_batch_failure(
                     ctx,
@@ -264,6 +286,8 @@ pub(super) fn process_batch(
                 continue;
             };
 
+            #[cfg(target_arch = "wasm32")]
+            let crop_start = crate::runtime::now_ms();
             let crop_bytes = match crop_face_bytes_from_source(
                 &source_url,
                 face,
@@ -290,6 +314,8 @@ pub(super) fn process_batch(
                     continue;
                 }
             };
+            #[cfg(target_arch = "wasm32")]
+            let crop_ms = elapsed_ms_since(crop_start);
             if let Some(url) = temporary_url.as_deref() {
                 revoke_object_url(url);
             }
@@ -335,10 +361,19 @@ pub(super) fn process_batch(
                 );
                 progress_pct.set(u32::from(p.percent()));
             });
+            let total_ms = elapsed_ms_since(start_ms);
             stats.update(|s| {
-                s.record_image(elapsed_ms_since(start_ms), faces.len() as u32, true);
+                s.record_image(total_ms, faces.len() as u32, true);
                 s.push_log(format!("Processed {file_name}: {} face(s).", faces.len()));
             });
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::log_1(
+                &format!(
+                    "[FCF timing] {file_name}: decode={decode_ms}ms detect={detect_ms}ms crop={crop_ms}ms total={total_ms}ms backend={}",
+                    crate::worker_bridge::last_detection_backend_label()
+                )
+                .into(),
+            );
         }
 
         progress.update(|p| {

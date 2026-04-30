@@ -68,7 +68,7 @@ pub fn build_zip_bytes(entries: &[(String, Vec<u8>)]) -> Result<Vec<u8>, String>
     {
         let mut writer = zip::ZipWriter::new(&mut cursor);
         let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
+            .compression_method(zip::CompressionMethod::Stored);
         for (file_name, bytes) in entries {
             writer
                 .start_file(file_name, options)

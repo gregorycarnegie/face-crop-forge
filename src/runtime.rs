@@ -3,6 +3,24 @@ use crate::state::ProcessingSettings;
 use crate::worker_bridge::DetectedFace;
 use std::collections::HashMap;
 
+pub const MAX_DETECTION_SIDE: u32 = 1600;
+
+/// Scale detected face coordinates from detection-image space back to original-image space.
+/// Call this after detecting on a downscaled image with `scale = detection_size / original_size`.
+/// Pass `1.0 / scale` as both `scale_x` and `scale_y`.
+pub fn scale_detected_faces(mut faces: Vec<DetectedFace>, scale_x: f64, scale_y: f64) -> Vec<DetectedFace> {
+    if (scale_x - 1.0).abs() < 1e-9 && (scale_y - 1.0).abs() < 1e-9 {
+        return faces;
+    }
+    for face in &mut faces {
+        face.x *= scale_x;
+        face.y *= scale_y;
+        face.width *= scale_x;
+        face.height *= scale_y;
+    }
+    faces
+}
+
 #[derive(Clone)]
 pub struct ProcessedImageOutput {
     pub bytes: Vec<u8>,
@@ -242,6 +260,123 @@ pub async fn files_from_data_transfer(
     _data: web_sys::DataTransfer,
 ) -> Result<Vec<web_sys::File>, String> {
     Ok(Vec::new())
+}
+
+/// Returns `(file_for_detection, scale)` where `scale < 1.0` means the returned file is a
+/// downscaled JPEG. Multiply detected face coords by `1.0 / scale` to recover original-image
+/// coordinates. Returns the original file unchanged when the image already fits within `max_side`.
+#[cfg(target_arch = "wasm32")]
+pub async fn maybe_downscale_for_detection(
+    file: &web_sys::File,
+    dims: Dimensions,
+    max_side: u32,
+) -> Result<(web_sys::File, f64), String> {
+    use wasm_bindgen::closure::Closure;
+    use wasm_bindgen::{JsCast, JsValue};
+    use wasm_bindgen_futures::JsFuture;
+
+    let longest = dims.width.max(dims.height);
+    if longest <= max_side {
+        return Ok((file.clone(), 1.0));
+    }
+
+    let scale = f64::from(max_side) / f64::from(longest);
+    let target_w = ((f64::from(dims.width) * scale).round() as u32).max(1);
+    let target_h = ((f64::from(dims.height) * scale).round() as u32).max(1);
+
+    let object_url = web_sys::Url::create_object_url_with_blob(file)
+        .map_err(|err| format!("Downscale: create_object_url failed: {err:?}"))?;
+    let image = web_sys::HtmlImageElement::new().map_err(|err| format!("{err:?}"))?;
+    image.set_src(&object_url);
+    let decode_result = JsFuture::from(image.decode()).await;
+    let _ = web_sys::Url::revoke_object_url(&object_url);
+    decode_result.map_err(|err| format!("Downscale: image decode failed: {err:?}"))?;
+
+    let document = leptos::prelude::window()
+        .document()
+        .ok_or_else(|| "Document unavailable".to_string())?;
+    let canvas = document
+        .create_element("canvas")
+        .map_err(|err| format!("{err:?}"))?
+        .dyn_into::<web_sys::HtmlCanvasElement>()
+        .map_err(|_| "Failed to create detection canvas".to_string())?;
+    canvas.set_width(target_w);
+    canvas.set_height(target_h);
+    let context = canvas
+        .get_context("2d")
+        .map_err(|err| format!("{err:?}"))?
+        .ok_or_else(|| "2d context unavailable".to_string())?
+        .dyn_into::<web_sys::CanvasRenderingContext2d>()
+        .map_err(|_| "Failed to cast detection canvas context".to_string())?;
+    context
+        .draw_image_with_html_image_element_and_dw_and_dh(
+            &image,
+            0.0,
+            0.0,
+            f64::from(target_w),
+            f64::from(target_h),
+        )
+        .map_err(|err| format!("Downscale: draw failed: {err:?}"))?;
+
+    let canvas_clone = canvas.clone();
+    let blob_promise = js_sys::Promise::new(&mut move |resolve, reject| {
+        let resolve_fn = resolve.clone();
+        let reject_fn = reject.clone();
+        let slot: BlobClosureSlot = std::rc::Rc::new(std::cell::RefCell::new(None));
+        let slot_for_cb: BlobClosureSlot = std::rc::Rc::clone(&slot);
+        let callback = Closure::new(move |blob: Option<web_sys::Blob>| {
+            if let Some(blob) = blob {
+                let _ = resolve_fn.call1(&JsValue::NULL, &blob);
+            } else {
+                let _ = reject_fn.call1(
+                    &JsValue::NULL,
+                    &JsValue::from_str("Detection canvas to_blob produced no data"),
+                );
+            }
+            slot_for_cb.borrow_mut().take();
+        });
+        match canvas_clone.to_blob_with_type(callback.as_ref().unchecked_ref(), "image/jpeg") {
+            Ok(()) => {
+                *slot.borrow_mut() = Some(callback);
+            }
+            Err(err) => {
+                let _ = reject.call1(
+                    &JsValue::NULL,
+                    &JsValue::from(format!("Detection canvas to_blob failed: {err:?}")),
+                );
+                slot.borrow_mut().take();
+            }
+        }
+    });
+
+    let blob_js = JsFuture::from(blob_promise)
+        .await
+        .map_err(|err| format!("Downscale: blob promise failed: {err:?}"))?;
+    let blob = blob_js
+        .dyn_into::<web_sys::Blob>()
+        .map_err(|_| "Failed to cast downscaled detection blob".to_string())?;
+
+    let parts = js_sys::Array::new();
+    parts.push(&blob);
+    let file_options = web_sys::FilePropertyBag::new();
+    file_options.set_type("image/jpeg");
+    let detection_file = web_sys::File::new_with_blob_sequence_and_options(
+        &parts,
+        "detect.jpg",
+        &file_options,
+    )
+    .map_err(|err| format!("Failed to create detection file: {err:?}"))?;
+
+    Ok((detection_file, scale))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn maybe_downscale_for_detection(
+    file: &web_sys::File,
+    _dims: Dimensions,
+    _max_side: u32,
+) -> Result<(web_sys::File, f64), String> {
+    Ok((file.clone(), 1.0))
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -737,6 +872,44 @@ mod tests {
             height: h,
             confidence: 1.0,
         }
+    }
+
+    // ── scale_detected_faces ──────────────────────────────────────────────────
+
+    #[test]
+    fn scale_detected_faces_multiplies_all_coords_uniformly() {
+        let faces = vec![face(100.0, 80.0, 200.0, 250.0)];
+        let scaled = scale_detected_faces(faces, 2.5, 2.5);
+        assert!((scaled[0].x - 250.0).abs() < 1e-9);
+        assert!((scaled[0].y - 200.0).abs() < 1e-9);
+        assert!((scaled[0].width - 500.0).abs() < 1e-9);
+        assert!((scaled[0].height - 625.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn scale_detected_faces_is_noop_at_unity() {
+        let faces = vec![face(100.0, 80.0, 200.0, 250.0)];
+        let scaled = scale_detected_faces(faces.clone(), 1.0, 1.0);
+        assert_eq!(scaled[0].x, faces[0].x);
+        assert_eq!(scaled[0].width, faces[0].width);
+    }
+
+    #[test]
+    fn scale_detected_faces_round_trips_with_inverse() {
+        let original = vec![face(320.0, 240.0, 160.0, 200.0)];
+        let downscale = 0.4;
+        let detection_space = scale_detected_faces(original.clone(), downscale, downscale);
+        let recovered = scale_detected_faces(detection_space, 1.0 / downscale, 1.0 / downscale);
+        assert!((recovered[0].x - original[0].x).abs() < 1e-6, "x should round-trip");
+        assert!((recovered[0].y - original[0].y).abs() < 1e-6, "y should round-trip");
+        assert!((recovered[0].width - original[0].width).abs() < 1e-6, "width should round-trip");
+        assert!((recovered[0].height - original[0].height).abs() < 1e-6, "height should round-trip");
+    }
+
+    #[test]
+    fn scale_detected_faces_handles_empty_vec() {
+        let scaled = scale_detected_faces(vec![], 2.0, 2.0);
+        assert!(scaled.is_empty());
     }
 
     // ── batch_file_label ──────────────────────────────────────────────────────

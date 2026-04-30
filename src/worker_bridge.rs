@@ -9,6 +9,10 @@ enum DetectionBackend {
 thread_local! {
     static LAST_DETECTION_BACKEND: std::cell::RefCell<Option<DetectionBackend>> =
         const { std::cell::RefCell::new(None) };
+    static CACHED_BROWSER_DETECTOR: std::cell::RefCell<Option<wasm_bindgen::JsValue>> =
+        const { std::cell::RefCell::new(None) };
+    static CACHED_MP_DETECTOR: std::cell::RefCell<Option<wasm_bindgen::JsValue>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 pub fn last_detection_backend_label() -> &'static str {
@@ -31,6 +35,13 @@ pub fn clear_last_detection_backend() {
     LAST_DETECTION_BACKEND.with(|slot| {
         *slot.borrow_mut() = None;
     });
+}
+
+#[cfg(target_arch = "wasm32")]
+#[allow(dead_code)]
+pub fn clear_detector_caches() {
+    CACHED_BROWSER_DETECTOR.with(|slot| *slot.borrow_mut() = None);
+    CACHED_MP_DETECTOR.with(|slot| *slot.borrow_mut() = None);
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -184,10 +195,14 @@ pub async fn detect_faces_with_worker(
 }
 
 #[cfg(target_arch = "wasm32")]
-async fn detect_faces_with_browser_api(file: web_sys::File) -> Result<Vec<DetectedFace>, String> {
-    use js_sys::{Array, Function, Object, Promise, Reflect};
+fn get_or_create_browser_detector() -> Result<wasm_bindgen::JsValue, String> {
+    use js_sys::{Array, Function, Object, Reflect};
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
+
+    if let Some(cached) = CACHED_BROWSER_DETECTOR.with(|s| s.borrow().clone()) {
+        return Ok(cached);
+    }
 
     let face_detector_ctor = Reflect::get(&js_sys::global(), &JsValue::from_str("FaceDetector"))
         .map_err(|err| format!("FaceDetector lookup failed: {err:?}"))?;
@@ -197,21 +212,24 @@ async fn detect_faces_with_browser_api(file: web_sys::File) -> Result<Vec<Detect
     let ctor_fn = face_detector_ctor
         .dyn_into::<Function>()
         .map_err(|_| "FaceDetector constructor is not callable".to_string())?;
-
     let options = Object::new();
-    let _ = Reflect::set(
-        &options,
-        &JsValue::from_str("fastMode"),
-        &JsValue::from_bool(true),
-    );
-    let _ = Reflect::set(
-        &options,
-        &JsValue::from_str("maxDetectedFaces"),
-        &JsValue::from_f64(32.0),
-    );
+    let _ = Reflect::set(&options, &JsValue::from_str("fastMode"), &JsValue::from_bool(true));
+    let _ = Reflect::set(&options, &JsValue::from_str("maxDetectedFaces"), &JsValue::from_f64(32.0));
     let ctor_args = Array::new();
     ctor_args.push(&options);
     let detector = Reflect::construct(&ctor_fn, &ctor_args).map_err(|err| format!("{err:?}"))?;
+
+    CACHED_BROWSER_DETECTOR.with(|s| *s.borrow_mut() = Some(detector.clone()));
+    Ok(detector)
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn detect_faces_with_browser_api(file: web_sys::File) -> Result<Vec<DetectedFace>, String> {
+    use js_sys::{Array, Function, Promise, Reflect};
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen::JsValue;
+
+    let detector = get_or_create_browser_detector()?;
 
     let object_url = web_sys::Url::create_object_url_with_blob(&file)
         .map_err(|err| format!("Failed to create object URL: {err:?}"))?;
@@ -225,12 +243,16 @@ async fn detect_faces_with_browser_api(file: web_sys::File) -> Result<Vec<Detect
         .map_err(|err| format!("FaceDetector.detect lookup failed: {err:?}"))?
         .dyn_into::<Function>()
         .map_err(|_| "FaceDetector.detect is not callable".to_string())?;
-    let detect_result = detect_fn
-        .call1(&detector, &image)
-        .map_err(|err| format!("FaceDetector.detect call failed: {err:?}"))?;
+    let detect_result = detect_fn.call1(&detector, &image).map_err(|err| {
+        CACHED_BROWSER_DETECTOR.with(|s| *s.borrow_mut() = None);
+        format!("FaceDetector.detect call failed: {err:?}")
+    })?;
     let detections_js = wasm_bindgen_futures::JsFuture::from(Promise::from(detect_result))
         .await
-        .map_err(|err| format!("FaceDetector.detect rejected: {err:?}"))?;
+        .map_err(|err| {
+            CACHED_BROWSER_DETECTOR.with(|s| *s.borrow_mut() = None);
+            format!("FaceDetector.detect rejected: {err:?}")
+        })?;
     let detections = Array::from(&detections_js);
 
     let mut faces = Vec::with_capacity(detections.length() as usize);
@@ -278,18 +300,20 @@ async fn detect_faces_with_browser_api(file: web_sys::File) -> Result<Vec<Detect
 }
 
 #[cfg(target_arch = "wasm32")]
-#[allow(clippy::too_many_lines)]
-async fn detect_faces_with_mediapipe(file: web_sys::File) -> Result<Vec<DetectedFace>, String> {
-    use js_sys::{Array, Function, Object, Reflect};
+async fn get_or_create_mp_detector() -> Result<wasm_bindgen::JsValue, String> {
+    use js_sys::{Function, Object, Reflect};
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
+
+    if let Some(cached) = CACHED_MP_DETECTOR.with(|s| s.borrow().clone()) {
+        return Ok(cached);
+    }
 
     let assets = crate::mediapipe::MediaPipeAssetPaths::default();
     let module = import_js_module(&assets.vision_bundle_url).await?;
 
     let fileset_resolver = Reflect::get(&module, &JsValue::from_str("FilesetResolver"))
-        .map_err(|err| format!("MediaPipe FilesetResolver lookup failed: {err:?}"))?;
-    let fileset_resolver = fileset_resolver
+        .map_err(|err| format!("MediaPipe FilesetResolver lookup failed: {err:?}"))?
         .dyn_into::<Object>()
         .map_err(|_| "MediaPipe FilesetResolver export is not an object".to_string())?;
     let for_vision_tasks = Reflect::get(
@@ -301,22 +325,18 @@ async fn detect_faces_with_mediapipe(file: web_sys::File) -> Result<Vec<Detected
     .map_err(|_| "MediaPipe forVisionTasks is not callable".to_string())?;
     let vision = resolve_js_value(
         for_vision_tasks
-            .call1(
-                fileset_resolver.as_ref(),
-                &JsValue::from_str(&assets.wasm_root),
-            )
+            .call1(fileset_resolver.as_ref(), &JsValue::from_str(&assets.wasm_root))
             .map_err(|err| format!("MediaPipe forVisionTasks call failed: {err:?}"))?,
     )
     .await
     .map_err(|err| format!("MediaPipe FilesetResolver init failed: {err}"))?;
 
-    let face_detector = Reflect::get(&module, &JsValue::from_str("FaceDetector"))
-        .map_err(|err| format!("MediaPipe FaceDetector export lookup failed: {err:?}"))?;
-    let face_detector = face_detector
+    let face_detector_cls = Reflect::get(&module, &JsValue::from_str("FaceDetector"))
+        .map_err(|err| format!("MediaPipe FaceDetector export lookup failed: {err:?}"))?
         .dyn_into::<Object>()
         .map_err(|_| "MediaPipe FaceDetector export is not an object".to_string())?;
     let create_from_options = Reflect::get(
-        face_detector.as_ref(),
+        face_detector_cls.as_ref(),
         &JsValue::from_str("createFromOptions"),
     )
     .map_err(|err| format!("MediaPipe createFromOptions lookup failed: {err:?}"))?
@@ -324,41 +344,32 @@ async fn detect_faces_with_mediapipe(file: web_sys::File) -> Result<Vec<Detected
     .map_err(|_| "MediaPipe createFromOptions is not callable".to_string())?;
 
     let base_options = Object::new();
-    let _ = Reflect::set(
-        &base_options,
-        &JsValue::from_str("modelAssetPath"),
-        &JsValue::from_str(&assets.detector_model_url),
-    );
-    let _ = Reflect::set(
-        &base_options,
-        &JsValue::from_str("delegate"),
-        &JsValue::from_str("GPU"),
-    );
-
+    let _ = Reflect::set(&base_options, &JsValue::from_str("modelAssetPath"), &JsValue::from_str(&assets.detector_model_url));
+    let _ = Reflect::set(&base_options, &JsValue::from_str("delegate"), &JsValue::from_str("GPU"));
     let options = Object::new();
-    let _ = Reflect::set(
-        &options,
-        &JsValue::from_str("baseOptions"),
-        base_options.as_ref(),
-    );
-    let _ = Reflect::set(
-        &options,
-        &JsValue::from_str("runningMode"),
-        &JsValue::from_str("IMAGE"),
-    );
-    let _ = Reflect::set(
-        &options,
-        &JsValue::from_str("minDetectionConfidence"),
-        &JsValue::from_f64(0.25),
-    );
+    let _ = Reflect::set(&options, &JsValue::from_str("baseOptions"), base_options.as_ref());
+    let _ = Reflect::set(&options, &JsValue::from_str("runningMode"), &JsValue::from_str("IMAGE"));
+    let _ = Reflect::set(&options, &JsValue::from_str("minDetectionConfidence"), &JsValue::from_f64(0.25));
 
     let detector = resolve_js_value(
         create_from_options
-            .call2(face_detector.as_ref(), &vision, options.as_ref())
+            .call2(face_detector_cls.as_ref(), &vision, options.as_ref())
             .map_err(|err| format!("MediaPipe createFromOptions call failed: {err:?}"))?,
     )
     .await
     .map_err(|err| format!("MediaPipe detector creation failed: {err}"))?;
+
+    CACHED_MP_DETECTOR.with(|s| *s.borrow_mut() = Some(detector.clone()));
+    Ok(detector)
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn detect_faces_with_mediapipe(file: web_sys::File) -> Result<Vec<DetectedFace>, String> {
+    use js_sys::{Array, Function, Reflect};
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen::JsValue;
+
+    let detector = get_or_create_mp_detector().await?;
 
     let object_url = web_sys::Url::create_object_url_with_blob(&file)
         .map_err(|err| format!("Failed to create object URL: {err:?}"))?;
@@ -373,12 +384,16 @@ async fn detect_faces_with_mediapipe(file: web_sys::File) -> Result<Vec<Detected
         .dyn_into::<Function>()
         .map_err(|_| "MediaPipe detect is not callable".to_string())?;
     let detection_result = resolve_js_value(
-        detect_fn
-            .call1(&detector, &image)
-            .map_err(|err| format!("MediaPipe detect call failed: {err:?}"))?,
+        detect_fn.call1(&detector, &image).map_err(|err| {
+            CACHED_MP_DETECTOR.with(|s| *s.borrow_mut() = None);
+            format!("MediaPipe detect call failed: {err:?}")
+        })?,
     )
     .await
-    .map_err(|err| format!("MediaPipe detect failed: {err}"))?;
+    .map_err(|err| {
+        CACHED_MP_DETECTOR.with(|s| *s.borrow_mut() = None);
+        format!("MediaPipe detect failed: {err}")
+    })?;
 
     let detections = Reflect::get(&detection_result, &JsValue::from_str("detections"))
         .unwrap_or(JsValue::UNDEFINED);

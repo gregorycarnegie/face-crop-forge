@@ -543,19 +543,49 @@ fn load_single_file(
 
     spawn_local(async move {
         let start_ms = crate::runtime::now_ms();
-        match decode_image_dimensions(&file).await {
+        #[cfg(target_arch = "wasm32")]
+        let decode_start = crate::runtime::now_ms();
+        let maybe_dims = match decode_image_dimensions(&file).await {
             Ok(dimensions) => {
                 source_dimensions.set((f64::from(dimensions.width), f64::from(dimensions.height)));
+                Some(dimensions)
             }
             Err(error) => {
                 runtime.update(|state| {
                     state.set_status(format!("Image dimension read failed: {error}"))
                 });
+                None
             }
-        }
+        };
+        #[cfg(target_arch = "wasm32")]
+        let decode_ms = crate::runtime::elapsed_ms_since(decode_start);
 
-        match detect_faces_with_worker("browser-face-detector", file).await {
-            Ok(faces) => {
+        let (detection_file, detection_scale) = if let Some(dims) = maybe_dims {
+            match crate::runtime::maybe_downscale_for_detection(
+                &file,
+                dims,
+                crate::runtime::MAX_DETECTION_SIDE,
+            )
+            .await
+            {
+                Ok(pair) => pair,
+                Err(_) => (file, 1.0),
+            }
+        } else {
+            (file, 1.0)
+        };
+
+        #[cfg(target_arch = "wasm32")]
+        let detect_start = crate::runtime::now_ms();
+        match detect_faces_with_worker("browser-face-detector", detection_file).await {
+            Ok(raw) => {
+                #[cfg(target_arch = "wasm32")]
+                let detect_ms = crate::runtime::elapsed_ms_since(detect_start);
+                let faces = crate::runtime::scale_detected_faces(
+                    raw,
+                    1.0 / detection_scale,
+                    1.0 / detection_scale,
+                );
                 raw_detected_faces.set(faces.clone());
                 let filtered = apply_detection_quality_filters(faces, &settings.get());
                 let ids = filtered
@@ -566,9 +596,18 @@ fn load_single_file(
                 detected_faces.set(filtered);
                 single_state.update(|state| state.set_faces(ids));
                 worker_state.update(FaceWorkerBridgeState::mark_request_succeeded);
+                let total_ms = crate::runtime::elapsed_ms_since(start_ms);
+                #[cfg(target_arch = "wasm32")]
+                web_sys::console::log_1(
+                    &format!(
+                        "[FCF timing] single: decode={decode_ms}ms detect={detect_ms}ms total={total_ms}ms backend={}",
+                        crate::worker_bridge::last_detection_backend_label()
+                    )
+                    .into(),
+                );
                 runtime.update(|state| {
                     state.complete(
-                        crate::runtime::elapsed_ms_since(start_ms),
+                        total_ms,
                         if count == 0 {
                             "Detection completed. No faces found.".to_string()
                         } else {
@@ -643,10 +682,19 @@ fn export_selected_faces(
                 plan.filenames.get(index).cloned().unwrap_or_else(|| {
                     format!("face_{}.{}", index + 1, export_settings.output_format)
                 });
+            #[cfg(target_arch = "wasm32")]
+            let crop_start = crate::runtime::now_ms();
             match crop_face_bytes_from_source(&source_url_value, face, &export_settings, &mime_type)
                 .await
             {
                 Ok(bytes) => {
+                    #[cfg(target_arch = "wasm32")]
+                    let crop_ms = crate::runtime::elapsed_ms_since(crop_start);
+                    #[cfg(target_arch = "wasm32")]
+                    web_sys::console::log_1(
+                        &format!("[FCF timing] single export: {file_name} crop={crop_ms}ms")
+                            .into(),
+                    );
                     let final_name = normalize_export_filename_for_mime(&file_name, &mime_type);
                     if !validate_export_filename_for_mime(&final_name, &mime_type) {
                         runtime.update(|state| {
