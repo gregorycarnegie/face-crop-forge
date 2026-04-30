@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Face Crop Forge logo">
+  <defs>
+    <linearGradient id="logo-gradient" x1="5" y1="27" x2="27" y2="5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffb89a" />
+      <stop offset="0.32" stop-color="#ff6b8b" />
+      <stop offset="0.66" stop-color="#7be0d6" />
+      <stop offset="1" stop-color="#d8f06a" />
+    </linearGradient>
+    <filter id="peach-glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="32" height="32" rx="16" fill="#0a0f1c" />
+  <circle cx="16" cy="16" r="15" fill="url(#logo-gradient)" />
+  <circle cx="16" cy="16" r="10" fill="#0a0f1c" />
+  <circle cx="16" cy="16" r="4" fill="#ffb89a" filter="url(#peach-glow)" />
+</svg>
