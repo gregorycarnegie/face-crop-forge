@@ -40,11 +40,11 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 
 ## Priority 2 — Responsiveness and throughput
 
-- [ ] Add controlled batch concurrency.
-  - [ ] Start conservatively with 1 concurrent job on mobile and 2 on desktop.
-  - [ ] Consider using `navigator.hardwareConcurrency` as an upper bound.
-  - [ ] Avoid unlimited parallel image decodes or detection calls.
-  - [ ] Add a queue that can pause, resume, and cancel cleanly.
+- [x] Add controlled batch concurrency.
+  - [x] Start conservatively with 1 concurrent job on mobile and 2 on desktop.
+  - [x] Consider using `navigator.hardwareConcurrency` as an upper bound.
+  - [x] Avoid unlimited parallel image decodes or detection calls.
+  - [x] Add a queue that can pause, resume, and cancel cleanly.
   - [ ] Surface current concurrency in a developer stats panel.
 
 - [ ] Use `createImageBitmap()` where supported.
@@ -140,7 +140,7 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 - [x] Change ZIP default from deflated to stored and benchmark it.
 - [x] Cache the MediaPipe detector.
 - [x] Add detection downscaling and coordinate remapping.
-- [ ] Add controlled batch concurrency.
+- [x] Add controlled batch concurrency.
 - [ ] Move batch work into a real Web Worker.
 - [ ] Add `OffscreenCanvas` support inside the worker.
 - [ ] Reduce memory duplication during ZIP export.

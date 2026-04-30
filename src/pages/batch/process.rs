@@ -15,7 +15,9 @@ use crate::single_core::generate_face_filename;
 use crate::state::ProcessingSettings;
 use crate::worker_bridge::detect_faces_with_worker;
 use leptos::prelude::*;
-use std::collections::HashMap;
+use std::cell::{Cell, RefCell};
+use std::collections::{HashMap, VecDeque};
+use std::rc::Rc;
 use wasm_bindgen_futures::spawn_local;
 
 #[derive(Clone, Copy)]
@@ -104,6 +106,29 @@ pub(super) fn load_batch_files(
     });
 }
 
+/// How many images to process concurrently.
+/// Conservative defaults: 1 on touch/mobile, 2 on desktop (capped by hardwareConcurrency).
+#[cfg(target_arch = "wasm32")]
+fn batch_concurrency_limit() -> usize {
+    use wasm_bindgen::JsValue;
+    let window = leptos::prelude::window();
+    let hardware = js_sys::Reflect::get(
+        &window.navigator(),
+        &JsValue::from_str("hardwareConcurrency"),
+    )
+    .ok()
+    .and_then(|v| v.as_f64())
+    .map(|n| n as usize)
+    .unwrap_or(1);
+    let is_touch = window.navigator().max_touch_points() > 0;
+    if is_touch { 1 } else { 2_usize.min(hardware.max(1)) }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn batch_concurrency_limit() -> usize {
+    1
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn process_batch(
     settings: RwSignal<ProcessingSettings>,
@@ -129,8 +154,8 @@ pub(super) fn process_batch(
         return;
     }
 
-    let files = files_by_id.get();
-    let previews = preview_urls.get();
+    let files = Rc::new(files_by_id.get());
+    let previews = Rc::new(preview_urls.get());
     let settings_snapshot = settings.get();
     let mime_type = mime_type_for_output_format(&settings_snapshot.output_format).to_string();
     for id in &selected_ids {
@@ -153,239 +178,283 @@ pub(super) fn process_batch(
         )
     });
 
-    spawn_local(async move {
-        let ctx = BatchProcessCtx {
-            progress,
-            stats,
-            batch_state,
-            progress_pct,
-        };
-        let total = selected_ids.len();
-        let validation = ImageValidationConfig::default();
-        for (index, id) in selected_ids.into_iter().enumerate() {
-            let start_ms = crate::runtime::now_ms();
-            let Some(file) = files.get(&id).cloned() else {
-                record_batch_failure(ctx, &id, 0, "Missing source file.", "Missing source file.");
-                if !continue_on_error {
+    let total = selected_ids.len();
+    let concurrency = batch_concurrency_limit();
+    let queue: Rc<RefCell<VecDeque<String>>> =
+        Rc::new(RefCell::new(selected_ids.into_iter().collect()));
+    let workers_remaining: Rc<Cell<usize>> = Rc::new(Cell::new(concurrency));
+    let abort: Rc<Cell<bool>> = Rc::new(Cell::new(false));
+    let started_count: Rc<Cell<usize>> = Rc::new(Cell::new(0));
+    let ctx = BatchProcessCtx {
+        progress,
+        stats,
+        batch_state,
+        progress_pct,
+    };
+
+    for _ in 0..concurrency {
+        let queue = Rc::clone(&queue);
+        let workers_remaining = Rc::clone(&workers_remaining);
+        let abort = Rc::clone(&abort);
+        let files = Rc::clone(&files);
+        let previews = Rc::clone(&previews);
+        let settings_snapshot = settings_snapshot.clone();
+        let mime_type = mime_type.clone();
+        let started_count = Rc::clone(&started_count);
+
+        spawn_local(async move {
+            let validation = ImageValidationConfig::default();
+            loop {
+                if abort.get() {
                     break;
                 }
-                continue;
-            };
-            let file_name = file.name();
-            progress
-                .update(|p| p.status = format!("Processing {}/{}: {file_name}", index + 1, total));
+                let id = queue.borrow_mut().pop_front();
+                let Some(id) = id else {
+                    break;
+                };
 
-            #[cfg(target_arch = "wasm32")]
-            let decode_start = crate::runtime::now_ms();
-            let dimensions = match decode_image_dimensions(&file).await {
-                Ok(dimensions) => dimensions,
-                Err(error) => {
-                    record_batch_failure(
-                        ctx,
-                        &id,
-                        elapsed_ms_since(start_ms),
-                        format!("Decode failed: {file_name}"),
-                        format!("Decode failed for {file_name}: {error}"),
-                    );
+                let start_ms = crate::runtime::now_ms();
+                let Some(file) = files.get(&id).cloned() else {
+                    record_batch_failure(ctx, &id, 0, "Missing source file.", "Missing source file.");
                     if !continue_on_error {
+                        abort.set(true);
                         break;
                     }
                     continue;
-                }
-            };
-            #[cfg(target_arch = "wasm32")]
-            let decode_ms = elapsed_ms_since(decode_start);
-            if let Err(error) = validate_image_meta(
-                ImageMeta {
-                    file_name: &file_name,
-                    mime_type: &file.type_(),
-                    file_size_bytes: file.size() as u64,
-                    dimensions,
-                },
-                validation,
-            ) {
-                record_batch_failure(
-                    ctx,
-                    &id,
-                    elapsed_ms_since(start_ms),
-                    format!("Validation failed: {file_name}"),
-                    format!("Validation failed for {file_name}: {error}"),
-                );
-                if !continue_on_error {
-                    break;
-                }
-                continue;
-            }
+                };
+                let file_name = file.name();
+                let n = started_count.get() + 1;
+                started_count.set(n);
+                progress.update(|p| {
+                    p.status = format!("Processing {n}/{total}: {file_name}");
+                });
 
-            let (detection_file, detection_scale) = match maybe_downscale_for_detection(
-                &file,
-                dimensions,
-                MAX_DETECTION_SIDE,
-            )
-            .await
-            {
-                Ok(pair) => pair,
-                Err(_) => (file.clone(), 1.0),
-            };
-
-            #[cfg(target_arch = "wasm32")]
-            let detect_start = crate::runtime::now_ms();
-            let faces = match detect_faces_with_worker("browser-face-detector", detection_file).await
-            {
-                Ok(raw) => {
-                    let scaled = scale_detected_faces(raw, 1.0 / detection_scale, 1.0 / detection_scale);
-                    apply_detection_quality_filters(scaled, &settings_snapshot)
-                }
-                Err(error) => {
-                    record_batch_failure(
-                        ctx,
-                        &id,
-                        elapsed_ms_since(start_ms),
-                        format!("Detection failed: {file_name}"),
-                        format!("Detection failed for {file_name}: {error}"),
-                    );
-                    if !continue_on_error {
-                        break;
+                #[cfg(target_arch = "wasm32")]
+                let decode_start = crate::runtime::now_ms();
+                let dimensions = match decode_image_dimensions(&file).await {
+                    Ok(d) => d,
+                    Err(error) => {
+                        record_batch_failure(
+                            ctx,
+                            &id,
+                            elapsed_ms_since(start_ms),
+                            format!("Decode failed: {file_name}"),
+                            format!("Decode failed for {file_name}: {error}"),
+                        );
+                        if !continue_on_error {
+                            abort.set(true);
+                            break;
+                        }
+                        continue;
                     }
-                    continue;
-                }
-            };
-            #[cfg(target_arch = "wasm32")]
-            let detect_ms = elapsed_ms_since(detect_start);
-            let Some(face) = faces.first() else {
-                record_batch_failure(
-                    ctx,
-                    &id,
-                    elapsed_ms_since(start_ms),
-                    format!("No face found: {file_name}"),
-                    format!("No crop target found for {file_name}."),
-                );
-                if !continue_on_error {
-                    break;
-                }
-                continue;
-            };
-
-            let mut temporary_url = None;
-            let source_url = previews.get(&id).cloned().or_else(|| {
-                let url = object_url_for_file(&file);
-                temporary_url.clone_from(&url);
-                url
-            });
-            let Some(source_url) = source_url else {
-                record_batch_failure(
-                    ctx,
-                    &id,
-                    elapsed_ms_since(start_ms),
-                    format!("Preview URL failed: {file_name}"),
-                    format!("Could not create source URL for {file_name}."),
-                );
-                if !continue_on_error {
-                    break;
-                }
-                continue;
-            };
-
-            #[cfg(target_arch = "wasm32")]
-            let crop_start = crate::runtime::now_ms();
-            let crop_bytes = match crop_face_bytes_from_source(
-                &source_url,
-                face,
-                &settings_snapshot,
-                &mime_type,
-            )
-            .await
-            {
-                Ok(bytes) => bytes,
-                Err(error) => {
-                    if let Some(url) = temporary_url.as_deref() {
-                        revoke_object_url(url);
-                    }
-                    record_batch_failure(
-                        ctx,
-                        &id,
-                        elapsed_ms_since(start_ms),
-                        format!("Crop failed: {file_name}"),
-                        format!("Crop failed for {file_name}: {error}"),
-                    );
-                    if !continue_on_error {
-                        break;
-                    }
-                    continue;
-                }
-            };
-            #[cfg(target_arch = "wasm32")]
-            let crop_ms = elapsed_ms_since(crop_start);
-            if let Some(url) = temporary_url.as_deref() {
-                revoke_object_url(url);
-            }
-
-            let preview_url = match object_url_for_bytes(&crop_bytes, &mime_type) {
-                Ok(url) => url,
-                Err(error) => {
-                    record_batch_failure(
-                        ctx,
-                        &id,
-                        elapsed_ms_since(start_ms),
-                        format!("Preview failed: {file_name}"),
-                        format!("Crop preview failed for {file_name}: {error}"),
-                    );
-                    if !continue_on_error {
-                        break;
-                    }
-                    continue;
-                }
-            };
-
-            outputs.update(|map| {
-                if let Some(old) = map.insert(
-                    id.clone(),
-                    ProcessedImageOutput {
-                        bytes: crop_bytes,
-                        mime_type: mime_type.clone(),
-                        preview_url,
+                };
+                #[cfg(target_arch = "wasm32")]
+                let decode_ms = elapsed_ms_since(decode_start);
+                if let Err(error) = validate_image_meta(
+                    ImageMeta {
+                        file_name: &file_name,
+                        mime_type: &file.type_(),
+                        file_size_bytes: file.size() as u64,
+                        dimensions,
                     },
+                    validation,
                 ) {
-                    revoke_object_url(&old.preview_url);
+                    record_batch_failure(
+                        ctx,
+                        &id,
+                        elapsed_ms_since(start_ms),
+                        format!("Validation failed: {file_name}"),
+                        format!("Validation failed for {file_name}: {error}"),
+                    );
+                    if !continue_on_error {
+                        abort.set(true);
+                        break;
+                    }
+                    continue;
                 }
-            });
-            batch_state.update(|state| state.mark_processed(&id));
-            progress.update(|p| {
-                p.record_result(true);
-                p.status = format!(
-                    "Processed {}/{}: {} ({} face(s))",
-                    index + 1,
-                    total,
-                    file_name,
-                    faces.len()
-                );
-                progress_pct.set(u32::from(p.percent()));
-            });
-            let total_ms = elapsed_ms_since(start_ms);
-            stats.update(|s| {
-                s.record_image(total_ms, faces.len() as u32, true);
-                s.push_log(format!("Processed {file_name}: {} face(s).", faces.len()));
-            });
-            #[cfg(target_arch = "wasm32")]
-            web_sys::console::log_1(
-                &format!(
-                    "[FCF timing] {file_name}: decode={decode_ms}ms detect={detect_ms}ms crop={crop_ms}ms total={total_ms}ms backend={}",
-                    crate::worker_bridge::last_detection_backend_label()
-                )
-                .into(),
-            );
-        }
 
-        progress.update(|p| {
-            let status = format!(
-                "Batch complete: {} processed, {} failed.",
-                p.processed.saturating_sub(p.failed),
-                p.failed
-            );
-            p.complete(status);
-            progress_pct.set(u32::from(p.percent()));
+                let (detection_file, detection_scale) = match maybe_downscale_for_detection(
+                    &file,
+                    dimensions,
+                    MAX_DETECTION_SIDE,
+                )
+                .await
+                {
+                    Ok(pair) => pair,
+                    Err(_) => (file.clone(), 1.0),
+                };
+
+                #[cfg(target_arch = "wasm32")]
+                let detect_start = crate::runtime::now_ms();
+                let faces =
+                    match detect_faces_with_worker("browser-face-detector", detection_file).await {
+                        Ok(raw) => {
+                            let scaled = scale_detected_faces(
+                                raw,
+                                1.0 / detection_scale,
+                                1.0 / detection_scale,
+                            );
+                            apply_detection_quality_filters(scaled, &settings_snapshot)
+                        }
+                        Err(error) => {
+                            record_batch_failure(
+                                ctx,
+                                &id,
+                                elapsed_ms_since(start_ms),
+                                format!("Detection failed: {file_name}"),
+                                format!("Detection failed for {file_name}: {error}"),
+                            );
+                            if !continue_on_error {
+                                abort.set(true);
+                                break;
+                            }
+                            continue;
+                        }
+                    };
+                #[cfg(target_arch = "wasm32")]
+                let detect_ms = elapsed_ms_since(detect_start);
+                let face_count = faces.len();
+                let Some(face) = faces.into_iter().next() else {
+                    record_batch_failure(
+                        ctx,
+                        &id,
+                        elapsed_ms_since(start_ms),
+                        format!("No face found: {file_name}"),
+                        format!("No crop target found for {file_name}."),
+                    );
+                    if !continue_on_error {
+                        abort.set(true);
+                        break;
+                    }
+                    continue;
+                };
+
+                let mut temporary_url = None;
+                let source_url = previews.get(&id).cloned().or_else(|| {
+                    let url = object_url_for_file(&file);
+                    temporary_url.clone_from(&url);
+                    url
+                });
+                let Some(source_url) = source_url else {
+                    record_batch_failure(
+                        ctx,
+                        &id,
+                        elapsed_ms_since(start_ms),
+                        format!("Preview URL failed: {file_name}"),
+                        format!("Could not create source URL for {file_name}."),
+                    );
+                    if !continue_on_error {
+                        abort.set(true);
+                        break;
+                    }
+                    continue;
+                };
+
+                #[cfg(target_arch = "wasm32")]
+                let crop_start = crate::runtime::now_ms();
+                let crop_bytes = match crop_face_bytes_from_source(
+                    &source_url,
+                    &face,
+                    &settings_snapshot,
+                    &mime_type,
+                )
+                .await
+                {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        if let Some(url) = temporary_url.as_deref() {
+                            revoke_object_url(url);
+                        }
+                        record_batch_failure(
+                            ctx,
+                            &id,
+                            elapsed_ms_since(start_ms),
+                            format!("Crop failed: {file_name}"),
+                            format!("Crop failed for {file_name}: {error}"),
+                        );
+                        if !continue_on_error {
+                            abort.set(true);
+                            break;
+                        }
+                        continue;
+                    }
+                };
+                #[cfg(target_arch = "wasm32")]
+                let crop_ms = elapsed_ms_since(crop_start);
+                if let Some(url) = temporary_url.as_deref() {
+                    revoke_object_url(url);
+                }
+
+                let preview_url = match object_url_for_bytes(&crop_bytes, &mime_type) {
+                    Ok(url) => url,
+                    Err(error) => {
+                        record_batch_failure(
+                            ctx,
+                            &id,
+                            elapsed_ms_since(start_ms),
+                            format!("Preview failed: {file_name}"),
+                            format!("Crop preview failed for {file_name}: {error}"),
+                        );
+                        if !continue_on_error {
+                            abort.set(true);
+                            break;
+                        }
+                        continue;
+                    }
+                };
+
+                outputs.update(|map| {
+                    if let Some(old) = map.insert(
+                        id.clone(),
+                        ProcessedImageOutput {
+                            bytes: crop_bytes,
+                            mime_type: mime_type.clone(),
+                            preview_url,
+                        },
+                    ) {
+                        revoke_object_url(&old.preview_url);
+                    }
+                });
+                batch_state.update(|state| state.mark_processed(&id));
+                progress.update(|p| {
+                    p.record_result(true);
+                    p.status = format!(
+                        "Processed {}/{}: {file_name} ({face_count} face(s))",
+                        p.processed,
+                        total
+                    );
+                    progress_pct.set(u32::from(p.percent()));
+                });
+                let total_ms = elapsed_ms_since(start_ms);
+                stats.update(|s| {
+                    s.record_image(total_ms, face_count as u32, true);
+                    s.push_log(format!("Processed {file_name}: {face_count} face(s)."));
+                });
+                #[cfg(target_arch = "wasm32")]
+                web_sys::console::log_1(
+                    &format!(
+                        "[FCF timing] {file_name}: decode={decode_ms}ms detect={detect_ms}ms crop={crop_ms}ms total={total_ms}ms backend={}",
+                        crate::worker_bridge::last_detection_backend_label()
+                    )
+                    .into(),
+                );
+            }
+
+            let remaining = workers_remaining.get().saturating_sub(1);
+            workers_remaining.set(remaining);
+            if remaining == 0 {
+                progress.update(|p| {
+                    let status = format!(
+                        "Batch complete: {} processed, {} failed.",
+                        p.processed.saturating_sub(p.failed),
+                        p.failed
+                    );
+                    p.complete(status);
+                    progress_pct.set(u32::from(p.percent()));
+                });
+            }
         });
-    });
+    }
 }
 
 pub(super) fn download_batch_zip(
