@@ -30,6 +30,12 @@ pub fn validate_export_filename_for_mime(file_name: &str, mime_type: &str) -> bo
     file_name.to_ascii_lowercase().ends_with(&format!(".{ext}"))
 }
 
+fn iso_timestamp_to_token(iso: &str) -> String {
+    iso.chars()
+        .filter(|ch| ch.is_ascii_digit() || *ch == 'T' || *ch == 'Z')
+        .collect()
+}
+
 pub fn current_utc_timestamp_token() -> String {
     #[cfg(target_arch = "wasm32")]
     {
@@ -37,9 +43,7 @@ pub fn current_utc_timestamp_token() -> String {
             .to_iso_string()
             .as_string()
             .unwrap_or_else(|| "1970-01-01T00:00:00.000Z".to_string());
-        iso.chars()
-            .filter(|ch| ch.is_ascii_digit() || *ch == 'T' || *ch == 'Z')
-            .collect()
+        iso_timestamp_to_token(&iso)
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -116,6 +120,20 @@ pub fn download_bytes(_file_name: &str, _mime_type: &str, _bytes: &[u8]) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn iso_timestamp_filter_keeps_only_digits_t_and_z() {
+        assert_eq!(
+            iso_timestamp_to_token("2024-01-15T12:30:45.000Z"),
+            "20240115T123045000Z"
+        );
+        assert_eq!(
+            iso_timestamp_to_token("1970-01-01T00:00:00.000Z"),
+            "19700101T000000000Z"
+        );
+        assert_eq!(iso_timestamp_to_token(""), "");
+        assert_eq!(iso_timestamp_to_token("no-digits-here"), "");
+    }
 
     #[test]
     fn mime_extension_mapping_covers_png_jpeg_webp() {

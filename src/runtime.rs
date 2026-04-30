@@ -721,3 +721,206 @@ pub async fn capture_webcam_frame_to_file(
 ) -> Result<web_sys::File, String> {
     Err("Webcam capture is only available on wasm32".to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::ProcessingSettings;
+    use crate::worker_bridge::DetectedFace;
+
+    fn face(x: f64, y: f64, w: f64, h: f64) -> DetectedFace {
+        DetectedFace {
+            id: "face_1".to_string(),
+            x,
+            y,
+            width: w,
+            height: h,
+            confidence: 1.0,
+        }
+    }
+
+    // ── batch_file_label ──────────────────────────────────────────────────────
+
+    #[test]
+    fn batch_file_label_extracts_filename_from_composite_id() {
+        assert_eq!(batch_file_label("photo.jpg::1024::0::0"), "photo.jpg");
+        assert_eq!(batch_file_label("a::b::c"), "a");
+        assert_eq!(batch_file_label("plain_name"), "plain_name");
+    }
+
+    // ── mime_type_for_output_format ───────────────────────────────────────────
+
+    #[test]
+    fn mime_type_for_output_format_covers_all_variants() {
+        assert_eq!(mime_type_for_output_format("jpeg"), "image/jpeg");
+        assert_eq!(mime_type_for_output_format("jpg"), "image/jpeg");
+        assert_eq!(mime_type_for_output_format("webp"), "image/webp");
+        assert_eq!(mime_type_for_output_format("png"), "image/png");
+        assert_eq!(mime_type_for_output_format("unknown"), "image/png");
+    }
+
+    // ── apply_detection_quality_filters ──────────────────────────────────────
+
+    #[test]
+    fn quality_filter_removes_faces_below_threshold() {
+        let mut low = face(0.0, 0.0, 100.0, 100.0);
+        low.confidence = 0.3;
+        let mut high = face(50.0, 50.0, 80.0, 80.0);
+        high.confidence = 0.9;
+        let settings = ProcessingSettings {
+            min_confidence: 0.5,
+            ..ProcessingSettings::default()
+        };
+        let filtered = apply_detection_quality_filters(vec![low, high], &settings);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].confidence, 0.9);
+    }
+
+    #[test]
+    fn quality_filter_keeps_face_exactly_at_threshold() {
+        let mut at = face(0.0, 0.0, 100.0, 100.0);
+        at.confidence = 0.5;
+        let settings = ProcessingSettings {
+            min_confidence: 0.5,
+            ..ProcessingSettings::default()
+        };
+        let filtered = apply_detection_quality_filters(vec![at], &settings);
+        assert_eq!(filtered.len(), 1);
+    }
+
+    // ── normalize_face_box ────────────────────────────────────────────────────
+
+    #[test]
+    fn normalize_face_box_scales_normalized_coords_to_pixels() {
+        let f = face(0.5, 0.25, 0.2, 0.3);
+        let (x, y, w, h) = normalize_face_box(&f, 1000.0, 800.0);
+        assert!((x - 500.0).abs() < 0.01);
+        assert!((y - 200.0).abs() < 0.01);
+        assert!((w - 200.0).abs() < 0.01);
+        assert!((h - 240.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn normalize_face_box_leaves_pixel_coords_unchanged() {
+        let f = face(100.0, 200.0, 150.0, 180.0);
+        let (x, y, w, h) = normalize_face_box(&f, 1000.0, 800.0);
+        assert!((x - 100.0).abs() < 0.01);
+        assert!((y - 200.0).abs() < 0.01);
+        assert!((w - 150.0).abs() < 0.01);
+        assert!((h - 180.0).abs() < 0.01);
+    }
+
+    // ── compute_source_crop_rect ──────────────────────────────────────────────
+
+    #[test]
+    fn crop_rect_is_centered_on_face_for_square_output() {
+        let f = face(450.0, 350.0, 100.0, 100.0);
+        let settings = ProcessingSettings {
+            output_width: 256,
+            output_height: 256,
+            face_height_pct: 100,
+            vertical_offset_pct: 0,
+            horizontal_offset_pct: 0,
+            ..ProcessingSettings::default()
+        };
+        let (x, y, w, h) = compute_source_crop_rect(&f, 1000.0, 800.0, &settings);
+        assert!((w - h).abs() < 0.01, "crop must be square for 1:1 output");
+        let cx = x + w / 2.0;
+        let cy = y + h / 2.0;
+        assert!((cx - 500.0).abs() < 1.0, "crop must be centered on face x");
+        assert!((cy - 400.0).abs() < 1.0, "crop must be centered on face y");
+    }
+
+    #[test]
+    fn crop_rect_respects_output_aspect_ratio() {
+        let f = face(400.0, 300.0, 100.0, 100.0);
+        let settings = ProcessingSettings {
+            output_width: 400,
+            output_height: 200,
+            face_height_pct: 100,
+            ..ProcessingSettings::default()
+        };
+        let (_, _, w, h) = compute_source_crop_rect(&f, 1000.0, 800.0, &settings);
+        assert!(
+            (w / h - 2.0).abs() < 0.01,
+            "crop ratio must be 2:1, got {}",
+            w / h
+        );
+    }
+
+    #[test]
+    fn crop_rect_clamps_to_image_bounds() {
+        let f = face(0.0, 0.0, 50.0, 50.0);
+        let settings = ProcessingSettings {
+            output_width: 256,
+            output_height: 256,
+            ..ProcessingSettings::default()
+        };
+        let (x, y, w, h) = compute_source_crop_rect(&f, 500.0, 500.0, &settings);
+        assert!(x >= 0.0, "crop x must not go negative");
+        assert!(y >= 0.0, "crop y must not go negative");
+        assert!(x + w <= 500.001, "crop must not exceed image width");
+        assert!(y + h <= 500.001, "crop must not exceed image height");
+    }
+
+    #[test]
+    fn crop_rect_scales_down_when_face_exceeds_image() {
+        let f = face(0.0, 0.0, 800.0, 800.0);
+        let settings = ProcessingSettings {
+            output_width: 256,
+            output_height: 256,
+            face_height_pct: 100,
+            ..ProcessingSettings::default()
+        };
+        let (x, y, w, h) = compute_source_crop_rect(&f, 600.0, 600.0, &settings);
+        assert!(x >= 0.0);
+        assert!(y >= 0.0);
+        assert!(w <= 600.001, "crop width must not exceed image width");
+        assert!(h <= 600.001, "crop height must not exceed image height");
+    }
+
+    // ── overlay_percent_crop_rect ─────────────────────────────────────────────
+
+    #[test]
+    fn overlay_percent_crop_rect_values_are_within_0_to_100() {
+        let f = face(200.0, 150.0, 100.0, 120.0);
+        let settings = ProcessingSettings::default();
+        let (left, top, w, h) = overlay_percent_crop_rect(&f, 1000.0, 800.0, &settings);
+        for v in [left, top, w, h] {
+            assert!(v >= 0.0 && v <= 100.0, "percent value {v} out of range");
+        }
+    }
+
+    #[test]
+    fn overlay_percent_crop_rect_center_matches_face_center_at_100pct_height() {
+        let f = face(450.0, 350.0, 100.0, 100.0);
+        let settings = ProcessingSettings {
+            output_width: 256,
+            output_height: 256,
+            face_height_pct: 100,
+            ..ProcessingSettings::default()
+        };
+        let (left, top, w, h) = overlay_percent_crop_rect(&f, 1000.0, 800.0, &settings);
+        let cx = left + w / 2.0;
+        let cy = top + h / 2.0;
+        assert!(
+            (cx - 50.0).abs() < 1.0,
+            "overlay center x should be 50%, got {cx}"
+        );
+        assert!(
+            (cy - 50.0).abs() < 1.0,
+            "overlay center y should be 50%, got {cy}"
+        );
+    }
+
+    // ── revoke_preview_urls ───────────────────────────────────────────────────
+
+    #[test]
+    fn revoke_preview_urls_does_not_panic_on_mixed_url_types() {
+        let mut urls = std::collections::HashMap::new();
+        urls.insert("a".to_string(), "blob:http://example.com/abc".to_string());
+        urls.insert("b".to_string(), "data:image/png;base64,abc".to_string());
+        urls.insert("c".to_string(), String::new());
+        revoke_preview_urls(&urls);
+    }
+}

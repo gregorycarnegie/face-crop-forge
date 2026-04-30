@@ -250,3 +250,160 @@ fn panel_no_badge_when_none() {
             .is_none()
     );
 }
+
+// ── Crop + export pipeline (E2E in real browser) ──────────────────────────────
+
+fn make_canvas(width: u32, height: u32, fill: &str) -> web_sys::HtmlCanvasElement {
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen::JsValue;
+
+    let doc = web_sys::window().unwrap().document().unwrap();
+    let canvas = doc
+        .create_element("canvas")
+        .unwrap()
+        .dyn_into::<web_sys::HtmlCanvasElement>()
+        .unwrap();
+    canvas.set_width(width);
+    canvas.set_height(height);
+    let ctx = canvas
+        .get_context("2d")
+        .unwrap()
+        .unwrap()
+        .dyn_into::<web_sys::CanvasRenderingContext2d>()
+        .unwrap();
+    ctx.set_fill_style(&JsValue::from_str(fill));
+    ctx.fill_rect(0.0, 0.0, f64::from(width), f64::from(height));
+    canvas
+}
+
+#[wasm_bindgen_test]
+async fn crop_face_bytes_returns_valid_png() {
+    let canvas = make_canvas(200, 200, "rgb(200, 100, 50)");
+    let data_url = canvas.to_data_url().expect("to_data_url failed");
+    assert!(data_url.starts_with("data:image/png"));
+
+    let face = crate::worker_bridge::DetectedFace {
+        id: "face_1".to_string(),
+        x: 50.0,
+        y: 50.0,
+        width: 100.0,
+        height: 100.0,
+        confidence: 1.0,
+    };
+    let settings = crate::state::ProcessingSettings {
+        output_width: 64,
+        output_height: 64,
+        ..crate::state::ProcessingSettings::default()
+    };
+
+    let bytes =
+        crate::runtime::crop_face_bytes_from_source(&data_url, &face, &settings, "image/png")
+            .await
+            .expect("crop_face_bytes_from_source failed");
+
+    assert!(!bytes.is_empty(), "crop output must not be empty");
+    // PNG magic bytes: 0x89 P N G
+    assert_eq!(&bytes[..4], b"\x89PNG", "output must be a valid PNG");
+}
+
+#[wasm_bindgen_test]
+async fn crop_face_bytes_returns_valid_jpeg() {
+    let canvas = make_canvas(200, 200, "rgb(50, 150, 200)");
+    let data_url = canvas.to_data_url().expect("to_data_url failed");
+
+    let face = crate::worker_bridge::DetectedFace {
+        id: "face_1".to_string(),
+        x: 25.0,
+        y: 25.0,
+        width: 150.0,
+        height: 150.0,
+        confidence: 0.95,
+    };
+    let settings = crate::state::ProcessingSettings {
+        output_width: 128,
+        output_height: 128,
+        jpeg_quality: 0.9,
+        ..crate::state::ProcessingSettings::default()
+    };
+
+    let bytes =
+        crate::runtime::crop_face_bytes_from_source(&data_url, &face, &settings, "image/jpeg")
+            .await
+            .expect("crop_face_bytes_from_source failed for JPEG");
+
+    assert!(!bytes.is_empty(), "JPEG crop output must not be empty");
+    // JPEG magic bytes: FF D8
+    assert_eq!(&bytes[..2], b"\xFF\xD8", "output must be a valid JPEG");
+}
+
+#[wasm_bindgen_test]
+async fn crop_then_zip_produces_valid_archive() {
+    let canvas = make_canvas(120, 120, "blue");
+    let data_url = canvas.to_data_url().expect("to_data_url failed");
+
+    let face = crate::worker_bridge::DetectedFace {
+        id: "face_1".to_string(),
+        x: 10.0,
+        y: 10.0,
+        width: 100.0,
+        height: 100.0,
+        confidence: 0.9,
+    };
+    let settings = crate::state::ProcessingSettings::default();
+
+    let crop_bytes =
+        crate::runtime::crop_face_bytes_from_source(&data_url, &face, &settings, "image/png")
+            .await
+            .expect("crop failed");
+
+    let zip_bytes =
+        crate::export_runtime::build_zip_bytes(&[("face_1.png".to_string(), crop_bytes)])
+            .expect("build_zip_bytes failed");
+
+    // ZIP local file header magic: PK 0x03 0x04
+    assert_eq!(&zip_bytes[..4], b"PK\x03\x04", "output must be a valid ZIP");
+}
+
+#[wasm_bindgen_test]
+async fn confidence_filter_excludes_low_confidence_face_from_export() {
+    let canvas = make_canvas(200, 200, "green");
+    let data_url = canvas.to_data_url().expect("to_data_url failed");
+
+    let faces = vec![
+        crate::worker_bridge::DetectedFace {
+            id: "face_1".to_string(),
+            x: 10.0,
+            y: 10.0,
+            width: 80.0,
+            height: 80.0,
+            confidence: 0.9,
+        },
+        crate::worker_bridge::DetectedFace {
+            id: "face_2".to_string(),
+            x: 110.0,
+            y: 110.0,
+            width: 80.0,
+            height: 80.0,
+            confidence: 0.2,
+        },
+    ];
+    let settings = crate::state::ProcessingSettings {
+        min_confidence: 0.5,
+        output_width: 64,
+        output_height: 64,
+        ..crate::state::ProcessingSettings::default()
+    };
+
+    let passing = crate::runtime::apply_detection_quality_filters(faces, &settings);
+    assert_eq!(
+        passing.len(),
+        1,
+        "only the high-confidence face should pass"
+    );
+
+    let bytes =
+        crate::runtime::crop_face_bytes_from_source(&data_url, &passing[0], &settings, "image/png")
+            .await
+            .expect("crop of passing face failed");
+    assert_eq!(&bytes[..4], b"\x89PNG");
+}
