@@ -1,0 +1,148 @@
+# Face Crop Forge Performance Checklist
+
+A practical checklist for improving runtime performance, responsiveness, memory use, and large-batch reliability.
+
+## Priority 1 — Highest impact
+
+- [ ] Benchmark current performance before changing anything.
+  - [ ] Measure single-image detection time.
+  - [ ] Measure 10-image, 100-image, and 500-image batch runs.
+  - [ ] Record browser, device, image sizes, output format, and detection backend.
+  - [ ] Add a simple developer-only timing panel or console timing output.
+
+- [ ] Move batch detection, cropping, and export work into a real Web Worker.
+  - [ ] Keep the main thread focused on UI, file selection, previews, and progress display.
+  - [ ] Send files/jobs to the worker.
+  - [ ] Send progress events back to the UI.
+  - [ ] Keep detection, crop generation, and ZIP creation off the UI thread where possible.
+  - [ ] Rename or split `worker_bridge.rs` so the name reflects the actual architecture.
+
+- [ ] Cache the MediaPipe detector instance.
+  - [ ] Avoid dynamically importing the MediaPipe bundle for every image.
+  - [ ] Avoid resolving the vision fileset repeatedly.
+  - [ ] Avoid creating a new detector for every detection request.
+  - [ ] Create one detector per worker/session and reuse it across batch jobs.
+  - [ ] Add safe fallback/reinitialisation if the cached detector fails.
+
+- [ ] Detect on a downscaled image, then crop from the original.
+  - [ ] Decode or render a detection-sized version of the image.
+  - [ ] Cap detection input to a sensible max dimension, for example 1024–1600 px.
+  - [ ] Run face detection on the smaller image.
+  - [ ] Scale the detected face box back to original image coordinates.
+  - [ ] Crop/export from the original-resolution image to preserve quality.
+  - [ ] Add tests for coordinate scaling.
+
+- [ ] Change ZIP export to use stored files by default.
+  - [ ] Review current `Deflated` ZIP compression.
+  - [ ] Use `Stored` for already-compressed image outputs such as JPG, PNG, and WebP.
+  - [ ] Optionally add an advanced setting: `Fast ZIP` vs `Smaller ZIP`.
+  - [ ] Benchmark export time and ZIP size difference.
+
+## Priority 2 — Responsiveness and throughput
+
+- [ ] Add controlled batch concurrency.
+  - [ ] Start conservatively with 1 concurrent job on mobile and 2 on desktop.
+  - [ ] Consider using `navigator.hardwareConcurrency` as an upper bound.
+  - [ ] Avoid unlimited parallel image decodes or detection calls.
+  - [ ] Add a queue that can pause, resume, and cancel cleanly.
+  - [ ] Surface current concurrency in a developer stats panel.
+
+- [ ] Use `createImageBitmap()` where supported.
+  - [ ] Prefer `createImageBitmap(file)` over object URL + `HtmlImageElement` for decode paths where practical.
+  - [ ] Reuse the decoded bitmap for detection and cropping when possible.
+  - [ ] Close `ImageBitmap` objects once processing is finished.
+  - [ ] Keep the existing image element path as a compatibility fallback.
+
+- [ ] Use `OffscreenCanvas` for worker-side crop generation.
+  - [ ] Detect support for `OffscreenCanvas`.
+  - [ ] Move crop drawing and encoding into the worker where supported.
+  - [ ] Keep a normal canvas fallback for unsupported browsers.
+  - [ ] Benchmark crop/export time with and without `OffscreenCanvas`.
+
+- [ ] Throttle progress and log UI updates.
+  - [ ] Avoid reactive state updates for every tiny internal step.
+  - [ ] Update progress per image or every 100–250 ms.
+  - [ ] Batch log updates during large runs.
+  - [ ] Keep recent logs capped, as currently done.
+  - [ ] Check whether Leptos rerenders become noisy during large batches.
+
+## Priority 3 — Memory and large-batch reliability
+
+- [ ] Avoid holding all crop bytes and the final ZIP in memory at the same time.
+  - [ ] Stream generated entries into the ZIP where possible.
+  - [ ] Release each crop buffer after it has been written.
+  - [ ] Avoid duplicating large byte arrays unnecessarily.
+  - [ ] Track approximate memory use during batch export.
+
+- [ ] Split very large exports into multiple ZIP files.
+  - [ ] Define a sensible max entries-per-ZIP or max estimated ZIP size.
+  - [ ] Export names like `face-crops-part-001.zip`, `face-crops-part-002.zip`.
+  - [ ] Make the split behaviour clear in the UI.
+  - [ ] Add tests for deterministic part naming.
+
+- [ ] Revoke and release browser resources aggressively.
+  - [ ] Revoke object URLs as soon as images are decoded.
+  - [ ] Close `ImageBitmap`s after use.
+  - [ ] Drop canvas references after export.
+  - [ ] Clear temporary batch state when a run finishes or is cancelled.
+
+- [ ] Add cancellation support for long-running batches.
+  - [ ] Add a cancel button to batch and CSV workflows.
+  - [ ] Stop queueing new jobs after cancellation.
+  - [ ] Let the currently running job finish or abort safely.
+  - [ ] Clean up temporary buffers and object URLs.
+  - [ ] Show a clear cancelled state in the UI.
+
+## Priority 4 — Build and asset performance
+
+- [ ] Compare release profiles.
+  - [ ] Benchmark current `opt-level = "z"` release build.
+  - [ ] Benchmark `opt-level = 3` for runtime-heavy workloads.
+  - [ ] Compare WASM size, initial load time, and batch processing time.
+  - [ ] Pick the profile based on measured results, not assumptions.
+
+- [ ] Review MediaPipe asset loading.
+  - [ ] Confirm MediaPipe assets are cached correctly by the browser.
+  - [ ] Ensure model and WASM files are served with appropriate cache headers.
+  - [ ] Consider preloading the fallback model only when needed.
+  - [ ] Show detection backend status clearly in the UI.
+
+- [ ] Review recommended deployment headers.
+  - [ ] Confirm static hosting can send `Cross-Origin-Opener-Policy: same-origin`.
+  - [ ] Confirm static hosting can send `Cross-Origin-Embedder-Policy: require-corp`.
+  - [ ] Confirm static hosting can send `Cross-Origin-Resource-Policy: cross-origin` where appropriate.
+  - [ ] Document any hosting limitations.
+
+## Priority 5 — Measurement and regression guards
+
+- [ ] Add performance regression tests or smoke checks.
+  - [ ] Add a small benchmark-like test for ZIP generation.
+  - [ ] Add browser-level timing smoke tests for single-image detection.
+  - [ ] Add a large-batch simulation test for queue/progress behaviour.
+  - [ ] Track average processing time and export time separately.
+
+- [ ] Add developer diagnostics.
+  - [ ] Show selected detection backend: native FaceDetector or MediaPipe.
+  - [ ] Show decode time, detection time, crop time, and export time.
+  - [ ] Show image dimensions and downscale factor.
+  - [ ] Show queue length and concurrency.
+  - [ ] Add a copyable debug summary for bug reports.
+
+- [ ] Add browser compatibility notes.
+  - [ ] Document which browsers support native `FaceDetector`.
+  - [ ] Document when MediaPipe fallback is used.
+  - [ ] Document `createImageBitmap` and `OffscreenCanvas` fallback behaviour.
+  - [ ] Explain why performance may vary between Chrome, Edge, Firefox, Safari, desktop, and mobile.
+
+## Suggested implementation order
+
+- [ ] Add timing instrumentation.
+- [ ] Change ZIP default from deflated to stored and benchmark it.
+- [ ] Cache the MediaPipe detector.
+- [ ] Add detection downscaling and coordinate remapping.
+- [ ] Add controlled batch concurrency.
+- [ ] Move batch work into a real Web Worker.
+- [ ] Add `OffscreenCanvas` support inside the worker.
+- [ ] Reduce memory duplication during ZIP export.
+- [ ] Add cancellation and cleanup.
+- [ ] Add regression checks so performance does not drift backwards.
