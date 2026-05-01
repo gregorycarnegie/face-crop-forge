@@ -195,6 +195,7 @@ pub(super) fn process_batch(
     let workers_remaining: Rc<Cell<usize>> = Rc::new(Cell::new(concurrency));
     let abort: Rc<Cell<bool>> = Rc::new(Cell::new(false));
     let started_count: Rc<Cell<usize>> = Rc::new(Cell::new(0));
+    let log_buffer: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
     let ctx = BatchProcessCtx {
         progress,
         stats,
@@ -211,6 +212,7 @@ pub(super) fn process_batch(
         let settings_snapshot = settings_snapshot.clone();
         let mime_type = mime_type.clone();
         let started_count = Rc::clone(&started_count);
+        let log_buffer = Rc::clone(&log_buffer);
 
         spawn_local(async move {
             let validation = ImageValidationConfig::default();
@@ -478,8 +480,18 @@ pub(super) fn process_batch(
                     s.record_image(total_ms, face_count as u32, true);
                     s.record_backend(crate::worker_bridge::last_detection_backend_label());
                     s.record_image_size(dimensions.width, dimensions.height, detection_scale);
-                    s.push_log(format!("Processed {file_name}: {face_count} face(s)."));
                 });
+                log_buffer
+                    .borrow_mut()
+                    .push(format!("Processed {file_name}: {face_count} face(s)."));
+                if log_buffer.borrow().len() >= 10 {
+                    let msgs: Vec<String> = log_buffer.borrow_mut().drain(..).collect();
+                    stats.update(|s| {
+                        for msg in msgs {
+                            s.push_log(msg);
+                        }
+                    });
+                }
                 #[cfg(target_arch = "wasm32")]
                 web_sys::console::log_1(
                     &format!(
@@ -493,6 +505,14 @@ pub(super) fn process_batch(
             let remaining = workers_remaining.get().saturating_sub(1);
             workers_remaining.set(remaining);
             if remaining == 0 {
+                let pending: Vec<String> = log_buffer.borrow_mut().drain(..).collect();
+                if !pending.is_empty() {
+                    stats.update(|s| {
+                        for msg in pending {
+                            s.push_log(msg);
+                        }
+                    });
+                }
                 if cancel_requested.get_untracked() {
                     progress.update(|p| {
                         let status =

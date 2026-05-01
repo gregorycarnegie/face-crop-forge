@@ -61,8 +61,8 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 
 - [x] Throttle progress and log UI updates.
   - [x] Avoid reactive state updates for every tiny internal step.
-  - [ ] Update progress per image or every 100–250 ms.
-  - [ ] Batch log updates during large runs.
+  - [x] Update progress per image or every 100–250 ms.
+  - [x] Batch log updates during large runs.
   - [x] Keep recent logs capped, as currently done.
   - [x] Check whether Leptos rerenders become noisy during large batches.
 
