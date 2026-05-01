@@ -19,8 +19,8 @@ fn render_single_page() -> web_sys::Element {
         container.clone().unchecked_into::<web_sys::HtmlElement>(),
         || {
             provide_context(AppState::new());
-            let (route, set_route) = signal(Route::Single);
-            view! { <Single route=route.get() set_route /> }
+            let (_, set_route) = signal(Route::Single);
+            view! { <Single route=Route::Single set_route /> }
         },
     )
     .forget();
@@ -49,6 +49,35 @@ fn install_browser_hooks() {
             ]);
           }
         };
+
+        if (!URL.__faceCropForgeWorkerHook) {
+          Object.defineProperty(URL, "__faceCropForgeWorkerHook", {
+            value: true
+          });
+
+          const createObjectURL = URL.createObjectURL.bind(URL);
+          URL.createObjectURL = function(object) {
+            if (object instanceof Blob && object.type === "application/javascript") {
+              const faceDetectorStub = `
+                self.FaceDetector = class {
+                  constructor() {}
+                  detect() {
+                    return Promise.resolve([
+                      {
+                        boundingBox: { x: 36, y: 30, width: 58, height: 66 },
+                        confidence: [0.92]
+                      }
+                    ]);
+                  }
+                };
+              `;
+              return createObjectURL(new Blob([faceDetectorStub, "\n", object], {
+                type: object.type
+              }));
+            }
+            return createObjectURL(object);
+          };
+        }
 
         if (!HTMLAnchorElement.prototype.__faceCropForgeDownloadHook) {
           Object.defineProperty(HTMLAnchorElement.prototype, "__faceCropForgeDownloadHook", {
@@ -153,6 +182,7 @@ fn downloads() -> Array {
 
 #[wasm_bindgen_test]
 async fn single_image_detect_crop_export_flow_runs_in_browser() {
+    crate::worker_bridge::clear_detector_caches();
     install_browser_hooks();
     let root = render_single_page();
     let file = synthetic_png_file().await;

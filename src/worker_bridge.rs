@@ -147,6 +147,18 @@ pub struct DetectedFace {
     pub confidence: f64,
 }
 
+pub struct CropFaceWorkerRequest<'a> {
+    pub file: &'a web_sys::File,
+    pub source_x: f64,
+    pub source_y: f64,
+    pub source_width: f64,
+    pub source_height: f64,
+    pub output_width: u32,
+    pub output_height: u32,
+    pub mime_type: &'a str,
+    pub quality: Option<f64>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FaceWorkerBridgeState {
     pub status: FaceWorkerStatus,
@@ -452,17 +464,7 @@ fn parse_worker_faces(data: &wasm_bindgen::JsValue) -> Result<Vec<DetectedFace>,
 /// is not available in this browser; the caller falls back to the main-thread
 /// canvas path in that case.
 #[cfg(target_arch = "wasm32")]
-pub async fn crop_face_in_worker(
-    file: &web_sys::File,
-    sx: f64,
-    sy: f64,
-    sw: f64,
-    sh: f64,
-    out_w: u32,
-    out_h: u32,
-    mime: &str,
-    quality: Option<f64>,
-) -> Result<Vec<u8>, String> {
+pub async fn crop_face_in_worker(request: CropFaceWorkerRequest<'_>) -> Result<Vec<u8>, String> {
     use js_sys::Reflect;
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -491,23 +493,46 @@ pub async fn crop_face_in_worker(
         &JsValue::from_str("id"),
         &JsValue::from_f64(job_id as f64),
     );
-    let _ = Reflect::set(&msg, &JsValue::from_str("file"), file.as_ref());
-    let _ = Reflect::set(&msg, &JsValue::from_str("sx"), &JsValue::from_f64(sx));
-    let _ = Reflect::set(&msg, &JsValue::from_str("sy"), &JsValue::from_f64(sy));
-    let _ = Reflect::set(&msg, &JsValue::from_str("sw"), &JsValue::from_f64(sw));
-    let _ = Reflect::set(&msg, &JsValue::from_str("sh"), &JsValue::from_f64(sh));
+    let _ = Reflect::set(&msg, &JsValue::from_str("file"), request.file.as_ref());
+    let _ = Reflect::set(
+        &msg,
+        &JsValue::from_str("sx"),
+        &JsValue::from_f64(request.source_x),
+    );
+    let _ = Reflect::set(
+        &msg,
+        &JsValue::from_str("sy"),
+        &JsValue::from_f64(request.source_y),
+    );
+    let _ = Reflect::set(
+        &msg,
+        &JsValue::from_str("sw"),
+        &JsValue::from_f64(request.source_width),
+    );
+    let _ = Reflect::set(
+        &msg,
+        &JsValue::from_str("sh"),
+        &JsValue::from_f64(request.source_height),
+    );
     let _ = Reflect::set(
         &msg,
         &JsValue::from_str("outW"),
-        &JsValue::from_f64(f64::from(out_w)),
+        &JsValue::from_f64(f64::from(request.output_width)),
     );
     let _ = Reflect::set(
         &msg,
         &JsValue::from_str("outH"),
-        &JsValue::from_f64(f64::from(out_h)),
+        &JsValue::from_f64(f64::from(request.output_height)),
     );
-    let _ = Reflect::set(&msg, &JsValue::from_str("mime"), &JsValue::from_str(mime));
-    let quality_val = quality.map(JsValue::from_f64).unwrap_or(JsValue::NULL);
+    let _ = Reflect::set(
+        &msg,
+        &JsValue::from_str("mime"),
+        &JsValue::from_str(request.mime_type),
+    );
+    let quality_val = request
+        .quality
+        .map(JsValue::from_f64)
+        .unwrap_or(JsValue::NULL);
     let _ = Reflect::set(&msg, &JsValue::from_str("quality"), &quality_val);
 
     if let Err(e) = worker.post_message(msg.as_ref()) {
@@ -535,17 +560,18 @@ pub async fn crop_face_in_worker(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub async fn crop_face_in_worker(
-    _file: &web_sys::File,
-    _sx: f64,
-    _sy: f64,
-    _sw: f64,
-    _sh: f64,
-    _out_w: u32,
-    _out_h: u32,
-    _mime: &str,
-    _quality: Option<f64>,
-) -> Result<Vec<u8>, String> {
+pub async fn crop_face_in_worker(request: CropFaceWorkerRequest<'_>) -> Result<Vec<u8>, String> {
+    let _ = (
+        request.file,
+        request.source_x,
+        request.source_y,
+        request.source_width,
+        request.source_height,
+        request.output_width,
+        request.output_height,
+        request.mime_type,
+        request.quality,
+    );
     Err("Worker crop is only available on wasm32".to_string())
 }
 

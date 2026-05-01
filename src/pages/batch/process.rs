@@ -14,7 +14,7 @@ use crate::runtime::{
 };
 use crate::single_core::generate_face_filename;
 use crate::state::ProcessingSettings;
-use crate::worker_bridge::{crop_face_in_worker, detect_faces_with_worker};
+use crate::worker_bridge::{CropFaceWorkerRequest, crop_face_in_worker, detect_faces_with_worker};
 use leptos::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
@@ -358,9 +358,17 @@ pub(super) fn process_batch(
                 } else {
                     Some(f64::from(settings_snapshot.jpeg_quality))
                 };
-                let crop_bytes = match crop_face_in_worker(
-                    &file, src_x, src_y, src_w, src_h, out_w, out_h, &mime_type, quality,
-                )
+                let crop_bytes = match crop_face_in_worker(CropFaceWorkerRequest {
+                    file: &file,
+                    source_x: src_x,
+                    source_y: src_y,
+                    source_width: src_w,
+                    source_height: src_h,
+                    output_width: out_w,
+                    output_height: out_h,
+                    mime_type: &mime_type,
+                    quality,
+                })
                 .await
                 {
                     Ok(bytes) => bytes,
@@ -569,6 +577,7 @@ pub(super) fn download_batch_zip(
         );
         let total_parts = part_ranges.len();
         let total_count = entries.len();
+        #[cfg(target_arch = "wasm32")]
         let mut total_export_ms: u64 = 0;
 
         for (part_idx, range) in part_ranges.into_iter().enumerate() {

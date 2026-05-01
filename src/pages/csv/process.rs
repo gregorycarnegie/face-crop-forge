@@ -516,6 +516,7 @@ pub(super) fn download_csv_zip(
         );
         let total_parts = part_ranges.len();
         let total_count = entries.len();
+        #[cfg(target_arch = "wasm32")]
         let mut total_export_ms: u64 = 0;
 
         for (part_idx, range) in part_ranges.into_iter().enumerate() {

@@ -255,7 +255,6 @@ fn panel_no_badge_when_none() {
 
 fn make_canvas(width: u32, height: u32, fill: &str) -> web_sys::HtmlCanvasElement {
     use wasm_bindgen::JsCast;
-    use wasm_bindgen::JsValue;
 
     let doc = web_sys::window().unwrap().document().unwrap();
     let canvas = doc
@@ -271,7 +270,7 @@ fn make_canvas(width: u32, height: u32, fill: &str) -> web_sys::HtmlCanvasElemen
         .unwrap()
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
-    ctx.set_fill_style(&JsValue::from_str(fill));
+    ctx.set_fill_style_str(fill);
     ctx.fill_rect(0.0, 0.0, f64::from(width), f64::from(height));
     canvas
 }
