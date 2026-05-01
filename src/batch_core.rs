@@ -435,7 +435,10 @@ mod tests {
         assert_eq!(progress.processed, N);
         assert_eq!(progress.failed, FAILURES);
         assert_eq!(progress.percent(), 100);
-        assert!(progress.running, "running must still be true before complete()");
+        assert!(
+            progress.running,
+            "running must still be true before complete()"
+        );
 
         progress.complete(format!(
             "Batch complete: {} processed, {} failed.",

@@ -359,15 +359,7 @@ pub(super) fn process_batch(
                     Some(f64::from(settings_snapshot.jpeg_quality))
                 };
                 let crop_bytes = match crop_face_in_worker(
-                    &file,
-                    src_x,
-                    src_y,
-                    src_w,
-                    src_h,
-                    out_w,
-                    out_h,
-                    &mime_type,
-                    quality,
+                    &file, src_x, src_y, src_w, src_h, out_w, out_h, &mime_type, quality,
                 )
                 .await
                 {
@@ -494,11 +486,8 @@ pub(super) fn process_batch(
             if remaining == 0 {
                 if cancel_requested.get_untracked() {
                     progress.update(|p| {
-                        let status = format!(
-                            "Cancelled after {}/{} images.",
-                            p.processed,
-                            p.total,
-                        );
+                        let status =
+                            format!("Cancelled after {}/{} images.", p.processed, p.total,);
                         p.cancel(status);
                         progress_pct.set(u32::from(p.percent()));
                     });
@@ -541,7 +530,7 @@ pub(super) fn download_batch_zip(
     let settings_snapshot = settings.get();
     let outputs_snapshot = outputs.get();
     let timestamp = current_timestamp_ms();
-    let zip_name = format!("face-crops-{}.zip", current_utc_timestamp_token());
+    let timestamp_token = current_utc_timestamp_token();
     spawn_local(async move {
         let mut entries: Vec<(String, &[u8])> = Vec::new();
         for (index, id) in ids.into_iter().enumerate() {
@@ -572,43 +561,62 @@ pub(super) fn download_batch_zip(
             return;
         }
 
-        let count = entries.len();
-        #[cfg(target_arch = "wasm32")]
-        let export_start = crate::runtime::now_ms();
-        let zip_result = build_zip_bytes(&entries);
-        #[cfg(target_arch = "wasm32")]
-        let export_ms = crate::runtime::elapsed_ms_since(export_start);
+        let byte_sizes: Vec<usize> = entries.iter().map(|(_, b)| b.len()).collect();
+        let part_ranges = crate::export_runtime::compute_zip_part_ranges(
+            &byte_sizes,
+            crate::export_runtime::MAX_ZIP_PART_BYTES,
+            crate::export_runtime::MAX_ZIP_PART_ENTRIES,
+        );
+        let total_parts = part_ranges.len();
+        let total_count = entries.len();
+        let mut total_export_ms: u64 = 0;
+
+        for (part_idx, range) in part_ranges.into_iter().enumerate() {
+            let part_name =
+                crate::export_runtime::zip_part_filename(&timestamp_token, part_idx, total_parts);
+            #[cfg(target_arch = "wasm32")]
+            let export_start = crate::runtime::now_ms();
+            let zip_result = build_zip_bytes(&entries[range]);
+            #[cfg(target_arch = "wasm32")]
+            {
+                total_export_ms =
+                    total_export_ms.saturating_add(crate::runtime::elapsed_ms_since(export_start));
+            }
+            match zip_result {
+                Ok(zip_bytes) => {
+                    if let Err(error) = download_bytes(&part_name, "application/zip", &zip_bytes) {
+                        drop(zip_bytes);
+                        drop(entries);
+                        drop(outputs_snapshot);
+                        progress.update(|p| p.complete(format!("ZIP download failed: {error}")));
+                        return;
+                    }
+                }
+                Err(error) => {
+                    drop(entries);
+                    drop(outputs_snapshot);
+                    progress.update(|p| p.complete(format!("ZIP build failed: {error}")));
+                    return;
+                }
+            }
+        }
+
         drop(entries);
         drop(outputs_snapshot);
 
-        match zip_result {
-            Ok(zip_bytes) => {
-                let dl_result = download_bytes(&zip_name, "application/zip", &zip_bytes);
-                drop(zip_bytes);
-                match dl_result {
-                    Ok(()) => {
-                        progress.update(|p| {
-                            p.complete(format!("Exported {zip_name} with {count} file(s)."))
-                        });
-                        #[cfg(target_arch = "wasm32")]
-                        stats.update(|s| {
-                            s.record_export(export_ms);
-                            s.push_log(format!(
-                                "Exported ZIP {zip_name} with {count} file(s). ({export_ms}ms)"
-                            ));
-                        });
-                        #[cfg(not(target_arch = "wasm32"))]
-                        stats.update(|s| {
-                            s.push_log(format!("Exported ZIP {zip_name} with {count} file(s)."))
-                        });
-                    }
-                    Err(error) => {
-                        progress.update(|p| p.complete(format!("ZIP download failed: {error}")))
-                    }
-                }
-            }
-            Err(error) => progress.update(|p| p.complete(format!("ZIP build failed: {error}"))),
-        }
+        let summary = if total_parts == 1 {
+            format!("Exported face-crops-{timestamp_token}.zip with {total_count} file(s).")
+        } else {
+            format!("Exported {total_parts} ZIP parts with {total_count} file(s) total.")
+        };
+        progress.update(|p| p.complete(summary.clone()));
+        #[cfg(target_arch = "wasm32")]
+        stats.update(|s| {
+            s.record_export(total_export_ms);
+            s.push_log(format!("{summary} ({total_export_ms}ms)"));
+        });
+        #[cfg(not(target_arch = "wasm32"))]
+        stats.update(|s| s.push_log(summary));
     });
 }
 

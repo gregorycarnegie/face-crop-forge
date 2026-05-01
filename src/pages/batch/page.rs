@@ -303,6 +303,14 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                             <span><span>"Continue on error"</span><span class="desc">"Skip failures and keep processing"</span></span>
                             <input type="checkbox" prop:checked=move || continue_on_error.get() on:change=move |ev| continue_on_error.set(event_target_checked(&ev)) />
                         </label>
+                        <div class="compat-note">
+                            <p class="compat-head">"Detection backend"</p>
+                            <p>"Uses native "<code>"FaceDetector"</code>" API on Chrome and Edge (Chromium ≥ 123). Falls back to MediaPipe on Firefox and Safari."</p>
+                            <p class="compat-head">"Worker crop"</p>
+                            <p>"Off-thread crop via "<code>"OffscreenCanvas"</code>" runs on Chrome, Edge, and Firefox. Safari uses the main-thread canvas fallback."</p>
+                            <p class="compat-head">"Large exports"</p>
+                            <p>"Exports over 500 crops or 200 MB are split into numbered ZIP parts automatically."</p>
+                        </div>
                     </Panel>
                 </div>
             </aside>

@@ -1,5 +1,49 @@
 use std::io::Write;
 
+/// Maximum number of entries in a single ZIP part before splitting.
+pub const MAX_ZIP_PART_ENTRIES: usize = 500;
+
+/// Maximum uncompressed bytes per ZIP part before splitting (~200 MB).
+pub const MAX_ZIP_PART_BYTES: usize = 200 * 1024 * 1024;
+
+/// Returns the filename for a ZIP export part.
+/// Single-part exports get `face-crops-{token}.zip`.
+/// Multi-part exports get `face-crops-{token}-part-001.zip`, etc.
+pub fn zip_part_filename(timestamp_token: &str, part: usize, total_parts: usize) -> String {
+    if total_parts <= 1 {
+        format!("face-crops-{timestamp_token}.zip")
+    } else {
+        format!("face-crops-{timestamp_token}-part-{:03}.zip", part + 1)
+    }
+}
+
+/// Given the byte size of each entry, returns `(start, end)` index ranges for each ZIP part.
+/// Parts respect both `max_bytes` and `max_entries` limits.
+pub fn compute_zip_part_ranges(
+    entry_byte_sizes: &[usize],
+    max_bytes: usize,
+    max_entries: usize,
+) -> Vec<std::ops::Range<usize>> {
+    if entry_byte_sizes.is_empty() {
+        return Vec::new();
+    }
+    let mut ranges = Vec::new();
+    let mut part_start = 0;
+    let mut part_bytes: usize = 0;
+    for (i, &size) in entry_byte_sizes.iter().enumerate() {
+        let would_overflow = part_start < i
+            && (part_bytes.saturating_add(size) > max_bytes || (i - part_start) >= max_entries);
+        if would_overflow {
+            ranges.push(part_start..i);
+            part_start = i;
+            part_bytes = 0;
+        }
+        part_bytes = part_bytes.saturating_add(size);
+    }
+    ranges.push(part_start..entry_byte_sizes.len());
+    ranges
+}
+
 pub fn extension_for_mime(mime_type: &str) -> Option<&'static str> {
     let lower = mime_type.to_ascii_lowercase();
     if lower.contains("image/png") {
@@ -161,6 +205,95 @@ mod tests {
         assert!(validate_export_filename_for_mime(&png_name, "image/png"));
     }
 
+    // ── ZIP part naming ──────────────────────────────────────────────────────
+
+    #[test]
+    fn single_part_uses_flat_filename() {
+        assert_eq!(
+            zip_part_filename("20260501T120000Z", 0, 1),
+            "face-crops-20260501T120000Z.zip"
+        );
+    }
+
+    #[test]
+    fn multi_part_uses_three_digit_suffix() {
+        assert_eq!(
+            zip_part_filename("20260501T120000Z", 0, 3),
+            "face-crops-20260501T120000Z-part-001.zip"
+        );
+        assert_eq!(
+            zip_part_filename("20260501T120000Z", 2, 3),
+            "face-crops-20260501T120000Z-part-003.zip"
+        );
+    }
+
+    // ── ZIP part boundary computation ─────────────────────────────────────────
+
+    #[test]
+    fn compute_ranges_returns_single_range_for_small_input() {
+        let sizes = vec![100usize; 10];
+        let ranges = compute_zip_part_ranges(&sizes, MAX_ZIP_PART_BYTES, MAX_ZIP_PART_ENTRIES);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0], 0..10);
+    }
+
+    #[test]
+    fn compute_ranges_splits_on_entry_count_limit() {
+        // 600 entries all tiny — should split at 500
+        let sizes = vec![1usize; 600];
+        let ranges = compute_zip_part_ranges(&sizes, MAX_ZIP_PART_BYTES, 500);
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(ranges[0], 0..500);
+        assert_eq!(ranges[1], 500..600);
+    }
+
+    #[test]
+    fn compute_ranges_splits_on_byte_limit() {
+        // 10 entries at 60 MB each — exceeds 200 MB threshold after 3 entries
+        let mb60 = 60 * 1024 * 1024;
+        let sizes = vec![mb60; 10];
+        let ranges = compute_zip_part_ranges(&sizes, MAX_ZIP_PART_BYTES, MAX_ZIP_PART_ENTRIES);
+        // 200 MB / 60 MB = 3 per part exactly (3×60=180 < 200, 4×60=240 > 200)
+        assert!(ranges.len() > 1, "should have split into multiple parts");
+        for range in &ranges {
+            let part_bytes: usize = sizes[range.clone()].iter().sum();
+            assert!(
+                part_bytes <= MAX_ZIP_PART_BYTES,
+                "part bytes {part_bytes} exceeded limit"
+            );
+        }
+    }
+
+    #[test]
+    fn compute_ranges_handles_empty_input() {
+        let ranges = compute_zip_part_ranges(&[], MAX_ZIP_PART_BYTES, MAX_ZIP_PART_ENTRIES);
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn compute_ranges_single_entry_always_one_part() {
+        let sizes = vec![MAX_ZIP_PART_BYTES + 1]; // larger than the limit
+        let ranges = compute_zip_part_ranges(&sizes, MAX_ZIP_PART_BYTES, MAX_ZIP_PART_ENTRIES);
+        // Can't split a single entry — must still produce one part
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0], 0..1);
+    }
+
+    #[test]
+    fn compute_ranges_covers_all_entries_without_overlap() {
+        let sizes: Vec<usize> = (0..1000).map(|i| (i % 50 + 1) * 1024).collect();
+        let ranges = compute_zip_part_ranges(&sizes, MAX_ZIP_PART_BYTES, 250);
+        // All entries must be covered exactly once
+        let mut covered = vec![false; sizes.len()];
+        for range in &ranges {
+            for i in range.clone() {
+                assert!(!covered[i], "entry {i} covered twice");
+                covered[i] = true;
+            }
+        }
+        assert!(covered.iter().all(|&c| c), "some entries not covered");
+    }
+
     // ── ZIP regression guards ─────────────────────────────────────────────────
 
     #[test]
@@ -172,7 +305,11 @@ mod tests {
         ];
 
         let zip = build_zip_bytes(&entries).expect("build_zip_bytes failed");
-        assert_eq!(&zip[..4], b"PK\x03\x04", "ZIP local file header magic missing");
+        assert_eq!(
+            &zip[..4],
+            b"PK\x03\x04",
+            "ZIP local file header magic missing"
+        );
 
         let cursor = std::io::Cursor::new(&zip);
         let mut archive = zip::ZipArchive::new(cursor).expect("ZipArchive::new failed");

@@ -486,7 +486,11 @@ pub async fn crop_face_in_worker(
 
     let msg = js_sys::Object::new();
     let _ = Reflect::set(&msg, &JsValue::from_str("type"), &JsValue::from_str("crop"));
-    let _ = Reflect::set(&msg, &JsValue::from_str("id"), &JsValue::from_f64(job_id as f64));
+    let _ = Reflect::set(
+        &msg,
+        &JsValue::from_str("id"),
+        &JsValue::from_f64(job_id as f64),
+    );
     let _ = Reflect::set(&msg, &JsValue::from_str("file"), file.as_ref());
     let _ = Reflect::set(&msg, &JsValue::from_str("sx"), &JsValue::from_f64(sx));
     let _ = Reflect::set(&msg, &JsValue::from_str("sy"), &JsValue::from_f64(sy));

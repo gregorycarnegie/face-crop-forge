@@ -45,7 +45,7 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [x] Consider using `navigator.hardwareConcurrency` as an upper bound.
   - [x] Avoid unlimited parallel image decodes or detection calls.
   - [x] Add a queue that can pause, resume, and cancel cleanly.
-  - [ ] Surface current concurrency in a developer stats panel.
+  - [x] Surface current concurrency in a developer stats panel.
 
 - [ ] Use `createImageBitmap()` where supported.
   - [ ] Prefer `createImageBitmap(file)` over object URL + `HtmlImageElement` for decode paths where practical.
@@ -74,23 +74,23 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [x] Avoid duplicating large byte arrays unnecessarily.
   - [ ] Track approximate memory use during batch export.
 
-- [ ] Split very large exports into multiple ZIP files.
-  - [ ] Define a sensible max entries-per-ZIP or max estimated ZIP size.
-  - [ ] Export names like `face-crops-part-001.zip`, `face-crops-part-002.zip`.
-  - [ ] Make the split behaviour clear in the UI.
-  - [ ] Add tests for deterministic part naming.
+- [x] Split very large exports into multiple ZIP files.
+  - [x] Define a sensible max entries-per-ZIP or max estimated ZIP size.
+  - [x] Export names like `face-crops-part-001.zip`, `face-crops-part-002.zip`.
+  - [x] Make the split behaviour clear in the UI.
+  - [x] Add tests for deterministic part naming.
 
-- [ ] Revoke and release browser resources aggressively.
-  - [ ] Revoke object URLs as soon as images are decoded.
-  - [ ] Close `ImageBitmap`s after use.
-  - [ ] Drop canvas references after export.
-  - [ ] Clear temporary batch state when a run finishes or is cancelled.
+- [x] Revoke and release browser resources aggressively.
+  - [x] Revoke object URLs as soon as images are decoded.
+  - [x] Close `ImageBitmap`s after use.
+  - [x] Drop canvas references after export.
+  - [x] Clear temporary batch state when a run finishes or is cancelled.
 
 - [x] Add cancellation support for long-running batches.
   - [x] Add a cancel button to batch and CSV workflows.
   - [x] Stop queueing new jobs after cancellation.
   - [x] Let the currently running job finish or abort safely.
-  - [ ] Clean up temporary buffers and object URLs.
+  - [x] Clean up temporary buffers and object URLs.
   - [x] Show a clear cancelled state in the UI.
 
 ## Priority 4 — Build and asset performance
@@ -105,7 +105,7 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [ ] Confirm MediaPipe assets are cached correctly by the browser.
   - [ ] Ensure model and WASM files are served with appropriate cache headers.
   - [ ] Consider preloading the fallback model only when needed.
-  - [ ] Show detection backend status clearly in the UI.
+  - [x] Show detection backend status clearly in the UI.
 
 - [ ] Review recommended deployment headers.
   - [ ] Confirm static hosting can send `Cross-Origin-Opener-Policy: same-origin`.
@@ -128,11 +128,11 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [x] Show queue length and concurrency.
   - [ ] Add a copyable debug summary for bug reports.
 
-- [ ] Add browser compatibility notes.
-  - [ ] Document which browsers support native `FaceDetector`.
-  - [ ] Document when MediaPipe fallback is used.
-  - [ ] Document `createImageBitmap` and `OffscreenCanvas` fallback behaviour.
-  - [ ] Explain why performance may vary between Chrome, Edge, Firefox, Safari, desktop, and mobile.
+- [x] Add browser compatibility notes.
+  - [x] Document which browsers support native `FaceDetector`.
+  - [x] Document when MediaPipe fallback is used.
+  - [x] Document `createImageBitmap` and `OffscreenCanvas` fallback behaviour.
+  - [x] Explain why performance may vary between Chrome, Edge, Firefox, Safari, desktop, and mobile.
 
 ## Suggested implementation order
 
