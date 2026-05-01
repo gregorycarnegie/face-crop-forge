@@ -59,12 +59,12 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [x] Keep a normal canvas fallback for unsupported browsers.
   - [ ] Benchmark crop/export time with and without `OffscreenCanvas`.
 
-- [ ] Throttle progress and log UI updates.
-  - [ ] Avoid reactive state updates for every tiny internal step.
+- [x] Throttle progress and log UI updates.
+  - [x] Avoid reactive state updates for every tiny internal step.
   - [ ] Update progress per image or every 100–250 ms.
   - [ ] Batch log updates during large runs.
-  - [ ] Keep recent logs capped, as currently done.
-  - [ ] Check whether Leptos rerenders become noisy during large batches.
+  - [x] Keep recent logs capped, as currently done.
+  - [x] Check whether Leptos rerenders become noisy during large batches.
 
 ## Priority 3 — Memory and large-batch reliability
 
@@ -121,11 +121,11 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [x] Add a large-batch simulation test for queue/progress behaviour.
   - [x] Track average processing time and export time separately.
 
-- [ ] Add developer diagnostics.
-  - [ ] Show selected detection backend: native FaceDetector or MediaPipe.
-  - [ ] Show decode time, detection time, crop time, and export time.
+- [x] Add developer diagnostics.
+  - [x] Show selected detection backend: native FaceDetector or MediaPipe.
+  - [x] Show decode time, detection time, crop time, and export time.
   - [ ] Show image dimensions and downscale factor.
-  - [ ] Show queue length and concurrency.
+  - [x] Show queue length and concurrency.
   - [ ] Add a copyable debug summary for bug reports.
 
 - [ ] Add browser compatibility notes.

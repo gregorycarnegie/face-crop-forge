@@ -17,7 +17,8 @@ use super::helpers::{
     batch_format_class, filter_tab_class, gallery_cell_class, status_badge,
 };
 use super::process::{
-    BatchProcessCtx, clear_batch, download_batch_zip, load_batch_files, process_batch,
+    BatchProcessCtx, batch_concurrency_limit, clear_batch, download_batch_zip, load_batch_files,
+    process_batch,
 };
 
 #[component]
@@ -312,6 +313,33 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                     <div class="s peach"><div class="k">"processed"</div><div class="v"><em>{move || processed_count.get().to_string()}</em><span style="font-size:14px;color:var(--ink-3)">" / " {move || batch_state.get().total_count().to_string()}</span></div><div class="sub">{move || format!("{}% complete", progress_pct.get())}</div></div>
                     <div class="s peach"><div class="k">"detected"</div><div class="v"><em>{move || faces_detected.get().to_string()}</em></div><div class="sub">"faces found"</div></div>
                     <div class="s rose"><div class="k">"failed"</div><div class="v"><em>{move || failed_count.get().to_string()}</em></div><div class="sub">"skipped"</div></div>
+                </div>
+
+                <div class="diag-strip">
+                    <div class="d">
+                        <div class="k">"backend"</div>
+                        <div class="v">{move || {
+                            let b = stats.get().detected_backend;
+                            if b.is_empty() { "—".to_string() } else { b }
+                        }}</div>
+                    </div>
+                    <div class="d">
+                        <div class="k">"avg / img"</div>
+                        <div class="v">{move || {
+                            let ms = stats.get().avg_processing_time_ms();
+                            if ms == 0 { "—".to_string() } else { format!("{ms}ms") }
+                        }}</div>
+                    </div>
+                    <div class="d">
+                        <div class="k">"last export"</div>
+                        <div class="v">{move || stats.get().last_export_time_ms
+                            .map_or("—".to_string(), |ms| format!("{ms}ms"))
+                        }</div>
+                    </div>
+                    <div class="d">
+                        <div class="k">"concurrency"</div>
+                        <div class="v">{move || format!("{} worker(s)", batch_concurrency_limit())}</div>
+                    </div>
                 </div>
 
                 <div class="gallery-card">

@@ -45,8 +45,11 @@ fn record_batch_failure(
     progress.update(|p| {
         p.record_result(false);
         p.status = status.into();
-        progress_pct.set(u32::from(p.percent()));
     });
+    let new_pct = progress.with_untracked(|p| u32::from(p.percent()));
+    if new_pct != progress_pct.get_untracked() {
+        progress_pct.set(new_pct);
+    }
     stats.update(|s| {
         s.record_image(elapsed_ms, 0, false);
         s.push_log(log);
@@ -110,7 +113,7 @@ pub(super) fn load_batch_files(
 /// How many images to process concurrently.
 /// Conservative defaults: 1 on touch/mobile, 2 on desktop (capped by hardwareConcurrency).
 #[cfg(target_arch = "wasm32")]
-fn batch_concurrency_limit() -> usize {
+pub(super) fn batch_concurrency_limit() -> usize {
     use wasm_bindgen::JsValue;
     let window = leptos::prelude::window();
     let hardware = js_sys::Reflect::get(
@@ -130,7 +133,7 @@ fn batch_concurrency_limit() -> usize {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn batch_concurrency_limit() -> usize {
+pub(super) fn batch_concurrency_limit() -> usize {
     1
 }
 
@@ -465,11 +468,15 @@ pub(super) fn process_batch(
                         "Processed {}/{}: {file_name} ({face_count} face(s))",
                         p.processed, total
                     );
-                    progress_pct.set(u32::from(p.percent()));
                 });
+                let new_pct = progress.with_untracked(|p| u32::from(p.percent()));
+                if new_pct != progress_pct.get_untracked() {
+                    progress_pct.set(new_pct);
+                }
                 let total_ms = elapsed_ms_since(start_ms);
                 stats.update(|s| {
                     s.record_image(total_ms, face_count as u32, true);
+                    s.record_backend(crate::worker_bridge::last_detection_backend_label());
                     s.push_log(format!("Processed {file_name}: {face_count} face(s)."));
                 });
                 #[cfg(target_arch = "wasm32")]

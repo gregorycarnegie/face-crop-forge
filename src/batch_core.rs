@@ -64,6 +64,7 @@ pub struct BatchRuntimeStats {
     pub successful_processing: u64,
     pub processing_times_ms: Vec<u64>,
     pub last_export_time_ms: Option<u64>,
+    pub detected_backend: String,
     pub logs: Vec<String>,
 }
 
@@ -75,6 +76,7 @@ impl Default for BatchRuntimeStats {
             successful_processing: 0,
             processing_times_ms: Vec::new(),
             last_export_time_ms: None,
+            detected_backend: String::new(),
             logs: vec!["Ready to process images...".to_string()],
         }
     }
@@ -129,6 +131,12 @@ impl BatchRuntimeStats {
 
     pub fn record_export(&mut self, time_ms: u64) {
         self.last_export_time_ms = Some(time_ms);
+    }
+
+    pub fn record_backend(&mut self, backend: &str) {
+        if self.detected_backend.is_empty() {
+            self.detected_backend = backend.to_string();
+        }
     }
 
     pub fn push_log(&mut self, message: impl Into<String>) {
