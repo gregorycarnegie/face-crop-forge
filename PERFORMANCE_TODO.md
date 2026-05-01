@@ -10,12 +10,12 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [ ] Record browser, device, image sizes, output format, and detection backend.
   - [x] Add a simple developer-only timing panel or console timing output.
 
-- [ ] Move batch detection, cropping, and export work into a real Web Worker.
-  - [ ] Keep the main thread focused on UI, file selection, previews, and progress display.
-  - [ ] Send files/jobs to the worker.
-  - [ ] Send progress events back to the UI.
-  - [ ] Keep detection, crop generation, and ZIP creation off the UI thread where possible.
-  - [ ] Rename or split `worker_bridge.rs` so the name reflects the actual architecture.
+- [x] Move batch detection, cropping, and export work into a real Web Worker.
+  - [x] Keep the main thread focused on UI, file selection, previews, and progress display.
+  - [x] Send files/jobs to the worker.
+  - [x] Send progress events back to the UI.
+  - [x] Keep detection, crop generation, and ZIP creation off the UI thread where possible.
+  - [x] Rename or split `worker_bridge.rs` so the name reflects the actual architecture.
 
 - [x] Cache the MediaPipe detector instance.
   - [x] Avoid dynamically importing the MediaPipe bundle for every image.
@@ -53,10 +53,10 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [ ] Close `ImageBitmap` objects once processing is finished.
   - [ ] Keep the existing image element path as a compatibility fallback.
 
-- [ ] Use `OffscreenCanvas` for worker-side crop generation.
-  - [ ] Detect support for `OffscreenCanvas`.
-  - [ ] Move crop drawing and encoding into the worker where supported.
-  - [ ] Keep a normal canvas fallback for unsupported browsers.
+- [x] Use `OffscreenCanvas` for worker-side crop generation.
+  - [x] Detect support for `OffscreenCanvas`.
+  - [x] Move crop drawing and encoding into the worker where supported.
+  - [x] Keep a normal canvas fallback for unsupported browsers.
   - [ ] Benchmark crop/export time with and without `OffscreenCanvas`.
 
 - [ ] Throttle progress and log UI updates.
@@ -68,10 +68,10 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 
 ## Priority 3 — Memory and large-batch reliability
 
-- [ ] Avoid holding all crop bytes and the final ZIP in memory at the same time.
-  - [ ] Stream generated entries into the ZIP where possible.
-  - [ ] Release each crop buffer after it has been written.
-  - [ ] Avoid duplicating large byte arrays unnecessarily.
+- [x] Avoid holding all crop bytes and the final ZIP in memory at the same time.
+  - [x] Stream generated entries into the ZIP where possible.
+  - [x] Release each crop buffer after it has been written.
+  - [x] Avoid duplicating large byte arrays unnecessarily.
   - [ ] Track approximate memory use during batch export.
 
 - [ ] Split very large exports into multiple ZIP files.
@@ -86,12 +86,12 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [ ] Drop canvas references after export.
   - [ ] Clear temporary batch state when a run finishes or is cancelled.
 
-- [ ] Add cancellation support for long-running batches.
-  - [ ] Add a cancel button to batch and CSV workflows.
-  - [ ] Stop queueing new jobs after cancellation.
-  - [ ] Let the currently running job finish or abort safely.
+- [x] Add cancellation support for long-running batches.
+  - [x] Add a cancel button to batch and CSV workflows.
+  - [x] Stop queueing new jobs after cancellation.
+  - [x] Let the currently running job finish or abort safely.
   - [ ] Clean up temporary buffers and object URLs.
-  - [ ] Show a clear cancelled state in the UI.
+  - [x] Show a clear cancelled state in the UI.
 
 ## Priority 4 — Build and asset performance
 
@@ -141,8 +141,8 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 - [x] Cache the MediaPipe detector.
 - [x] Add detection downscaling and coordinate remapping.
 - [x] Add controlled batch concurrency.
-- [ ] Move batch work into a real Web Worker.
-- [ ] Add `OffscreenCanvas` support inside the worker.
-- [ ] Reduce memory duplication during ZIP export.
-- [ ] Add cancellation and cleanup.
+- [x] Move batch work into a real Web Worker.
+- [x] Add `OffscreenCanvas` support inside the worker.
+- [x] Reduce memory duplication during ZIP export.
+- [x] Add cancellation and cleanup.
 - [ ] Add regression checks so performance does not drift backwards.

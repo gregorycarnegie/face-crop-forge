@@ -18,6 +18,7 @@ pub struct BatchProgress {
     pub processed: usize,
     pub failed: usize,
     pub running: bool,
+    pub cancelled: bool,
     pub status: String,
 }
 
@@ -28,6 +29,7 @@ impl Default for BatchProgress {
             processed: 0,
             failed: 0,
             running: false,
+            cancelled: false,
             status: "Ready".to_string(),
         }
     }
@@ -39,6 +41,7 @@ impl BatchProgress {
         self.processed = 0;
         self.failed = 0;
         self.running = true;
+        self.cancelled = false;
         self.status = status.into();
     }
 
@@ -51,6 +54,13 @@ impl BatchProgress {
 
     pub fn complete(&mut self, status: impl Into<String>) {
         self.running = false;
+        self.cancelled = false;
+        self.status = status.into();
+    }
+
+    pub fn cancel(&mut self, status: impl Into<String>) {
+        self.running = false;
+        self.cancelled = true;
         self.status = status.into();
     }
 
@@ -106,6 +116,32 @@ mod tests {
         progress.complete("Done");
         assert!(!progress.running);
         assert_eq!(progress.status, "Done");
+    }
+
+    #[test]
+    fn cancel_sets_cancelled_flag_and_clears_running() {
+        let mut progress = BatchProgress::default();
+        progress.start(10, "Processing...");
+        progress.record_result(true);
+        progress.record_result(true);
+        assert!(progress.running);
+        assert!(!progress.cancelled);
+
+        progress.cancel("Cancelled after 2/10 images.");
+        assert!(!progress.running);
+        assert!(progress.cancelled);
+        assert_eq!(progress.status, "Cancelled after 2/10 images.");
+
+        // start() resets cancelled
+        progress.start(5, "Restarted");
+        assert!(progress.running);
+        assert!(!progress.cancelled);
+
+        // complete() also clears cancelled
+        progress.cancel("oops");
+        assert!(progress.cancelled);
+        progress.complete("Done");
+        assert!(!progress.cancelled);
     }
 
     #[test]

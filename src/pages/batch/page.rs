@@ -36,7 +36,9 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
     let continue_on_error = RwSignal::new(true);
     let gallery_filter = RwSignal::new(BatchGalleryFilter::All);
 
+    let cancel_requested = RwSignal::new(false);
     let busy = Signal::derive(move || progress.get().running);
+    let cancelled = Signal::derive(move || progress.get().cancelled);
     let has_images = Signal::derive(move || batch_state.get().total_count() > 0);
     let selected_count = Signal::derive(move || batch_state.get().selected_count());
     let processed_count = Signal::derive(move || {
@@ -84,7 +86,7 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
             <div class="meta-pills">
                 <span class="pill"><span class="d"></span>"Runtime - browser"</span>
                 <span class=move || { if has_images.get() { "pill ok" } else { "pill" } }><span class="d"></span>{move || format!("{} queued", batch_state.get().total_count())}</span>
-                <span class=move || { if busy.get() { "pill run" } else { "pill" } }><span class="d"></span>{move || progress.get().status}</span>
+                <span class=move || { if busy.get() { "pill run" } else if cancelled.get() { "pill cancel" } else { "pill" } }><span class="d"></span>{move || progress.get().status}</span>
             </div>
         </div>
 
@@ -104,8 +106,14 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                         progress_pct,
                         stats,
                         continue_on_error.get(),
+                        cancel_requested,
                     )
                 >"Start processing"</button>
+                <button
+                    class="btn btn-danger"
+                    style=move || if busy.get() { "" } else { "display:none" }
+                    on:click=move |_| cancel_requested.set(true)
+                >"Cancel"</button>
             </div>
             <span class="sep"></span>
             <button

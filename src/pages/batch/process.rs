@@ -7,13 +7,14 @@ use crate::export_runtime::{
 };
 use crate::runtime::{
     MAX_DETECTION_SIDE, ProcessedImageOutput, apply_detection_quality_filters, batch_file_label,
-    crop_face_bytes_from_source, decode_image_dimensions, elapsed_ms_since, is_probably_image_file,
-    make_file_id, maybe_downscale_for_detection, mime_type_for_output_format, object_url_for_bytes,
-    object_url_for_file, revoke_object_url, revoke_preview_urls, scale_detected_faces,
+    compute_source_crop_rect, crop_face_bytes_from_source, decode_image_dimensions,
+    elapsed_ms_since, is_probably_image_file, make_file_id, maybe_downscale_for_detection,
+    mime_type_for_output_format, object_url_for_bytes, object_url_for_file, revoke_object_url,
+    revoke_preview_urls, scale_detected_faces,
 };
 use crate::single_core::generate_face_filename;
 use crate::state::ProcessingSettings;
-use crate::worker_bridge::detect_faces_with_worker;
+use crate::worker_bridge::{crop_face_in_worker, detect_faces_with_worker};
 use leptos::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
@@ -121,7 +122,11 @@ fn batch_concurrency_limit() -> usize {
     .map(|n| n as usize)
     .unwrap_or(1);
     let is_touch = window.navigator().max_touch_points() > 0;
-    if is_touch { 1 } else { 2_usize.min(hardware.max(1)) }
+    if is_touch {
+        1
+    } else {
+        2_usize.min(hardware.max(1))
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -141,6 +146,7 @@ pub(super) fn process_batch(
     progress_pct: RwSignal<u32>,
     stats: RwSignal<BatchRuntimeStats>,
     continue_on_error: bool,
+    cancel_requested: RwSignal<bool>,
 ) {
     batch_queue.update(|queue| {
         while let Some(page) = queue.dequeue_next_page() {
@@ -169,6 +175,7 @@ pub(super) fn process_batch(
         }
     });
     batch_state.update(|state| selected_ids.iter().for_each(|id| state.mark_processing(id)));
+    cancel_requested.set(false);
     stats.update(BatchRuntimeStats::reset);
     progress_pct.set(0);
     progress.update(|p| {
@@ -205,7 +212,7 @@ pub(super) fn process_batch(
         spawn_local(async move {
             let validation = ImageValidationConfig::default();
             loop {
-                if abort.get() {
+                if abort.get() || cancel_requested.get_untracked() {
                     break;
                 }
                 let id = queue.borrow_mut().pop_front();
@@ -215,7 +222,13 @@ pub(super) fn process_batch(
 
                 let start_ms = crate::runtime::now_ms();
                 let Some(file) = files.get(&id).cloned() else {
-                    record_batch_failure(ctx, &id, 0, "Missing source file.", "Missing source file.");
+                    record_batch_failure(
+                        ctx,
+                        &id,
+                        0,
+                        "Missing source file.",
+                        "Missing source file.",
+                    );
                     if !continue_on_error {
                         abort.set(true);
                         break;
@@ -286,31 +299,29 @@ pub(super) fn process_batch(
 
                 #[cfg(target_arch = "wasm32")]
                 let detect_start = crate::runtime::now_ms();
-                let faces =
-                    match detect_faces_with_worker("browser-face-detector", detection_file).await {
-                        Ok(raw) => {
-                            let scaled = scale_detected_faces(
-                                raw,
-                                1.0 / detection_scale,
-                                1.0 / detection_scale,
-                            );
-                            apply_detection_quality_filters(scaled, &settings_snapshot)
+                let faces = match detect_faces_with_worker("browser-face-detector", detection_file)
+                    .await
+                {
+                    Ok(raw) => {
+                        let scaled =
+                            scale_detected_faces(raw, 1.0 / detection_scale, 1.0 / detection_scale);
+                        apply_detection_quality_filters(scaled, &settings_snapshot)
+                    }
+                    Err(error) => {
+                        record_batch_failure(
+                            ctx,
+                            &id,
+                            elapsed_ms_since(start_ms),
+                            format!("Detection failed: {file_name}"),
+                            format!("Detection failed for {file_name}: {error}"),
+                        );
+                        if !continue_on_error {
+                            abort.set(true);
+                            break;
                         }
-                        Err(error) => {
-                            record_batch_failure(
-                                ctx,
-                                &id,
-                                elapsed_ms_since(start_ms),
-                                format!("Detection failed: {file_name}"),
-                                format!("Detection failed for {file_name}: {error}"),
-                            );
-                            if !continue_on_error {
-                                abort.set(true);
-                                break;
-                            }
-                            continue;
-                        }
-                    };
+                        continue;
+                    }
+                };
                 #[cfg(target_arch = "wasm32")]
                 let detect_ms = elapsed_ms_since(detect_start);
                 let face_count = faces.len();
@@ -329,61 +340,93 @@ pub(super) fn process_batch(
                     continue;
                 };
 
-                let mut temporary_url = None;
-                let source_url = previews.get(&id).cloned().or_else(|| {
-                    let url = object_url_for_file(&file);
-                    temporary_url.clone_from(&url);
-                    url
-                });
-                let Some(source_url) = source_url else {
-                    record_batch_failure(
-                        ctx,
-                        &id,
-                        elapsed_ms_since(start_ms),
-                        format!("Preview URL failed: {file_name}"),
-                        format!("Could not create source URL for {file_name}."),
-                    );
-                    if !continue_on_error {
-                        abort.set(true);
-                        break;
-                    }
-                    continue;
-                };
-
                 #[cfg(target_arch = "wasm32")]
                 let crop_start = crate::runtime::now_ms();
-                let crop_bytes = match crop_face_bytes_from_source(
-                    &source_url,
+                let (src_x, src_y, src_w, src_h) = compute_source_crop_rect(
                     &face,
+                    f64::from(dimensions.width),
+                    f64::from(dimensions.height),
                     &settings_snapshot,
+                );
+                let out_w = settings_snapshot.output_width.max(1);
+                let out_h = settings_snapshot.output_height.max(1);
+                let quality = if mime_type == "image/png" {
+                    None
+                } else {
+                    Some(f64::from(settings_snapshot.jpeg_quality))
+                };
+                let crop_bytes = match crop_face_in_worker(
+                    &file,
+                    src_x,
+                    src_y,
+                    src_w,
+                    src_h,
+                    out_w,
+                    out_h,
                     &mime_type,
+                    quality,
                 )
                 .await
                 {
                     Ok(bytes) => bytes,
-                    Err(error) => {
-                        if let Some(url) = temporary_url.as_deref() {
-                            revoke_object_url(url);
+                    Err(_) => {
+                        // OffscreenCanvas not supported; fall back to main-thread crop
+                        let mut temporary_url = None;
+                        let source_url = previews.get(&id).cloned().or_else(|| {
+                            let url = object_url_for_file(&file);
+                            temporary_url.clone_from(&url);
+                            url
+                        });
+                        let Some(source_url) = source_url else {
+                            record_batch_failure(
+                                ctx,
+                                &id,
+                                elapsed_ms_since(start_ms),
+                                format!("Preview URL failed: {file_name}"),
+                                format!("Could not create source URL for {file_name}."),
+                            );
+                            if !continue_on_error {
+                                abort.set(true);
+                                break;
+                            }
+                            continue;
+                        };
+                        match crop_face_bytes_from_source(
+                            &source_url,
+                            &face,
+                            &settings_snapshot,
+                            &mime_type,
+                        )
+                        .await
+                        {
+                            Ok(bytes) => {
+                                if let Some(url) = temporary_url.as_deref() {
+                                    revoke_object_url(url);
+                                }
+                                bytes
+                            }
+                            Err(error) => {
+                                if let Some(url) = temporary_url.as_deref() {
+                                    revoke_object_url(url);
+                                }
+                                record_batch_failure(
+                                    ctx,
+                                    &id,
+                                    elapsed_ms_since(start_ms),
+                                    format!("Crop failed: {file_name}"),
+                                    format!("Crop failed for {file_name}: {error}"),
+                                );
+                                if !continue_on_error {
+                                    abort.set(true);
+                                    break;
+                                }
+                                continue;
+                            }
                         }
-                        record_batch_failure(
-                            ctx,
-                            &id,
-                            elapsed_ms_since(start_ms),
-                            format!("Crop failed: {file_name}"),
-                            format!("Crop failed for {file_name}: {error}"),
-                        );
-                        if !continue_on_error {
-                            abort.set(true);
-                            break;
-                        }
-                        continue;
                     }
                 };
                 #[cfg(target_arch = "wasm32")]
                 let crop_ms = elapsed_ms_since(crop_start);
-                if let Some(url) = temporary_url.as_deref() {
-                    revoke_object_url(url);
-                }
 
                 let preview_url = match object_url_for_bytes(&crop_bytes, &mime_type) {
                     Ok(url) => url,
@@ -420,8 +463,7 @@ pub(super) fn process_batch(
                     p.record_result(true);
                     p.status = format!(
                         "Processed {}/{}: {file_name} ({face_count} face(s))",
-                        p.processed,
-                        total
+                        p.processed, total
                     );
                     progress_pct.set(u32::from(p.percent()));
                 });
@@ -443,15 +485,27 @@ pub(super) fn process_batch(
             let remaining = workers_remaining.get().saturating_sub(1);
             workers_remaining.set(remaining);
             if remaining == 0 {
-                progress.update(|p| {
-                    let status = format!(
-                        "Batch complete: {} processed, {} failed.",
-                        p.processed.saturating_sub(p.failed),
-                        p.failed
-                    );
-                    p.complete(status);
-                    progress_pct.set(u32::from(p.percent()));
-                });
+                if cancel_requested.get_untracked() {
+                    progress.update(|p| {
+                        let status = format!(
+                            "Cancelled after {}/{} images.",
+                            p.processed,
+                            p.total,
+                        );
+                        p.cancel(status);
+                        progress_pct.set(u32::from(p.percent()));
+                    });
+                } else {
+                    progress.update(|p| {
+                        let status = format!(
+                            "Batch complete: {} processed, {} failed.",
+                            p.processed.saturating_sub(p.failed),
+                            p.failed
+                        );
+                        p.complete(status);
+                        progress_pct.set(u32::from(p.percent()));
+                    });
+                }
             }
         });
     }
@@ -482,9 +536,9 @@ pub(super) fn download_batch_zip(
     let timestamp = current_timestamp_ms();
     let zip_name = format!("face-crops-{}.zip", current_utc_timestamp_token());
     spawn_local(async move {
-        let mut entries = Vec::new();
+        let mut entries: Vec<(String, &[u8])> = Vec::new();
         for (index, id) in ids.into_iter().enumerate() {
-            let Some(output) = outputs_snapshot.get(&id).cloned() else {
+            let Some(output) = outputs_snapshot.get(&id) else {
                 continue;
             };
             let source_name = batch_file_label(&id).to_string();
@@ -503,7 +557,7 @@ pub(super) fn download_batch_zip(
                     .update(|s| s.push_log(format!("ZIP skipped invalid file name: {final_name}")));
                 continue;
             }
-            entries.push((final_name, output.bytes));
+            entries.push((final_name, &output.bytes));
         }
 
         if entries.is_empty() {
@@ -511,21 +565,29 @@ pub(super) fn download_batch_zip(
             return;
         }
 
-        match build_zip_bytes(&entries) {
-            Ok(bytes) => match download_bytes(&zip_name, "application/zip", &bytes) {
-                Ok(()) => {
-                    let count = entries.len();
-                    progress.update(|p| {
-                        p.complete(format!("Exported {zip_name} with {count} file(s)."))
-                    });
-                    stats.update(|s| {
-                        s.push_log(format!("Exported ZIP {zip_name} with {count} file(s)."))
-                    });
+        let count = entries.len();
+        let zip_result = build_zip_bytes(&entries);
+        drop(entries);
+        drop(outputs_snapshot);
+
+        match zip_result {
+            Ok(zip_bytes) => {
+                let dl_result = download_bytes(&zip_name, "application/zip", &zip_bytes);
+                drop(zip_bytes);
+                match dl_result {
+                    Ok(()) => {
+                        progress.update(|p| {
+                            p.complete(format!("Exported {zip_name} with {count} file(s)."))
+                        });
+                        stats.update(|s| {
+                            s.push_log(format!("Exported ZIP {zip_name} with {count} file(s)."))
+                        });
+                    }
+                    Err(error) => {
+                        progress.update(|p| p.complete(format!("ZIP download failed: {error}")))
+                    }
                 }
-                Err(error) => {
-                    progress.update(|p| p.complete(format!("ZIP download failed: {error}")))
-                }
-            },
+            }
             Err(error) => progress.update(|p| p.complete(format!("ZIP build failed: {error}"))),
         }
     });

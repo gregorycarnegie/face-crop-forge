@@ -8,7 +8,11 @@ pub const MAX_DETECTION_SIDE: u32 = 1600;
 /// Scale detected face coordinates from detection-image space back to original-image space.
 /// Call this after detecting on a downscaled image with `scale = detection_size / original_size`.
 /// Pass `1.0 / scale` as both `scale_x` and `scale_y`.
-pub fn scale_detected_faces(mut faces: Vec<DetectedFace>, scale_x: f64, scale_y: f64) -> Vec<DetectedFace> {
+pub fn scale_detected_faces(
+    mut faces: Vec<DetectedFace>,
+    scale_x: f64,
+    scale_y: f64,
+) -> Vec<DetectedFace> {
     if (scale_x - 1.0).abs() < 1e-9 && (scale_y - 1.0).abs() < 1e-9 {
         return faces;
     }
@@ -360,12 +364,9 @@ pub async fn maybe_downscale_for_detection(
     parts.push(&blob);
     let file_options = web_sys::FilePropertyBag::new();
     file_options.set_type("image/jpeg");
-    let detection_file = web_sys::File::new_with_blob_sequence_and_options(
-        &parts,
-        "detect.jpg",
-        &file_options,
-    )
-    .map_err(|err| format!("Failed to create detection file: {err:?}"))?;
+    let detection_file =
+        web_sys::File::new_with_blob_sequence_and_options(&parts, "detect.jpg", &file_options)
+            .map_err(|err| format!("Failed to create detection file: {err:?}"))?;
 
     Ok((detection_file, scale))
 }
@@ -554,7 +555,7 @@ fn normalize_face_box(
     (x, y, width.max(1.0), height.max(1.0))
 }
 
-fn compute_source_crop_rect(
+pub fn compute_source_crop_rect(
     face: &DetectedFace,
     source_width: f64,
     source_height: f64,
@@ -900,10 +901,22 @@ mod tests {
         let downscale = 0.4;
         let detection_space = scale_detected_faces(original.clone(), downscale, downscale);
         let recovered = scale_detected_faces(detection_space, 1.0 / downscale, 1.0 / downscale);
-        assert!((recovered[0].x - original[0].x).abs() < 1e-6, "x should round-trip");
-        assert!((recovered[0].y - original[0].y).abs() < 1e-6, "y should round-trip");
-        assert!((recovered[0].width - original[0].width).abs() < 1e-6, "width should round-trip");
-        assert!((recovered[0].height - original[0].height).abs() < 1e-6, "height should round-trip");
+        assert!(
+            (recovered[0].x - original[0].x).abs() < 1e-6,
+            "x should round-trip"
+        );
+        assert!(
+            (recovered[0].y - original[0].y).abs() < 1e-6,
+            "y should round-trip"
+        );
+        assert!(
+            (recovered[0].width - original[0].width).abs() < 1e-6,
+            "width should round-trip"
+        );
+        assert!(
+            (recovered[0].height - original[0].height).abs() < 1e-6,
+            "height should round-trip"
+        );
     }
 
     #[test]

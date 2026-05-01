@@ -692,8 +692,7 @@ fn export_selected_faces(
                     let crop_ms = crate::runtime::elapsed_ms_since(crop_start);
                     #[cfg(target_arch = "wasm32")]
                     web_sys::console::log_1(
-                        &format!("[FCF timing] single export: {file_name} crop={crop_ms}ms")
-                            .into(),
+                        &format!("[FCF timing] single export: {file_name} crop={crop_ms}ms").into(),
                     );
                     let final_name = normalize_export_filename_for_mime(&file_name, &mime_type);
                     if !validate_export_filename_for_mime(&final_name, &mime_type) {

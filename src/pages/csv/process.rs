@@ -473,9 +473,9 @@ pub(super) fn download_csv_zip(
     let export_template = csv_template_display(&settings_snapshot.naming_template);
     let zip_name = format!("face-crops-{}.zip", current_utc_timestamp_token());
     spawn_local(async move {
-        let mut entries = Vec::new();
+        let mut entries: Vec<(String, &[u8])> = Vec::new();
         for (index, id) in ids.into_iter().enumerate() {
-            let Some(output) = outputs_snapshot.get(&id).cloned() else {
+            let Some(output) = outputs_snapshot.get(&id) else {
                 continue;
             };
             let source_name = source_names
@@ -500,27 +500,37 @@ pub(super) fn download_csv_zip(
                 });
                 continue;
             }
-            entries.push((final_name, output.bytes));
+            entries.push((final_name, &output.bytes));
         }
 
         if entries.is_empty() {
             progress.update(|p| p.complete("No mapped cropped outputs available for ZIP export."));
             return;
         }
-        match build_zip_bytes(&entries) {
-            Ok(bytes) => match download_bytes(&zip_name, "application/zip", &bytes) {
-                Ok(()) => {
-                    let count = entries.len();
-                    progress
-                        .update(|p| p.complete(format!("CSV ZIP exported: {zip_name} ({count})")));
-                    stats.update(|s| {
-                        s.push_log(format!("Exported CSV ZIP {zip_name} with {count} file(s)."))
-                    });
+
+        let count = entries.len();
+        let zip_result = build_zip_bytes(&entries);
+        drop(entries);
+        drop(outputs_snapshot);
+
+        match zip_result {
+            Ok(zip_bytes) => {
+                let dl_result = download_bytes(&zip_name, "application/zip", &zip_bytes);
+                drop(zip_bytes);
+                match dl_result {
+                    Ok(()) => {
+                        progress.update(|p| {
+                            p.complete(format!("CSV ZIP exported: {zip_name} ({count})"))
+                        });
+                        stats.update(|s| {
+                            s.push_log(format!("Exported CSV ZIP {zip_name} with {count} file(s)."))
+                        });
+                    }
+                    Err(error) => {
+                        progress.update(|p| p.complete(format!("CSV ZIP download failed: {error}")))
+                    }
                 }
-                Err(error) => {
-                    progress.update(|p| p.complete(format!("CSV ZIP download failed: {error}")))
-                }
-            },
+            }
             Err(error) => progress.update(|p| p.complete(format!("CSV ZIP build failed: {error}"))),
         }
     });

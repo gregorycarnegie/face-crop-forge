@@ -63,7 +63,11 @@ pub fn current_timestamp_ms() -> u64 {
     }
 }
 
-pub fn build_zip_bytes(entries: &[(String, Vec<u8>)]) -> Result<Vec<u8>, String> {
+pub fn build_zip_bytes<S, B>(entries: &[(S, B)]) -> Result<Vec<u8>, String>
+where
+    S: AsRef<str>,
+    B: AsRef<[u8]>,
+{
     let mut cursor = std::io::Cursor::new(Vec::new());
     {
         let mut writer = zip::ZipWriter::new(&mut cursor);
@@ -71,10 +75,10 @@ pub fn build_zip_bytes(entries: &[(String, Vec<u8>)]) -> Result<Vec<u8>, String>
             .compression_method(zip::CompressionMethod::Stored);
         for (file_name, bytes) in entries {
             writer
-                .start_file(file_name, options)
+                .start_file(file_name.as_ref(), options)
                 .map_err(|err| format!("ZIP start_file failed: {err}"))?;
             writer
-                .write_all(bytes)
+                .write_all(bytes.as_ref())
                 .map_err(|err| format!("ZIP write failed: {err}"))?;
         }
         writer

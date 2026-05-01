@@ -107,6 +107,8 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; col
 .pill.warn .d{background:var(--peach);box-shadow:0 0 8px var(--peach)}
 .pill.run{color:var(--peach);border-color:rgba(255,184,154,.4);background:rgba(255,184,154,.08)}
 .pill.run .d{background:var(--peach);box-shadow:0 0 8px var(--peach);animation:p 1.6s infinite}
+.pill.cancel{color:var(--rose);border-color:rgba(255,107,139,.3);background:rgba(255,107,139,.06)}
+.pill.cancel .d{background:var(--rose)}
 
 .badge{
   display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;
