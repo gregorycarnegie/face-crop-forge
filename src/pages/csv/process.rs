@@ -509,7 +509,11 @@ pub(super) fn download_csv_zip(
         }
 
         let count = entries.len();
+        #[cfg(target_arch = "wasm32")]
+        let export_start = crate::runtime::now_ms();
         let zip_result = build_zip_bytes(&entries);
+        #[cfg(target_arch = "wasm32")]
+        let export_ms = crate::runtime::elapsed_ms_since(export_start);
         drop(entries);
         drop(outputs_snapshot);
 
@@ -522,8 +526,18 @@ pub(super) fn download_csv_zip(
                         progress.update(|p| {
                             p.complete(format!("CSV ZIP exported: {zip_name} ({count})"))
                         });
+                        #[cfg(target_arch = "wasm32")]
                         stats.update(|s| {
-                            s.push_log(format!("Exported CSV ZIP {zip_name} with {count} file(s)."))
+                            s.record_export(export_ms);
+                            s.push_log(format!(
+                                "Exported CSV ZIP {zip_name} with {count} file(s). ({export_ms}ms)"
+                            ));
+                        });
+                        #[cfg(not(target_arch = "wasm32"))]
+                        stats.update(|s| {
+                            s.push_log(format!(
+                                "Exported CSV ZIP {zip_name} with {count} file(s)."
+                            ))
                         });
                     }
                     Err(error) => {

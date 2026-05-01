@@ -63,6 +63,7 @@ pub struct BatchRuntimeStats {
     pub images_processed: u64,
     pub successful_processing: u64,
     pub processing_times_ms: Vec<u64>,
+    pub last_export_time_ms: Option<u64>,
     pub logs: Vec<String>,
 }
 
@@ -73,6 +74,7 @@ impl Default for BatchRuntimeStats {
             images_processed: 0,
             successful_processing: 0,
             processing_times_ms: Vec::new(),
+            last_export_time_ms: None,
             logs: vec!["Ready to process images...".to_string()],
         }
     }
@@ -123,6 +125,10 @@ impl BatchRuntimeStats {
         {
             (sum as f64 / self.processing_times_ms.len() as f64).round() as u64
         }
+    }
+
+    pub fn record_export(&mut self, time_ms: u64) {
+        self.last_export_time_ms = Some(time_ms);
     }
 
     pub fn push_log(&mut self, message: impl Into<String>) {
@@ -393,6 +399,61 @@ mod tests {
         assert_eq!(stats.total_faces_detected, 3);
         assert_eq!(stats.success_rate_pct(), 50);
         assert_eq!(stats.avg_processing_time_ms(), 200);
+    }
+
+    #[test]
+    fn large_batch_progress_and_stats_stay_accurate_over_500_images() {
+        use crate::batch_export::BatchProgress;
+
+        const N: usize = 500;
+        const FAILURES: usize = 47;
+
+        let mut progress = BatchProgress::default();
+        progress.start(N, "Running...");
+        assert!(progress.running);
+        assert!(!progress.cancelled);
+
+        let mut stats = BatchRuntimeStats::default();
+        for i in 0..N {
+            let success = i >= FAILURES;
+            progress.record_result(success);
+            // Alternate between 80 ms and 120 ms processing time.
+            let time_ms = if i % 2 == 0 { 80 } else { 120 };
+            stats.record_image(time_ms, if success { 1 } else { 0 }, success);
+        }
+
+        // Progress counters must be exact.
+        assert_eq!(progress.total, N);
+        assert_eq!(progress.processed, N);
+        assert_eq!(progress.failed, FAILURES);
+        assert_eq!(progress.percent(), 100);
+        assert!(progress.running, "running must still be true before complete()");
+
+        progress.complete(format!(
+            "Batch complete: {} processed, {} failed.",
+            N - FAILURES,
+            FAILURES
+        ));
+        assert!(!progress.running);
+        assert!(!progress.cancelled);
+
+        // Stats counters must be exact.
+        assert_eq!(stats.images_processed, N as u64);
+        assert_eq!(stats.successful_processing, (N - FAILURES) as u64);
+        assert_eq!(stats.total_faces_detected, (N - FAILURES) as u64);
+
+        // avg is over the last 50 entries only (ring buffer cap).
+        // Last 50 entries alternate 80/120 → avg = 100.
+        assert_eq!(
+            stats.avg_processing_time_ms(),
+            100,
+            "avg over last 50 entries must be 100 ms"
+        );
+
+        // Export time starts as None, is recorded after export.
+        assert!(stats.last_export_time_ms.is_none());
+        stats.record_export(312);
+        assert_eq!(stats.last_export_time_ms, Some(312));
     }
 
     #[test]

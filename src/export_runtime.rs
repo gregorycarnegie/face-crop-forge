@@ -160,4 +160,78 @@ mod tests {
         assert_eq!(png_name, "face_2.png");
         assert!(validate_export_filename_for_mime(&png_name, "image/png"));
     }
+
+    // ── ZIP regression guards ─────────────────────────────────────────────────
+
+    #[test]
+    fn zip_output_has_valid_header_and_all_entries_round_trip() {
+        let entries = vec![
+            ("alpha.png".to_string(), vec![1u8, 2, 3, 4, 5]),
+            ("beta.jpg".to_string(), vec![10u8, 20, 30]),
+            ("gamma.webp".to_string(), vec![255u8; 64]),
+        ];
+
+        let zip = build_zip_bytes(&entries).expect("build_zip_bytes failed");
+        assert_eq!(&zip[..4], b"PK\x03\x04", "ZIP local file header magic missing");
+
+        let cursor = std::io::Cursor::new(&zip);
+        let mut archive = zip::ZipArchive::new(cursor).expect("ZipArchive::new failed");
+        assert_eq!(archive.len(), 3, "wrong entry count after round-trip");
+
+        let mut names = std::collections::HashSet::new();
+        for i in 0..archive.len() {
+            let file = archive.by_index(i).unwrap();
+            names.insert(file.name().to_string());
+        }
+        assert!(names.contains("alpha.png"));
+        assert!(names.contains("beta.jpg"));
+        assert!(names.contains("gamma.webp"));
+    }
+
+    #[test]
+    fn zip_stored_compression_does_not_shrink_compressible_data() {
+        // 200 entries of 1 KiB each of all-zeros — maximally compressible.
+        // With Deflated this would shrink dramatically; Stored must not.
+        let entry_bytes = vec![0u8; 1024];
+        let entries: Vec<(String, &[u8])> = (0..200)
+            .map(|i| (format!("file_{i:03}.bin"), entry_bytes.as_slice()))
+            .collect();
+
+        let zip = build_zip_bytes(&entries).expect("build_zip_bytes failed");
+        assert_eq!(&zip[..4], b"PK\x03\x04");
+
+        // Stored ZIP output = Σ(entry sizes) + per-entry header overhead.
+        // Local header: 30 bytes + filename len. Central dir: 46 bytes + filename.
+        // End of central dir: 22 bytes. Filename ~12 chars each.
+        // Min bound: raw data alone (regression: compression accidentally re-enabled shrinks this).
+        let raw_total = 200 * 1024;
+        assert!(
+            zip.len() >= raw_total,
+            "ZIP ({} bytes) smaller than raw input ({raw_total} bytes) — compression re-enabled?",
+            zip.len()
+        );
+        // Max bound: raw + generous header overhead (~100 bytes per entry + end record).
+        let max_expected = raw_total + 200 * 100 + 100;
+        assert!(
+            zip.len() <= max_expected,
+            "ZIP ({} bytes) unexpectedly large (max {max_expected})",
+            zip.len()
+        );
+    }
+
+    #[test]
+    fn zip_entry_content_survives_round_trip_intact() {
+        let payload: Vec<u8> = (0u8..=255).cycle().take(512).collect();
+        let entries = [("data.bin".to_string(), payload.clone())];
+
+        let zip = build_zip_bytes(&entries).expect("build_zip_bytes failed");
+        let cursor = std::io::Cursor::new(&zip);
+        let mut archive = zip::ZipArchive::new(cursor).unwrap();
+        let mut file = archive.by_name("data.bin").expect("entry not found");
+
+        use std::io::Read;
+        let mut recovered = Vec::new();
+        file.read_to_end(&mut recovered).unwrap();
+        assert_eq!(recovered, payload, "entry content corrupted in round-trip");
+    }
 }

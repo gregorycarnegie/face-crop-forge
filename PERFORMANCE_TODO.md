@@ -115,11 +115,11 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 
 ## Priority 5 — Measurement and regression guards
 
-- [ ] Add performance regression tests or smoke checks.
-  - [ ] Add a small benchmark-like test for ZIP generation.
+- [x] Add performance regression tests or smoke checks.
+  - [x] Add a small benchmark-like test for ZIP generation.
   - [ ] Add browser-level timing smoke tests for single-image detection.
-  - [ ] Add a large-batch simulation test for queue/progress behaviour.
-  - [ ] Track average processing time and export time separately.
+  - [x] Add a large-batch simulation test for queue/progress behaviour.
+  - [x] Track average processing time and export time separately.
 
 - [ ] Add developer diagnostics.
   - [ ] Show selected detection backend: native FaceDetector or MediaPipe.
@@ -145,4 +145,4 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 - [x] Add `OffscreenCanvas` support inside the worker.
 - [x] Reduce memory duplication during ZIP export.
 - [x] Add cancellation and cleanup.
-- [ ] Add regression checks so performance does not drift backwards.
+- [x] Add regression checks so performance does not drift backwards.
