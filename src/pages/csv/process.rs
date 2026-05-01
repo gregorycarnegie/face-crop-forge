@@ -524,7 +524,7 @@ pub(super) fn download_csv_zip(
                 crate::export_runtime::zip_part_filename(&timestamp_token, part_idx, total_parts);
             #[cfg(target_arch = "wasm32")]
             let export_start = crate::runtime::now_ms();
-            let zip_result = build_zip_bytes(&entries[range]);
+            let zip_result = build_zip_bytes(&entries[range], settings_snapshot.zip_compress);
             #[cfg(target_arch = "wasm32")]
             {
                 total_export_ms =

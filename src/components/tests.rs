@@ -356,7 +356,7 @@ async fn crop_then_zip_produces_valid_archive() {
             .expect("crop failed");
 
     let zip_bytes =
-        crate::export_runtime::build_zip_bytes(&[("face_1.png".to_string(), crop_bytes)])
+        crate::export_runtime::build_zip_bytes(&[("face_1.png".to_string(), crop_bytes)], false)
             .expect("build_zip_bytes failed");
 
     // ZIP local file header magic: PK 0x03 0x04

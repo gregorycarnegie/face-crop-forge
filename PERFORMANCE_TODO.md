@@ -35,7 +35,7 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 - [x] Change ZIP export to use stored files by default.
   - [x] Review current `Deflated` ZIP compression.
   - [x] Use `Stored` for already-compressed image outputs such as JPG, PNG, and WebP.
-  - [ ] Optionally add an advanced setting: `Fast ZIP` vs `Smaller ZIP`.
+  - [x] Optionally add an advanced setting: `Fast ZIP` vs `Smaller ZIP`.
   - [ ] Benchmark export time and ZIP size difference.
 
 ## Priority 2 — Responsiveness and throughput

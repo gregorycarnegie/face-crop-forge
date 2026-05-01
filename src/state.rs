@@ -12,6 +12,7 @@ pub struct ProcessingSettings {
     pub jpeg_quality: f32,
     pub naming_template: String,
     pub min_confidence: f32,
+    pub zip_compress: bool,
 }
 
 impl Default for ProcessingSettings {
@@ -26,6 +27,7 @@ impl Default for ProcessingSettings {
             jpeg_quality: 0.85,
             naming_template: "face_{original}_{index}".to_string(),
             min_confidence: 0.5,
+            zip_compress: false,
         }
     }
 }

@@ -285,6 +285,10 @@ pub fn Csv(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                             <span><span>"Continue on error"</span><span class="desc">"Skip failures and keep processing"</span></span>
                             <input type="checkbox" prop:checked=move || continue_on_error.get() on:change=move |ev| continue_on_error.set(event_target_checked(&ev)) />
                         </label>
+                        <label class="toggle-row">
+                            <span><span>"Compress ZIP"</span><span class="desc">"Smaller file, slower export (Deflate)"</span></span>
+                            <input type="checkbox" prop:checked=move || settings.get().zip_compress on:change=move |ev| settings.update(|s| s.zip_compress = event_target_checked(&ev)) />
+                        </label>
                     </Panel>
                 </div>
             </aside>

@@ -107,16 +107,21 @@ pub fn current_timestamp_ms() -> u64 {
     }
 }
 
-pub fn build_zip_bytes<S, B>(entries: &[(S, B)]) -> Result<Vec<u8>, String>
+pub fn build_zip_bytes<S, B>(entries: &[(S, B)], compress: bool) -> Result<Vec<u8>, String>
 where
     S: AsRef<str>,
     B: AsRef<[u8]>,
 {
+    let method = if compress {
+        zip::CompressionMethod::Deflated
+    } else {
+        zip::CompressionMethod::Stored
+    };
     let mut cursor = std::io::Cursor::new(Vec::new());
     {
         let mut writer = zip::ZipWriter::new(&mut cursor);
-        let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Stored);
+        let options =
+            zip::write::SimpleFileOptions::default().compression_method(method);
         for (file_name, bytes) in entries {
             writer
                 .start_file(file_name.as_ref(), options)
@@ -304,7 +309,7 @@ mod tests {
             ("gamma.webp".to_string(), vec![255u8; 64]),
         ];
 
-        let zip = build_zip_bytes(&entries).expect("build_zip_bytes failed");
+        let zip = build_zip_bytes(&entries, false).expect("build_zip_bytes failed");
         assert_eq!(
             &zip[..4],
             b"PK\x03\x04",
@@ -334,7 +339,7 @@ mod tests {
             .map(|i| (format!("file_{i:03}.bin"), entry_bytes.as_slice()))
             .collect();
 
-        let zip = build_zip_bytes(&entries).expect("build_zip_bytes failed");
+        let zip = build_zip_bytes(&entries, false).expect("build_zip_bytes failed");
         assert_eq!(&zip[..4], b"PK\x03\x04");
 
         // Stored ZIP output = Σ(entry sizes) + per-entry header overhead.
@@ -361,7 +366,7 @@ mod tests {
         let payload: Vec<u8> = (0u8..=255).cycle().take(512).collect();
         let entries = [("data.bin".to_string(), payload.clone())];
 
-        let zip = build_zip_bytes(&entries).expect("build_zip_bytes failed");
+        let zip = build_zip_bytes(&entries, false).expect("build_zip_bytes failed");
         let cursor = std::io::Cursor::new(&zip);
         let mut archive = zip::ZipArchive::new(cursor).unwrap();
         let mut file = archive.by_name("data.bin").expect("entry not found");
@@ -370,5 +375,33 @@ mod tests {
         let mut recovered = Vec::new();
         file.read_to_end(&mut recovered).unwrap();
         assert_eq!(recovered, payload, "entry content corrupted in round-trip");
+    }
+
+    #[test]
+    fn zip_deflate_shrinks_compressible_data_and_round_trips() {
+        let entry_bytes = vec![0u8; 1024];
+        let entries: Vec<(String, &[u8])> = (0..200)
+            .map(|i| (format!("file_{i:03}.bin"), entry_bytes.as_slice()))
+            .collect();
+
+        let stored = build_zip_bytes(&entries, false).expect("stored failed");
+        let compressed = build_zip_bytes(&entries, true).expect("compressed failed");
+
+        assert!(
+            compressed.len() < stored.len(),
+            "deflated ZIP ({} bytes) must be smaller than stored ({} bytes)",
+            compressed.len(),
+            stored.len()
+        );
+
+        // Verify round-trip integrity of compressed archive.
+        let cursor = std::io::Cursor::new(&compressed);
+        let mut archive = zip::ZipArchive::new(cursor).expect("ZipArchive::new failed");
+        assert_eq!(archive.len(), 200);
+        let mut file = archive.by_index(0).unwrap();
+        use std::io::Read;
+        let mut recovered = Vec::new();
+        file.read_to_end(&mut recovered).unwrap();
+        assert_eq!(recovered, entry_bytes, "deflated content corrupted");
     }
 }
