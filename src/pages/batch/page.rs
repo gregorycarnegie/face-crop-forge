@@ -314,6 +314,8 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                             <p>"Off-thread crop via "<code>"OffscreenCanvas"</code>" runs on Chrome, Edge, and Firefox. Safari uses the main-thread canvas fallback."</p>
                             <p class="compat-head">"Large exports"</p>
                             <p>"Exports over 500 crops or 200 MB are split into numbered ZIP parts automatically."</p>
+                            <p class="compat-head">"Deployment headers"</p>
+                            <p><code>"Cross-Origin-Opener-Policy: same-origin"</code>" is recommended on all hosts. "<code>"Cross-Origin-Embedder-Policy: require-corp"</code>" requires every cross-origin asset (including MediaPipe model files) to carry a "<code>"Cross-Origin-Resource-Policy"</code>" header — only enable it if you self-host the models."</p>
                         </div>
                     </Panel>
                 </div>

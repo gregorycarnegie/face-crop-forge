@@ -571,6 +571,14 @@ pub(super) fn download_batch_zip(
         }
 
         let byte_sizes: Vec<usize> = entries.iter().map(|(_, b)| b.len()).collect();
+        let total_raw_bytes: usize = byte_sizes.iter().sum();
+        let total_raw_mb = total_raw_bytes as f64 / 1_048_576.0;
+        stats.update(|s| {
+            s.push_log(format!(
+                "Exporting {} file(s) (~{total_raw_mb:.1} MB uncompressed).",
+                byte_sizes.len()
+            ));
+        });
         let part_ranges = crate::export_runtime::compute_zip_part_ranges(
             &byte_sizes,
             crate::export_runtime::MAX_ZIP_PART_BYTES,

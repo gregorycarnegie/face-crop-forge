@@ -120,8 +120,7 @@ where
     let mut cursor = std::io::Cursor::new(Vec::new());
     {
         let mut writer = zip::ZipWriter::new(&mut cursor);
-        let options =
-            zip::write::SimpleFileOptions::default().compression_method(method);
+        let options = zip::write::SimpleFileOptions::default().compression_method(method);
         for (file_name, bytes) in entries {
             writer
                 .start_file(file_name.as_ref(), options)

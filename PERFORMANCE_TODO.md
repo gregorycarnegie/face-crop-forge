@@ -72,7 +72,7 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [x] Stream generated entries into the ZIP where possible.
   - [x] Release each crop buffer after it has been written.
   - [x] Avoid duplicating large byte arrays unnecessarily.
-  - [ ] Track approximate memory use during batch export.
+  - [x] Track approximate memory use during batch export.
 
 - [x] Split very large exports into multiple ZIP files.
   - [x] Define a sensible max entries-per-ZIP or max estimated ZIP size.
@@ -107,11 +107,11 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [ ] Consider preloading the fallback model only when needed.
   - [x] Show detection backend status clearly in the UI.
 
-- [ ] Review recommended deployment headers.
-  - [ ] Confirm static hosting can send `Cross-Origin-Opener-Policy: same-origin`.
-  - [ ] Confirm static hosting can send `Cross-Origin-Embedder-Policy: require-corp`.
-  - [ ] Confirm static hosting can send `Cross-Origin-Resource-Policy: cross-origin` where appropriate.
-  - [ ] Document any hosting limitations.
+- [x] Review recommended deployment headers.
+  - [x] Confirm static hosting can send `Cross-Origin-Opener-Policy: same-origin`.
+  - [x] Confirm static hosting can send `Cross-Origin-Embedder-Policy: require-corp`.
+  - [x] Confirm static hosting can send `Cross-Origin-Resource-Policy: cross-origin` where appropriate.
+  - [x] Document any hosting limitations.
 
 ## Priority 5 — Measurement and regression guards
 
