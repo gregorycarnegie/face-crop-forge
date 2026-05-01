@@ -47,11 +47,11 @@ A practical checklist for improving runtime performance, responsiveness, memory 
   - [x] Add a queue that can pause, resume, and cancel cleanly.
   - [x] Surface current concurrency in a developer stats panel.
 
-- [ ] Use `createImageBitmap()` where supported.
-  - [ ] Prefer `createImageBitmap(file)` over object URL + `HtmlImageElement` for decode paths where practical.
-  - [ ] Reuse the decoded bitmap for detection and cropping when possible.
-  - [ ] Close `ImageBitmap` objects once processing is finished.
-  - [ ] Keep the existing image element path as a compatibility fallback.
+- [x] Use `createImageBitmap()` where supported.
+  - [x] Prefer `createImageBitmap(file)` over object URL + `HtmlImageElement` for decode paths where practical.
+  - [x] Reuse the decoded bitmap for detection and cropping when possible.
+  - [x] Close `ImageBitmap` objects once processing is finished.
+  - [x] Keep the existing image element path as a compatibility fallback.
 
 - [x] Use `OffscreenCanvas` for worker-side crop generation.
   - [x] Detect support for `OffscreenCanvas`.

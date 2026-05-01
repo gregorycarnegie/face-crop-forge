@@ -288,15 +288,19 @@ pub async fn maybe_downscale_for_detection(
     let target_w = ((f64::from(dims.width) * scale).round() as u32).max(1);
     let target_h = ((f64::from(dims.height) * scale).round() as u32).max(1);
 
-    let object_url = web_sys::Url::create_object_url_with_blob(file)
-        .map_err(|err| format!("Downscale: create_object_url failed: {err:?}"))?;
-    let image = web_sys::HtmlImageElement::new().map_err(|err| format!("{err:?}"))?;
-    image.set_src(&object_url);
-    let decode_result = JsFuture::from(image.decode()).await;
-    let _ = web_sys::Url::revoke_object_url(&object_url);
-    decode_result.map_err(|err| format!("Downscale: image decode failed: {err:?}"))?;
+    let window = leptos::prelude::window();
+    let bitmap_js = JsFuture::from(
+        window
+            .create_image_bitmap_with_blob(file)
+            .map_err(|err| format!("Downscale: createImageBitmap failed: {err:?}"))?,
+    )
+    .await
+    .map_err(|err| format!("Downscale: image decode failed: {err:?}"))?;
+    let bitmap = bitmap_js
+        .dyn_into::<web_sys::ImageBitmap>()
+        .map_err(|_| "Failed to cast ImageBitmap".to_string())?;
 
-    let document = leptos::prelude::window()
+    let document = window
         .document()
         .ok_or_else(|| "Document unavailable".to_string())?;
     let canvas = document
@@ -313,14 +317,15 @@ pub async fn maybe_downscale_for_detection(
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .map_err(|_| "Failed to cast detection canvas context".to_string())?;
     context
-        .draw_image_with_html_image_element_and_dw_and_dh(
-            &image,
+        .draw_image_with_image_bitmap_and_dw_and_dh(
+            &bitmap,
             0.0,
             0.0,
             f64::from(target_w),
             f64::from(target_h),
         )
         .map_err(|err| format!("Downscale: draw failed: {err:?}"))?;
+    bitmap.close();
 
     let canvas_clone = canvas.clone();
     let blob_promise = js_sys::Promise::new(&mut move |resolve, reject| {
@@ -382,19 +387,24 @@ pub async fn maybe_downscale_for_detection(
 
 #[cfg(target_arch = "wasm32")]
 pub async fn decode_image_dimensions(file: &web_sys::File) -> Result<Dimensions, String> {
+    use wasm_bindgen::JsCast;
     use wasm_bindgen_futures::JsFuture;
 
-    let object_url =
-        web_sys::Url::create_object_url_with_blob(file).map_err(|err| format!("{err:?}"))?;
-    let image = web_sys::HtmlImageElement::new().map_err(|err| format!("{err:?}"))?;
-    image.set_src(&object_url);
-    let decode_result = JsFuture::from(image.decode()).await;
-    let _ = web_sys::Url::revoke_object_url(&object_url);
-    decode_result.map_err(|err| format!("Image decode failed: {err:?}"))?;
-    Ok(Dimensions {
-        width: image.natural_width(),
-        height: image.natural_height(),
-    })
+    let promise = leptos::prelude::window()
+        .create_image_bitmap_with_blob(file)
+        .map_err(|err| format!("createImageBitmap failed: {err:?}"))?;
+    let bitmap_js = JsFuture::from(promise)
+        .await
+        .map_err(|err| format!("Image decode failed: {err:?}"))?;
+    let bitmap = bitmap_js
+        .dyn_into::<web_sys::ImageBitmap>()
+        .map_err(|_| "Failed to cast ImageBitmap".to_string())?;
+    let dims = Dimensions {
+        width: bitmap.width(),
+        height: bitmap.height(),
+    };
+    bitmap.close();
+    Ok(dims)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
