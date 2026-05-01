@@ -477,6 +477,7 @@ pub(super) fn process_batch(
                 stats.update(|s| {
                     s.record_image(total_ms, face_count as u32, true);
                     s.record_backend(crate::worker_bridge::last_detection_backend_label());
+                    s.record_image_size(dimensions.width, dimensions.height, detection_scale);
                     s.push_log(format!("Processed {file_name}: {face_count} face(s)."));
                 });
                 #[cfg(target_arch = "wasm32")]

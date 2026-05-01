@@ -124,9 +124,9 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 - [x] Add developer diagnostics.
   - [x] Show selected detection backend: native FaceDetector or MediaPipe.
   - [x] Show decode time, detection time, crop time, and export time.
-  - [ ] Show image dimensions and downscale factor.
+  - [x] Show image dimensions and downscale factor.
   - [x] Show queue length and concurrency.
-  - [ ] Add a copyable debug summary for bug reports.
+  - [x] Add a copyable debug summary for bug reports.
 
 - [x] Add browser compatibility notes.
   - [x] Document which browsers support native `FaceDetector`.

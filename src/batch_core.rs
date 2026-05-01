@@ -57,7 +57,7 @@ pub struct BatchLazyLoadPlan {
     pub queued_pages: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BatchRuntimeStats {
     pub total_faces_detected: u64,
     pub images_processed: u64,
@@ -65,6 +65,8 @@ pub struct BatchRuntimeStats {
     pub processing_times_ms: Vec<u64>,
     pub last_export_time_ms: Option<u64>,
     pub detected_backend: String,
+    pub last_image_dimensions: Option<(u32, u32)>,
+    pub last_downscale_factor: f64,
     pub logs: Vec<String>,
 }
 
@@ -77,6 +79,8 @@ impl Default for BatchRuntimeStats {
             processing_times_ms: Vec::new(),
             last_export_time_ms: None,
             detected_backend: String::new(),
+            last_image_dimensions: None,
+            last_downscale_factor: 1.0,
             logs: vec!["Ready to process images...".to_string()],
         }
     }
@@ -137,6 +141,11 @@ impl BatchRuntimeStats {
         if self.detected_backend.is_empty() {
             self.detected_backend = backend.to_string();
         }
+    }
+
+    pub fn record_image_size(&mut self, width: u32, height: u32, downscale: f64) {
+        self.last_image_dimensions = Some((width, height));
+        self.last_downscale_factor = downscale;
     }
 
     pub fn push_log(&mut self, message: impl Into<String>) {

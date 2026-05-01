@@ -348,6 +348,61 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                         <div class="k">"concurrency"</div>
                         <div class="v">{move || format!("{} worker(s)", batch_concurrency_limit())}</div>
                     </div>
+                    <div class="d">
+                        <div class="k">"last image"</div>
+                        <div class="v">{move || stats.get().last_image_dimensions
+                            .map_or("—".to_string(), |(w, h)| format!("{w}×{h}"))
+                        }</div>
+                    </div>
+                    <div class="d">
+                        <div class="k">"detect scale"</div>
+                        <div class="v">{move || {
+                            let s = stats.get();
+                            if s.last_image_dimensions.is_none() {
+                                "—".to_string()
+                            } else if (s.last_downscale_factor - 1.0).abs() < 0.005 {
+                                "1× (full)".to_string()
+                            } else {
+                                format!("{:.2}×", s.last_downscale_factor)
+                            }
+                        }}</div>
+                    </div>
+                </div>
+                <div class="diag-copy-row">
+                    <button
+                        class="btn-copy-debug"
+                        title="Copy diagnostics to clipboard"
+                        on:click=move |_| {
+                            let s = stats.get_untracked();
+                            let conc = batch_concurrency_limit();
+                            let backend = if s.detected_backend.is_empty() { "—".to_string() } else { s.detected_backend.clone() };
+                            let avg_ms = s.avg_processing_time_ms();
+                            let export = s.last_export_time_ms.map_or("—".to_string(), |ms| format!("{ms}ms"));
+                            let dims = s.last_image_dimensions.map_or("—".to_string(), |(w, h)| format!("{w}×{h}"));
+                            let ds = if s.last_image_dimensions.is_none() {
+                                "—".to_string()
+                            } else if (s.last_downscale_factor - 1.0).abs() < 0.005 {
+                                "1× (full res)".to_string()
+                            } else {
+                                format!("{:.2}×", s.last_downscale_factor)
+                            };
+                            let summary = format!(
+                                "face-crop-forge diagnostics\nbackend:      {backend}\navg / img:    {avg_ms}ms\nlast export:  {export}\nconcurrency:  {conc} worker(s)\nlast image:   {dims}\ndetect scale: {ds}\nprocessed:    {proc}\nfaces:        {faces}\nfailed:       {failed}",
+                                proc = s.images_processed,
+                                faces = s.total_faces_detected,
+                                failed = s.images_processed.saturating_sub(s.successful_processing),
+                            );
+                            spawn_local(async move {
+                                #[cfg(target_arch = "wasm32")]
+                                {
+                                    use wasm_bindgen_futures::JsFuture;
+                                    let window = leptos::prelude::window();
+                                    let clipboard = window.navigator().clipboard();
+                                    let _ = JsFuture::from(clipboard.write_text(&summary)).await;
+                                }
+                            });
+                        }
+                    >"copy debug"</button>
                 </div>
 
                 <div class="gallery-card">
