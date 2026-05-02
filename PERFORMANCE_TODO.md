@@ -95,16 +95,17 @@ A practical checklist for improving runtime performance, responsiveness, memory 
 
 ## Priority 4 — Build and asset performance
 
-- [ ] Compare release profiles.
-  - [ ] Benchmark current `opt-level = "z"` release build.
-  - [ ] Benchmark `opt-level = 3` for runtime-heavy workloads.
-  - [ ] Compare WASM size, initial load time, and batch processing time.
-  - [ ] Pick the profile based on measured results, not assumptions.
+- [x] Compare release profiles.
+  - [x] Benchmark current `opt-level = "z"` release build.
+  - [x] Benchmark `opt-level = 3` for runtime-heavy workloads.
+  - [x] Compare WASM size and initial load time — `z` wins decisively (0.86 MB vs 2.11 MB post-wasm-opt, 2.5× smaller).
+  - [x] Confirm batch processing time via manual browser benchmark — `opt-level = 3` is ~9% faster (~40s vs ~44s on a representative batch).
+  - [x] Keep `opt-level = "z"`: 1.25 MB permanent download penalty for ~9% runtime gain is not worth it; Rust is not the primary bottleneck (MediaPipe and canvas ops dominate).
 
-- [ ] Review MediaPipe asset loading.
-  - [ ] Confirm MediaPipe assets are cached correctly by the browser.
-  - [ ] Ensure model and WASM files are served with appropriate cache headers.
-  - [ ] Consider preloading the fallback model only when needed.
+- [x] Review MediaPipe asset loading.
+  - [x] Confirm MediaPipe assets are cached correctly by the browser — self-hosted, ETags present; GitHub Pages TTL is ~10 min with fast 304 revalidation, which is adequate.
+  - [x] Ensure model and WASM files are served with appropriate cache headers — GitHub Pages does not support custom headers; self-hosted deployments should add `Cache-Control: public, max-age=31536000` once filenames are content-hashed.
+  - [x] Preload fallback model only when needed — `index.html` now injects `modulepreload` for `vision_bundle.mjs` and `preload` for `blaze_face_short_range.tflite` at parse time when `FaceDetector` is unavailable, eliminating first-image MediaPipe load latency on Firefox and Safari.
   - [x] Show detection backend status clearly in the UI.
 
 - [x] Review recommended deployment headers.
