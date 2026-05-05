@@ -1083,7 +1083,7 @@ mod tests {
         let settings = ProcessingSettings::default();
         let (left, top, w, h) = overlay_percent_crop_rect(&f, 1000.0, 800.0, &settings);
         for v in [left, top, w, h] {
-            assert!(v >= 0.0 && v <= 100.0, "percent value {v} out of range");
+            assert!((0.0..=100.0).contains(&v), "percent value {v} out of range");
         }
     }
 

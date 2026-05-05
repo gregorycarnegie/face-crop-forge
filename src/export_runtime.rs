@@ -74,6 +74,7 @@ pub fn validate_export_filename_for_mime(file_name: &str, mime_type: &str) -> bo
     file_name.to_ascii_lowercase().ends_with(&format!(".{ext}"))
 }
 
+#[allow(dead_code)]
 fn iso_timestamp_to_token(iso: &str) -> String {
     iso.chars()
         .filter(|ch| ch.is_ascii_digit() || *ch == 'T' || *ch == 'Z')
