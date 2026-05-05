@@ -7,10 +7,10 @@ use crate::export_runtime::{
 };
 use crate::runtime::{
     MAX_DETECTION_SIDE, ProcessedImageOutput, apply_detection_quality_filters, batch_file_label,
-    compute_source_crop_rect, crop_face_bytes_from_source, decode_image_dimensions,
-    elapsed_ms_since, is_probably_image_file, make_file_id, maybe_downscale_for_detection,
-    mime_type_for_output_format, object_url_for_bytes, object_url_for_file, revoke_object_url,
-    revoke_preview_urls, scale_detected_faces,
+    choose_primary_face, compute_source_crop_rect, crop_face_bytes_from_source,
+    decode_image_dimensions, elapsed_ms_since, is_probably_image_file, make_file_id,
+    maybe_downscale_for_detection, mime_type_for_output_format, object_url_for_bytes,
+    object_url_for_file, revoke_object_url, revoke_preview_urls, scale_detected_faces,
 };
 use crate::single_core::generate_face_filename;
 use crate::state::ProcessingSettings;
@@ -330,7 +330,7 @@ pub(super) fn process_batch(
                 #[cfg(target_arch = "wasm32")]
                 let detect_ms = elapsed_ms_since(detect_start);
                 let face_count = faces.len();
-                let Some(face) = faces.into_iter().next() else {
+                let Some(face) = choose_primary_face(&faces) else {
                     record_batch_failure(
                         ctx,
                         &id,

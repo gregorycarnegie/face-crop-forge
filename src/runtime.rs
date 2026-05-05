@@ -524,6 +524,21 @@ pub async fn crop_face_bytes_from_source(
     Err("Face crop export is only available on wasm32".to_string())
 }
 
+pub fn choose_primary_face(faces: &[DetectedFace]) -> Option<&DetectedFace> {
+    faces.iter().max_by(|a, b| {
+        let area_a = a.width * a.height;
+        let area_b = b.width * b.height;
+        a.confidence
+            .partial_cmp(&b.confidence)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                area_a
+                    .partial_cmp(&area_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    })
+}
+
 pub fn apply_detection_quality_filters(
     mut faces: Vec<DetectedFace>,
     settings: &ProcessingSettings,

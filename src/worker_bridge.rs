@@ -4,8 +4,18 @@
 #[cfg(target_arch = "wasm32")]
 const DETECTION_WORKER_SCRIPT: &str = r#"'use strict';
 var _detector = null;
-self.onmessage = async function(e) {
+var _jobQueue = Promise.resolve();
+
+self.onmessage = function(e) {
     var d = e.data;
+    _jobQueue = _jobQueue.then(function() {
+        return handleJob(d);
+    }).catch(function() {
+        return handleJob(d);
+    });
+};
+
+async function handleJob(d) {
     var id = d.id;
     var type = d.type || 'detect';
     if (type === 'detect') {
