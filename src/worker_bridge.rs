@@ -50,18 +50,11 @@ async function handleJob(d) {
                 self.postMessage({ id: id, error: 'OffscreenCanvas not supported' });
                 return;
             }
-            var bitmap;
-            try {
-                bitmap = await createImageBitmap(d.file, d.sx, d.sy, d.sw, d.sh, {
-                    resizeWidth: d.outW, resizeHeight: d.outH, resizeQuality: 'high'
-                });
-            } catch(_) {
-                bitmap = await createImageBitmap(d.file, d.sx, d.sy, d.sw, d.sh);
-            }
+            var fullBitmap = await createImageBitmap(d.file);
             var canvas = new OffscreenCanvas(d.outW, d.outH);
             var ctx = canvas.getContext('2d');
-            ctx.drawImage(bitmap, 0, 0, d.outW, d.outH);
-            bitmap.close();
+            ctx.drawImage(fullBitmap, d.sx, d.sy, d.sw, d.sh, 0, 0, d.outW, d.outH);
+            fullBitmap.close();
             var opts = { type: d.mime };
             if (d.quality != null) { opts.quality = d.quality; }
             var blob = await canvas.convertToBlob(opts);

@@ -423,14 +423,36 @@ pub async fn crop_face_bytes_from_source(
     use wasm_bindgen::{JsCast, JsValue};
     use wasm_bindgen_futures::JsFuture;
 
-    let document = leptos::prelude::window()
+    let window = leptos::prelude::window();
+    let document = window
         .document()
         .ok_or_else(|| "Document is unavailable".to_string())?;
-    let image = web_sys::HtmlImageElement::new().map_err(|err| format!("{err:?}"))?;
-    image.set_src(source_url);
-    JsFuture::from(image.decode())
+    let response_js = JsFuture::from(window.fetch_with_str(source_url))
         .await
-        .map_err(|err| format!("Image decode failed: {err:?}"))?;
+        .map_err(|err| format!("Image fetch failed: {err:?}"))?;
+    let response = response_js
+        .dyn_into::<web_sys::Response>()
+        .map_err(|_| "Failed to cast image fetch response".to_string())?;
+    let source_blob_js = JsFuture::from(
+        response
+            .blob()
+            .map_err(|err| format!("Image blob read failed: {err:?}"))?,
+    )
+    .await
+    .map_err(|err| format!("Image blob read failed: {err:?}"))?;
+    let source_blob = source_blob_js
+        .dyn_into::<web_sys::Blob>()
+        .map_err(|_| "Failed to cast image source blob".to_string())?;
+    let bitmap_js = JsFuture::from(
+        window
+            .create_image_bitmap_with_blob(&source_blob)
+            .map_err(|err| format!("Crop createImageBitmap failed: {err:?}"))?,
+    )
+    .await
+    .map_err(|err| format!("Crop image decode failed: {err:?}"))?;
+    let bitmap = bitmap_js
+        .dyn_into::<web_sys::ImageBitmap>()
+        .map_err(|_| "Failed to cast crop ImageBitmap".to_string())?;
 
     let canvas = document
         .create_element("canvas")
@@ -451,13 +473,13 @@ pub async fn crop_face_bytes_from_source(
 
     let source_rect = compute_source_crop_rect(
         face,
-        f64::from(image.natural_width()),
-        f64::from(image.natural_height()),
+        f64::from(bitmap.width()),
+        f64::from(bitmap.height()),
         settings,
     );
     context
-        .draw_image_with_html_image_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-            &image,
+        .draw_image_with_image_bitmap_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
+            &bitmap,
             source_rect.0,
             source_rect.1,
             source_rect.2,
@@ -468,6 +490,7 @@ pub async fn crop_face_bytes_from_source(
             f64::from(crop_h),
         )
         .map_err(|err| format!("Crop draw failed: {err:?}"))?;
+    bitmap.close();
 
     let mime = mime_type.to_string();
     let canvas_clone = canvas.clone();
