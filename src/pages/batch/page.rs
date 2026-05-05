@@ -392,6 +392,7 @@ pub fn Batch(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                             } else {
                                 format!("{:.2}×", s.last_downscale_factor)
                             };
+                            #[allow(unused_variables)]
                             let summary = format!(
                                 "face-crop-forge diagnostics\nbackend:      {backend}\navg / img:    {avg_ms}ms\nlast export:  {export}\nconcurrency:  {conc} worker(s)\nlast image:   {dims}\ndetect scale: {ds}\nprocessed:    {proc}\nfaces:        {faces}\nfailed:       {failed}",
                                 proc = s.images_processed,
