@@ -348,7 +348,7 @@ pub(super) fn process_batch(
                 #[cfg(target_arch = "wasm32")]
                 let crop_start = crate::runtime::now_ms();
                 let (src_x, src_y, src_w, src_h) = compute_source_crop_rect(
-                    &face,
+                    face,
                     f64::from(dimensions.width),
                     f64::from(dimensions.height),
                     &settings_snapshot,
@@ -398,7 +398,7 @@ pub(super) fn process_batch(
                         };
                         match crop_face_bytes_from_source(
                             &source_url,
-                            &face,
+                            face,
                             &settings_snapshot,
                             &mime_type,
                         )

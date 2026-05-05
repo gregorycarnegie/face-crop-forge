@@ -133,6 +133,7 @@ impl BatchRuntimeStats {
         }
     }
 
+    #[allow(dead_code)]
     pub fn record_export(&mut self, time_ms: u64) {
         self.last_export_time_ms = Some(time_ms);
     }
