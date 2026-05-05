@@ -7,10 +7,10 @@ use crate::export_runtime::{
     normalize_export_filename_for_mime, validate_export_filename_for_mime,
 };
 use crate::runtime::{
-    ProcessedImageOutput, apply_detection_quality_filters, batch_file_label,
+    MAX_DETECTION_SIDE, ProcessedImageOutput, apply_detection_quality_filters, batch_file_label,
     crop_face_bytes_from_source, decode_image_dimensions, elapsed_ms_since, is_probably_image_file,
-    make_file_id, mime_type_for_output_format, object_url_for_bytes, object_url_for_file,
-    revoke_object_url, revoke_preview_urls,
+    make_file_id, maybe_downscale_for_detection, mime_type_for_output_format, object_url_for_bytes,
+    object_url_for_file, revoke_object_url, revoke_preview_urls, scale_detected_faces,
 };
 use crate::state::ProcessingSettings;
 use crate::worker_bridge::detect_faces_with_worker;
@@ -265,23 +265,33 @@ pub(super) fn process_csv_batch(
                 continue;
             }
 
-            let faces = match detect_faces_with_worker("browser-face-detector", file.clone()).await
-            {
-                Ok(faces) => apply_detection_quality_filters(faces, &settings_snapshot),
-                Err(error) => {
-                    record_csv_failure(
-                        ctx,
-                        &id,
-                        elapsed_ms_since(start_ms),
-                        format!("Detection failed: {source_name}"),
-                        format!("Detection failed for {source_name}: {error}"),
-                    );
-                    if !continue_on_error {
-                        break;
+            let (detection_file, detection_scale) =
+                match maybe_downscale_for_detection(&file, dimensions, MAX_DETECTION_SIDE).await {
+                    Ok(pair) => pair,
+                    Err(_) => (file.clone(), 1.0),
+                };
+
+            let faces =
+                match detect_faces_with_worker("browser-face-detector", detection_file).await {
+                    Ok(raw) => {
+                        let scaled =
+                            scale_detected_faces(raw, 1.0 / detection_scale, 1.0 / detection_scale);
+                        apply_detection_quality_filters(scaled, &settings_snapshot)
                     }
-                    continue;
-                }
-            };
+                    Err(error) => {
+                        record_csv_failure(
+                            ctx,
+                            &id,
+                            elapsed_ms_since(start_ms),
+                            format!("Detection failed: {source_name}"),
+                            format!("Detection failed for {source_name}: {error}"),
+                        );
+                        if !continue_on_error {
+                            break;
+                        }
+                        continue;
+                    }
+                };
             let Some(face) = faces.first() else {
                 record_csv_failure(
                     ctx,
