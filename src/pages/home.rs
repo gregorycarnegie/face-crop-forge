@@ -238,6 +238,46 @@ pub fn Home(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
             </div>
         </section>
 
+        <section class="studio-promo">
+            <div class="sp-inner">
+                <div class="sp-text">
+                    <div class="sp-label">"Also available · Desktop"</div>
+                    <h2>
+                        "Want the native app?"<br/>
+                        <span class="sp-grad">"Face Crop Studio."</span>
+                    </h2>
+                    <p>
+                        "If you use this tool and want something you can install, "
+                        <b>"Face Crop Studio"</b>" is the desktop companion — same pipeline,
+                        no browser tab, no memory cap. Drop entire drives, run it fully offline,
+                        keep it open all day."
+                    </p>
+                    <div class="sp-cta">
+                        <a class="sp-btn-primary" href="https://facecropstudio.com/" target="_blank" rel="noopener">
+                            "Get Face Crop Studio →"
+                        </a>
+                        <a class="sp-btn-ghost" href="https://github.com/gregorycarnegie/face-crop-studio" target="_blank" rel="noopener">
+                            "View on GitHub"
+                        </a>
+                    </div>
+                </div>
+                <div class="sp-chips">
+                    <div class="sp-chip">
+                        <span class="sp-chip-k">"Type"</span>
+                        <span class="sp-chip-v">"Desktop app"</span>
+                    </div>
+                    <div class="sp-chip">
+                        <span class="sp-chip-k">"Source"</span>
+                        <span class="sp-chip-v">"Open source"</span>
+                    </div>
+                    <div class="sp-chip">
+                        <span class="sp-chip-k">"Connection"</span>
+                        <span class="sp-chip-v">"Fully offline"</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <Footer />
     }
 }
