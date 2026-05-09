@@ -399,11 +399,12 @@ body.batch-page {
 }
 .gallery::-webkit-scrollbar{width:8px}.gallery::-webkit-scrollbar-thumb{background:var(--rule-2);border-radius:8px}
 .gcell{
-  aspect-ratio:1;background:var(--bg-1);position:relative;cursor:pointer;overflow:hidden;transition:.15s
+  background:var(--bg-1);position:relative;cursor:pointer;overflow:hidden;transition:.15s
 }
+.gcell::after{content:"";display:block;padding-bottom:100%}
 .gcell:hover{background:var(--bg-2)}
-.gcell svg{width:100%;height:100%;display:block}
-.gcell img{width:100%;height:100%;object-fit:cover;display:block}
+.gcell svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.gcell img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .gcell .frm{position:absolute;border:1.5px solid var(--peach);border-radius:4px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
 .gcell .check{
   position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:6px;
