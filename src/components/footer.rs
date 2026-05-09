@@ -28,6 +28,7 @@ pub fn Footer() -> impl IntoView {
                     <h6>"Project"</h6>
                     <a href="https://github.com/gregorycarnegie/face-crop-forge">"github / face-crop-forge"</a>
                     <a href="https://github.com/gregorycarnegie/face-crop-forge/blob/main/LICENSE">"AGPL-3.0 license"</a>
+                    <a href=route_href(Route::Donate)>"Donate"</a>
                     <h6 style="margin-top:20px">"Desktop app"</h6>
                     <a href="https://facecropstudio.com/" target="_blank" rel="noopener">"facecropstudio.com"</a>
                     <a href="https://github.com/gregorycarnegie/face-crop-studio" target="_blank" rel="noopener">"github / face-crop-studio"</a>

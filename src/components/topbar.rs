@@ -24,6 +24,7 @@ pub fn Topbar(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                 <a href=route_href(Route::Single) class=move || active_class(Route::Single) on:click=move |ev| handle_nav(ev, Route::Single)>"Single"</a>
                 <a href=route_href(Route::Csv) class=move || active_class(Route::Csv) on:click=move |ev| handle_nav(ev, Route::Csv)>"CSV"</a>
                 <a href=route_href(Route::Docs) class=move || active_class(Route::Docs) on:click=move |ev| handle_nav(ev, Route::Docs)>"Docs"</a>
+                <a href=route_href(Route::Donate) class=move || active_class(Route::Donate) on:click=move |ev| handle_nav(ev, Route::Donate)>"Donate"</a>
             </nav>
             <div class="top-r">
                 <a class="ghost" href="https://github.com/gregorycarnegie/face-crop-forge">"GitHub ->"</a>
@@ -32,7 +33,7 @@ pub fn Topbar(route: Route, set_route: WriteSignal<Route>) -> impl IntoView {
                         Route::Home | Route::Csv => ("Open Batch", Route::Batch),
                         Route::Batch => ("Single image", Route::Single),
                         Route::Single => ("Open Batch", Route::Batch),
-                        Route::Docs => ("Open Batch", Route::Batch),
+                        Route::Docs | Route::Donate => ("Open Batch", Route::Batch),
                     };
                     view! {
                         <a class="pri" href=route_href(r) on:click=move |ev| handle_nav(ev, r)>

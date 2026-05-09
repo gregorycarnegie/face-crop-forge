@@ -8,6 +8,7 @@ pub enum Route {
     Single,
     Csv,
     Docs,
+    Donate,
 }
 
 impl Route {
@@ -18,6 +19,7 @@ impl Route {
             Route::Single => "/single",
             Route::Csv => "/csv",
             Route::Docs => "/docs",
+            Route::Donate => "/donate",
         }
     }
 }
@@ -75,6 +77,7 @@ pub fn route_from_path(path: &str) -> Route {
         "single" => Route::Single,
         "csv" => Route::Csv,
         "docs" => Route::Docs,
+        "donate" => Route::Donate,
         _ => Route::Home,
     }
 }
